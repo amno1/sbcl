@@ -19,6 +19,60 @@
   (inst jmp (register-inline-constant :qword -1))
   (register-inline-constant :oword -1)) ; for effect
 
+(macrolet
+    ((def ((name c-name pseudo-atomic &key do-not-preserve (stack-delta 0))
+           move-arg
+           move-result
+           &optional
+           (float-move 'movaps)
+           (float-size 16)
+           (float-sc 'single-reg))
+       `(define-assembly-routine
+            (,name (:return-style :none))
+            ()
+          (macrolet ((map-registers (op)
+                       (let ((registers (set-difference
+                                         '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn
+                                           r8-tn r9-tn r10-tn r11-tn)
+                                         ',do-not-preserve)))
+                         ;; Preserve alignment
+                         (when (oddp (length registers))
+                           (push (car registers) registers))
+                         `(progn
+                            ,@(loop for reg in (if (eq op 'pop)
+                                                   (reverse registers)
+                                                   registers)
+                                    collect
+                                    `(inst ,op ,reg)))))
+                     (map-floats (op)
+                       `(progn
+                          ,@(loop for i by ,float-size
+                                  for offset below 16
+                                  for float = (make-random-tn :kind :normal
+                                                              :sc (sc-or-lose ',float-sc)
+                                                              :offset offset)
+                                  collect
+                                  (if (eql op 'pop)
+                                      `(inst ,',float-move ,float (ea ,i rsp-tn))
+                                      `(inst ,',float-move (ea ,i rsp-tn) ,float))))))
+            (inst cld)
+            (inst push rbp-tn)
+            (inst mov rbp-tn rsp-tn)
+            (inst and rsp-tn (- ,float-size))
+            (inst sub rsp-tn (* 16 ,float-size))
+            (map-floats push)
+            (map-registers push)
+            ,@move-arg
+            (pseudo-atomic (:elide-if (not ,pseudo-atomic))
+              ;; asm routines can always call foreign code with a relative operand
+              (inst call (make-fixup ,c-name :foreign)))
+            ,@move-result
+            (map-registers pop)
+            (map-floats pop)
+            (inst mov rsp-tn rbp-tn)
+            (inst pop rbp-tn)
+            (inst ret ,stack-delta)))))
+
 ;;; The SYNCHRONOUS-TRAP routine has nearly the same effect as executing INT3
 ;;; but is more friendly to gdb. There may be some subtle bugs with regard to
 ;;; blocking/unblocking of async signals which arrive nearly around the same
@@ -44,6 +98,28 @@
     (inst vmovaps (ea (* (mod i 4) 32) rsp-tn) (sb-x86-64-asm::get-fpr :ymm i)))
 
   (call-c "synchronous_trap" rsp-tn (addressof (ea 24 rbp-tn)))
+
+  #+avx2
+  (progn
+    (def (alloc-tramp-avx2 "alloc" nil)
+        ((inst mov rdi-tn (ea 16 rbp-tn))) 
+      ((inst mov (ea 16 rbp-tn) rax-tn))
+      vmovaps
+      32
+      ymm-reg)
+    (def (alloc-tramp-r11-avx2 "alloc" nil
+                               :do-not-preserve (r11-tn)
+                               :stack-delta 8) ;; remove the size parameter
+        ((inst mov rdi-tn (ea 16 rbp-tn)))     ; arg
+      ((inst mov r11-tn rax-tn))
+        vmovaps
+        32
+        ymm-reg))
+  
+  #+immobile-space
+  (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
+    () ; no arg
+    ((inst mov r11-tn rax-tn))) ; result
 
   (dotimes (i 16)
     (inst vmovaps (sb-x86-64-asm::get-fpr :ymm i) (ea (* (mod i 4) 32) rsp-tn))
