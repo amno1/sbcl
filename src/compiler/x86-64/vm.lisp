@@ -555,25 +555,7 @@
                #-sb-xc-host (and (eq (heap-allocated-p value) :static)
                                  (< (get-lisp-obj-address value)
                                     (get-lisp-obj-address sb-lockless:+tail+))))
-       immediate-sc-number))
-    #+(and sb-simd-pack (not sb-xc-host))
-    (simd-pack
-     (typecase value
-       ((simd-pack double-float) double-sse-immediate-sc-number)
-       ((simd-pack single-float) single-sse-immediate-sc-number)
-       (t int-sse-immediate-sc-number)))
-    #+(and sb-simd-pack-256 (not sb-xc-host))
-    (simd-pack-256
-     (typecase value
-       ((simd-pack-256 double-float) double-avx2-immediate-sc-number)
-       ((simd-pack-256 single-float) single-avx2-immediate-sc-number)
-       (t int-avx2-immediate-sc-number)))
-    #+(and sb-simd-pack-512 (not sb-xc-host))
-    (simd-pack-512
-     (typecase value
-       ((simd-pack-512 double-float) double-avx512-immediate-sc-number)
-       ((simd-pack-512 single-float) single-avx512-immediate-sc-number)
-       (t int-avx512-immediate-sc-number)))))
+       immediate-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
