@@ -100,7 +100,15 @@
        (inst ret)))
     ((:none :full-call-no-return))))
 
-(defconstant xsave-area-size (+ 512 64 256))
+;; uncompacted XSAVE size for AVX-512:
+;; Legacy      (512) + Header (64) = 576
+;; YMM (256)   at offset 576       = 832
+;; GAP (256)   Intel MPX           = 1088
+;; KMM (64)    at offset 1088      = 1152
+;; ZMM (0-15)  (512) at 1152       = 1664
+;; GAP         (448) at 1664       = 2112
+;; ZMM (16-31) (1024) at 2112      = 3136
+(defconstant xsave-area-size (+ 512 64 256 256 64 512 448 1024))
 (defconstant xsave-area-alignment 64)
 
 ;;; Save or restore all FPRs at the stack pointer as it existed just prior

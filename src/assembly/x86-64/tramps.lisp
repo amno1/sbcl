@@ -71,14 +71,21 @@
                               (push `(inst ,mnemonic (ea ,displacement rax-tn) ,fpr))
                               (pop `(inst ,mnemonic ,fpr (ea ,displacement rax-tn))))))
                    (incf displacement fpr-align))))))
+
   ;; Caller will have allocated 512+64+256 bytes above the stack-pointer
   ;; prior to the CALL. Use that as the save area.
+  ;;
+  ;; For AVX: 512 (Legacy) + 64 (Header) + 256 (YMM) = 832 bytes.
+  ;; For AVX-512: the standard uncompacted XSAVE layout places the highest state
+  ;; in upper 16 ZMM registers, at offset 2112 with a size of 1024, so the caller
+  ;; must allocate 3136 bytes. The pointer must be 64-byte aligned.
   (define-assembly-routine (fpr-save) ()
+    ;; Both AVX and AVX-512 utilize the XSAVE instruction
     (test-cpu-feature cpu-has-ymm-registers)
-    (inst jmp :nz have-ymm)
+    (inst jmp :nz have-xsave)
     (do-fprs push :xmm)
     (inst ret)
-    HAVE-YMM
+    HAVE-XSAVE
     ;; Although most of the time RDX can be clobbered, some of the time it can't.
     ;; If WITH-REGISTERS-PRESERVED wraps a lisp function to make it appear to preserve
     ;; all registers, we obviously need to return its primary value in RDX.
@@ -86,22 +93,54 @@
     (inst push rdx-tn)
     (zeroize rdx-tn)
     ;; After PUSH the save area is at RSP+16 with the return-PC at [RSP+8]
-    ;; Zero the header
+    ;; Zero the 64-byte header. In standard XSAVE format, the header is always
+    ;; exactly at offset 512, regardless of enabled features.
     (inst lea rax-tn (ea (+ 512 16) rsp-tn))
     (dotimes (i 8)
       (inst mov (ea (ash i word-shift) rax-tn) rdx-tn))
+    (test-cpu-feature cpu-has-zmm-registers)
+    (inst jmp :z avx-only)
+    ;; AVX-512 state mask for EAX:
+    ;; x87(0) | SSE(1) | AVX(2) | KMM(5) | ZMM 0-15(6) | ZMM 16-31(7) = 0xE7
+    (inst mov rax-tn #xE7)
+    (inst jmp do-xsave)
+    AVX-ONLY
+    ;; AVX state mask for EAX:
+    ;; x87(0) | SSE(1) | AVX(2) = 0x7
     (inst mov rax-tn 7)
+    DO-XSAVE
+    ;; RDX is already zeroized from the header-clearing loop above.
+    ;; sets the upper 32-bits of the EDX:EAX mask to 0.
     (inst xsave (ea 16 rsp-tn))
     (inst pop rdx-tn))
 
   (define-assembly-routine (fpr-restore) ()
-    (test-cpu-feature cpu-has-ymm-registers) (inst jmp :nz have-ymm)
+    ;; Both AVX and AVX-512 utilize the XRSTOR instruction
+    (test-cpu-feature cpu-has-ymm-registers)
+    (inst jmp :nz have-xrstor)
     (do-fprs pop :xmm)
     (inst ret)
-    HAVE-YMM
+
+    HAVE-XRSTOR
     (inst push rdx-tn)
-    (inst mov rax-tn 7) ; OK to clobber RAX
+
+    (test-cpu-feature cpu-has-zmm-registers)
+    (inst jmp :z avx-only)
+
+    ;; AVX-512 restore mask for EAX:
+    ;; x87(0) | SSE(1) | AVX(2) | KMM(5) | ZMM 0-15(6) | ZMM 16-31(7) = 0xE7
+    (inst mov rax-tn #xE7)
+    (inst jmp do-xrstor)
+
+    AVX-ONLY
+    ;; AVX restore mask for EAX:
+    ;; x87(0) | SSE(1) | AVX(2) = 0x7
+    (inst mov rax-tn 7)
+
+    DO-XRSTOR
+    ;; Clear RDX so the upper 32 bits of the EDX:EAX execution mask are 0
     (zeroize rdx-tn)
+
     (inst xrstor (ea 16 rsp-tn))
     (inst pop rdx-tn)))
 
