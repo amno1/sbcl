@@ -244,7 +244,13 @@
    #:sse4.2-supported-p
    #:avx-supported-p
    #:avx2-supported-p
-   #:fma-supported-p))
+   #:fma-supported-p
+   #:avx512f-supported-p
+   #:avx512dq-supported-p
+   #:avx512ifma-supported-p
+   #:avx512cd-supported-p
+   #:avx512bw-supported-p
+   #:avx512vl-supported-p))
 
 (progn
   (defpackage #:sb-simd
