@@ -63,7 +63,7 @@
      t)))
 
 #+avx2
-(defun avx-registers-used-p ()
+(defun ymm-registers-used-p ()
   (when (and #+sb-xc-host (boundp '*component-being-compiled*))
     (let ((comp (component-info *component-being-compiled*)))
       (flet ((used-p (tn)
@@ -71,8 +71,24 @@
                    ((null tn))
                  (when (sc-is tn ymm-reg
                               int-avx2-reg
-                              double-avx2-reg single-avx2-reg)
-                   (return-from avx-registers-used-p t)))))
+                              double-avx2-reg
+                              single-avx2-reg)
+                   (return-from ymm-registers-used-p t)))))
+        (used-p (sb-c::ir2-component-normal-tns comp))
+        (used-p (sb-c::ir2-component-wired-tns comp))))))
+
+#+avx512
+(defun zmm-registers-used-p ()
+  (when (and #+sb-xc-host (boundp '*component-being-compiled*))
+    (let ((comp (component-info *component-being-compiled*)))
+      (flet ((used-p (tn)
+               (do ((tn tn (sb-c::tn-next tn)))
+                   ((null tn))
+                 (when (sc-is tn zmm-reg
+                              int-avx512-reg
+                              double-avx512-reg
+                              single-avx512-reg)
+                   (return-from zmm-registers-used-p t)))))
         (used-p (sb-c::ir2-component-normal-tns comp))
         (used-p (sb-c::ir2-component-wired-tns comp))))))
 
@@ -90,8 +106,11 @@
   (let ((to-r11 (location= result-tn r11-tn)))
     (invoke-asm-routine 'call (cond
                                 #+avx2
-                                ((avx-registers-used-p)
+                                ((ymm-registers-used-p)
                                  (if to-r11 'alloc-tramp-r11-avx2 'alloc-tramp-avx2))
+                                #+avx512
+                                ((zmm-registers-used-p)
+                                 (if to-r11 'alloc-tramp-r11-avx512 'alloc-tramp-avx512))
                                 (t
                                  (if to-r11 'alloc-tramp-r11 'alloc-tramp))) node)
     (unless to-r11

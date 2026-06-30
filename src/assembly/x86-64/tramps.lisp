@@ -27,51 +27,52 @@
              (float-move 'movaps)
              (float-size 16)
              (float-sc 'single-reg))
-       `(define-assembly-routine
-            (,name (:return-style :none))
-            ()
-          (macrolet ((map-registers (op)
-                       (let ((registers (set-difference
-                                         '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn
-                                           r8-tn r9-tn r10-tn r11-tn)
-                                         ',do-not-preserve)))
-                         ;; Preserve alignment
-                         (when (oddp (length registers))
-                           (push (car registers) registers))
+       (let ((float-count (if (eq float-sc 'zmm-reg) 32 16)))
+         `(define-assembly-routine
+              (,name (:return-style :none))
+              ()
+            (macrolet ((map-registers (op)
+                         (let ((registers (set-difference
+                                           '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn
+                                             r8-tn r9-tn r10-tn r11-tn)
+                                           ',do-not-preserve)))
+                           ;; Preserve alignment
+                           (when (oddp (length registers))
+                             (push (car registers) registers))
+                           `(progn
+                              ,@(loop for reg in (if (eq op 'pop)
+                                                     (reverse registers)
+                                                     registers)
+                                      collect
+                                      `(inst ,op ,reg)))))
+                       (map-floats (op)
                          `(progn
-                            ,@(loop for reg in (if (eq op 'pop)
-                                                   (reverse registers)
-                                                   registers)
+                            ,@(loop for i by ,float-size
+                                    for offset below ,float-count
+                                    for float = (make-random-tn :kind :normal
+                                                                :sc (sc-or-lose ',float-sc)
+                                                                :offset offset)
                                     collect
-                                    `(inst ,op ,reg)))))
-                     (map-floats (op)
-                       `(progn
-                          ,@(loop for i by ,float-size
-                                  for offset below 16
-                                  for float = (make-random-tn :kind :normal
-                                                              :sc (sc-or-lose ',float-sc)
-                                                              :offset offset)
-                                  collect
-                                  (if (eql op 'pop)
-                                      `(inst ,',float-move ,float (ea ,i rsp-tn))
-                                      `(inst ,',float-move (ea ,i rsp-tn) ,float))))))
-            (inst cld)
-            (inst push rbp-tn)
-            (inst mov rbp-tn rsp-tn)
-            (inst and rsp-tn (- ,float-size))
-            (inst sub rsp-tn (* 16 ,float-size))
-            (map-floats push)
-            (map-registers push)
-            ,@move-arg
-            (pseudo-atomic (:elide-if (not ,pseudo-atomic))
-              ;; asm routines can always call foreign code with a relative operand
-              (inst call (make-fixup ,c-name :foreign)))
-            ,@move-result
-            (map-registers pop)
-            (map-floats pop)
-            (inst mov rsp-tn rbp-tn)
-            (inst pop rbp-tn)
-            (inst ret ,stack-delta)))))
+                                    (if (eql op 'pop)
+                                        `(inst ,',float-move ,float (ea ,i rsp-tn))
+                                        `(inst ,',float-move (ea ,i rsp-tn) ,float))))))
+              (inst cld)
+              (inst push rbp-tn)
+              (inst mov rbp-tn rsp-tn)
+              (inst and rsp-tn (- ,float-size))
+              (inst sub rsp-tn (* ,float-count ,float-size))
+              (map-floats push)
+              (map-registers push)
+              ,@move-arg
+              (pseudo-atomic (:elide-if (not ,pseudo-atomic))
+                ;; asm routines can always call foreign code with a relative operand
+                (inst call (make-fixup ,c-name :foreign)))
+              ,@move-result
+              (map-registers pop)
+              (map-floats pop)
+              (inst mov rsp-tn rbp-tn)
+              (inst pop rbp-tn)
+              (inst ret ,stack-delta))))))
 
 ;;; The SYNCHRONOUS-TRAP routine has nearly the same effect as executing INT3
 ;;; but is more friendly to gdb. There may be some subtle bugs with regard to
@@ -86,16 +87,22 @@
     (inst pushf)
     (inst push rbp-tn)
     (inst mov rbp-tn rsp-tn)
-    (inst and rsp-tn (- 32))
+    #-avx512 (inst and rsp-tn (- 32))
+    #+avx512 (inst and rsp-tn (- 64))
     ;; Arrange in the utterly confusing order that a linux signal context has them
     ;; so that we can memcpy() into a context. Push RBX twice to maintain alignment.
     ;; This enum is usually in "/usr/include/x86_64-linux-gnu/sys/ucontext.h"
     (regs-pushlist rsp rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
     ;;                                 ^^^ technically this is the slot for RBP
-
+    #-avx512
     (do ((i 15 (1- i))) ((< i 0))
       (when (member i '(15 11 7 3)) (inst sub rsp-tn (* 4 32))) ; 4 32-byte regs
       (inst vmovaps (ea (* (mod i 4) 32) rsp-tn) (sb-x86-64-asm::get-fpr :ymm i)))
+
+    #+avx512
+    (do ((i 31 (1- i))) ((< i 0))
+      (when (member i '(31 27 23 19 15 11 7 3)) (inst sub rsp-tn (* 4 64))) ; 4 64-byte regs
+      (inst vmovups (ea (* (mod i 4) 64) rsp-tn) (sb-x86-64-asm::get-fpr :zmm i)))
 
     (call-c "synchronous_trap" rsp-tn (addressof (ea 24 rbp-tn)))
 
@@ -116,14 +123,37 @@
         32
         ymm-reg))
 
+    #+avx512
+    (progn
+      (def (alloc-tramp-avx512 "alloc" nil)
+          ((inst mov rdi-tn (ea 16 rbp-tn)))
+        ((inst mov (ea 16 rbp-tn) rax-tn))
+        vmovaps
+        64
+        zmm-reg)
+      (def (alloc-tramp-r11-avx512 "alloc" nil
+                                   :do-not-preserve (r11-tn)
+                                   :stack-delta 8)
+          ((inst mov rdi-tn (ea 16 rbp-tn)))     ; arg
+        ((inst mov r11-tn rax-tn))
+        vmovaps
+        64
+        zmm-reg))
+
     #+immobile-space
     (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
         () ; no arg
       ((inst mov r11-tn rax-tn))) ; result
 
+    #-avx512
     (dotimes (i 16)
       (inst vmovaps (sb-x86-64-asm::get-fpr :ymm i) (ea (* (mod i 4) 32) rsp-tn))
       (when (member i '(15 11 7 3)) (inst add rsp-tn (* 4 32)))) ; 4 32-byte regs
+
+    #+avx512
+    (dotimes (i 32)
+      (inst vmovaps (sb-x86-64-asm::get-fpr :zmm i) (ea (* (mod i 4) 64) rsp-tn))
+      (when (member i '(31 27 23 19 15 11 7 3)) (inst add rsp-tn (* 4 64))))
 
     (regs-poplist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
     (inst leave)
@@ -134,14 +164,16 @@
              (multiple-value-bind (mnemonic fpr-align)
                  (ecase regset
                    (:xmm (values 'movaps 16))
-                   (:ymm (values 'vmovaps 32)))
+                   (:ymm (values 'vmovaps 32))
+                   (:zmm (values 'vmovaps 64)))
                (collect ((insts))
                  ;; RAX as the base register encodes shorter than RSP in an EA.
                  (insts '(inst lea rax-tn (ea 8 rsp-tn)))
-                 (dotimes (regno 16 `(progn ,@(insts)))
-                   (when (>= displacement 128)
-                     (insts '(inst add rax-tn 128))
-                     (decf displacement 128)) ; EA displacement stays 1-byte this way
+                 (dotimes (regno (if (eq regset :zmm) 32 16) `(progn ,@(insts)))
+                   (unless (eq regset :zmm) ;; not needed vor evex
+                     (when (>= displacement 128)
+                       (insts '(inst add rax-tn 128))
+                       (decf displacement 128))) ; EA displacement stays 1-byte this way
                    (let ((fpr `(sb-x86-64-asm::get-fpr ,regset ,regno)))
                      (insts (ecase operation
                               (push `(inst ,mnemonic (ea ,displacement rax-tn) ,fpr))
