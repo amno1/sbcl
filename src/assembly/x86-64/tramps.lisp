@@ -24,9 +24,9 @@
            move-arg
            move-result
            &optional
-           (float-move 'movaps)
-           (float-size 16)
-           (float-sc 'single-reg))
+             (float-move 'movaps)
+             (float-size 16)
+             (float-sc 'single-reg))
        `(define-assembly-routine
             (,name (:return-style :none))
             ()
@@ -81,53 +81,53 @@
 ;;; pseudo-atomic sequence, and will emit trapping instructions for TYPE-ERROR
 ;;; and other traps.
 ;;; For either feature, use at your own risk.
-#+(or sw-int-avoidance partial-sw-int-avoidance) ; "software interrupt avoidance"
-(define-assembly-routine (synchronous-trap) ()
-  (inst pushf)
-  (inst push rbp-tn)
-  (inst mov rbp-tn rsp-tn)
-  (inst and rsp-tn (- 32))
-  ;; Arrange in the utterly confusing order that a linux signal context has them
-  ;; so that we can memcpy() into a context. Push RBX twice to maintain alignment.
-  ;; This enum is usually in "/usr/include/x86_64-linux-gnu/sys/ucontext.h"
-  (regs-pushlist rsp rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
-  ;;                                 ^^^ technically this is the slot for RBP
+  #+(or sw-int-avoidance partial-sw-int-avoidance) ; "software interrupt avoidance"
+  (define-assembly-routine (synchronous-trap) ()
+    (inst pushf)
+    (inst push rbp-tn)
+    (inst mov rbp-tn rsp-tn)
+    (inst and rsp-tn (- 32))
+    ;; Arrange in the utterly confusing order that a linux signal context has them
+    ;; so that we can memcpy() into a context. Push RBX twice to maintain alignment.
+    ;; This enum is usually in "/usr/include/x86_64-linux-gnu/sys/ucontext.h"
+    (regs-pushlist rsp rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
+    ;;                                 ^^^ technically this is the slot for RBP
 
-  (do ((i 15 (1- i))) ((< i 0))
-    (when (member i '(15 11 7 3)) (inst sub rsp-tn (* 4 32))) ; 4 32-byte regs
-    (inst vmovaps (ea (* (mod i 4) 32) rsp-tn) (sb-x86-64-asm::get-fpr :ymm i)))
+    (do ((i 15 (1- i))) ((< i 0))
+      (when (member i '(15 11 7 3)) (inst sub rsp-tn (* 4 32))) ; 4 32-byte regs
+      (inst vmovaps (ea (* (mod i 4) 32) rsp-tn) (sb-x86-64-asm::get-fpr :ymm i)))
 
-  (call-c "synchronous_trap" rsp-tn (addressof (ea 24 rbp-tn)))
+    (call-c "synchronous_trap" rsp-tn (addressof (ea 24 rbp-tn)))
 
-  #+avx2
-  (progn
-    (def (alloc-tramp-avx2 "alloc" nil)
-        ((inst mov rdi-tn (ea 16 rbp-tn))) 
-      ((inst mov (ea 16 rbp-tn) rax-tn))
-      vmovaps
-      32
-      ymm-reg)
-    (def (alloc-tramp-r11-avx2 "alloc" nil
-                               :do-not-preserve (r11-tn)
-                               :stack-delta 8) ;; remove the size parameter
-        ((inst mov rdi-tn (ea 16 rbp-tn)))     ; arg
-      ((inst mov r11-tn rax-tn))
+    #+avx2
+    (progn
+      (def (alloc-tramp-avx2 "alloc" nil)
+          ((inst mov rdi-tn (ea 16 rbp-tn)))
+        ((inst mov (ea 16 rbp-tn) rax-tn))
+        vmovaps
+        32
+        ymm-reg)
+      (def (alloc-tramp-r11-avx2 "alloc" nil
+                                 :do-not-preserve (r11-tn)
+                                 :stack-delta 8) ;; remove the size parameter
+          ((inst mov rdi-tn (ea 16 rbp-tn)))     ; arg
+        ((inst mov r11-tn rax-tn))
         vmovaps
         32
         ymm-reg))
-  
-  #+immobile-space
-  (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
-    () ; no arg
-    ((inst mov r11-tn rax-tn))) ; result
 
-  (dotimes (i 16)
-    (inst vmovaps (sb-x86-64-asm::get-fpr :ymm i) (ea (* (mod i 4) 32) rsp-tn))
-    (when (member i '(15 11 7 3)) (inst add rsp-tn (* 4 32)))) ; 4 32-byte regs
+    #+immobile-space
+    (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
+        () ; no arg
+      ((inst mov r11-tn rax-tn))) ; result
 
-  (regs-poplist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
-  (inst leave)
-  (inst popf))
+    (dotimes (i 16)
+      (inst vmovaps (sb-x86-64-asm::get-fpr :ymm i) (ea (* (mod i 4) 32) rsp-tn))
+      (when (member i '(15 11 7 3)) (inst add rsp-tn (* 4 32)))) ; 4 32-byte regs
+
+    (regs-poplist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
+    (inst leave)
+    (inst popf))
 
 (macrolet ((do-fprs (operation regset &aux (displacement 0))
              ;; The YMM case could be removed now I suppose, since we use XSAVE + XRSTOR
@@ -218,7 +218,7 @@
     (zeroize rdx-tn)
 
     (inst xrstor (ea 16 rsp-tn))
-    (inst pop rdx-tn)))
+    (inst pop rdx-tn))))
 
 (define-assembly-routine (switch-to-arena (:return-style :raw)) ()
   ;; RSI and RDI are vop temps, so don't bother preserving them
@@ -271,40 +271,40 @@
                      (inst test rax-tn rax-tn)
                      (inst jmp :z RESTART))))
 
-(def-routine-pair (alloc-tramp) ()
-  (with-registers-preserved (c)
-    RESTART
-    (call-c "alloc" (ea 16 rbp-tn) system-tlab-p)
-    (test-arena-exhausted :bytes-non-list)
-    SUCCESS
-    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
+  (def-routine-pair (alloc-tramp) ()
+    (with-registers-preserved (c)
+      RESTART
+      (call-c "alloc" (ea 16 rbp-tn) system-tlab-p)
+      (test-arena-exhausted :bytes-non-list)
+      SUCCESS
+      (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
-  (with-registers-preserved (c)
-    RESTART
-    (call-c "alloc_list" (ea 16 rbp-tn) system-tlab-p)
-    (test-arena-exhausted :bytes-list)
-    SUCCESS
-    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
+  (def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
+    (with-registers-preserved (c)
+      RESTART
+      (call-c "alloc_list" (ea 16 rbp-tn) system-tlab-p)
+      (test-arena-exhausted :bytes-list)
+      SUCCESS
+      (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(def-routine-pair (listify-&rest (:return-style :none)) ()
-  (with-registers-preserved (c)
-    RESTART
-    (call-c "listify_rest_arg" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
-    (test-arena-exhausted :list-elts)
-    SUCCESS
-    (inst mov (ea 24 rbp-tn) rax-tn))   ; result
-  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+  (def-routine-pair (listify-&rest (:return-style :none)) ()
+    (with-registers-preserved (c)
+      RESTART
+      (call-c "listify_rest_arg" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
+      (test-arena-exhausted :list-elts)
+      SUCCESS
+      (inst mov (ea 24 rbp-tn) rax-tn))   ; result
+    (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
-(def-routine-pair (make-list (:return-style :none)) ()
-  (with-registers-preserved (c)
-    RESTART
-    (call-c "make_list" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
-    (test-arena-exhausted :list-elts)
-    SUCCESS
-    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
-  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
-)
+  (def-routine-pair (make-list (:return-style :none)) ()
+    (with-registers-preserved (c)
+      RESTART
+      (call-c "make_list" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
+      (test-arena-exhausted :list-elts)
+      SUCCESS
+      (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+    (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+  )
 
 (define-assembly-routine (alloc-funinstance) ()
   (with-registers-preserved (c)
@@ -414,18 +414,18 @@
 
 #+ultrafutex
 (progn
-(define-assembly-routine (mutex-wake-waiter (:return-style :raw)) ()
-  (with-registers-preserved (lisp)
-    (inst call (make-fixup "lispmutex_wake_waiter" :foreign)))) ; no args!
+  (define-assembly-routine (mutex-wake-waiter (:return-style :raw)) ()
+    (with-registers-preserved (lisp)
+      (inst call (make-fixup "lispmutex_wake_waiter" :foreign)))) ; no args!
 
-(define-assembly-routine (mutex-unlock (:return-style :raw)) ()
-  ;; There are no registers reserved for this asm routine
-  (inst push rax-tn)
-  (inst mov rax-tn (thread-tls-ea (load-time-tls-offset '*current-mutex*)))
-  (inst mov :qword (mutex-slot rax-tn %owner) 0)
-  (inst dec :lock :byte (mutex-slot rax-tn state))
-  (inst jmp :z uncontended) ; if ZF then previous value was 1, no waiters
-  (inst call (make-fixup 'mutex-wake-waiter :assembly-routine))
-  uncontended
-  (inst pop rax-tn))
-) ; end PROGN
+  (define-assembly-routine (mutex-unlock (:return-style :raw)) ()
+    ;; There are no registers reserved for this asm routine
+    (inst push rax-tn)
+    (inst mov rax-tn (thread-tls-ea (load-time-tls-offset '*current-mutex*)))
+    (inst mov :qword (mutex-slot rax-tn %owner) 0)
+    (inst dec :lock :byte (mutex-slot rax-tn state))
+    (inst jmp :z uncontended) ; if ZF then previous value was 1, no waiters
+    (inst call (make-fixup 'mutex-wake-waiter :assembly-routine))
+    uncontended
+    (inst pop rax-tn))
+  ) ; end PROGN
