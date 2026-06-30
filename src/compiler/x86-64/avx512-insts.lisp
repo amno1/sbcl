@@ -51,14 +51,11 @@
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem-dir prefix #b0001000)
                 (:emitter
                  (cond ((ea-p src)
-                        ;; (format *error-output* "EAP SRC ~A DST ~A ~%"
-                        ;;         (if (zmm-register-p dst) 'ZMM 'XMM) dst)
                         (if (zmm-register-p dst)
                             (emit-avx512-inst segment src dst ,prefix #x10)
                             (emit-avx2-inst segment src dst ,prefix #x10 :l 0)))
 
                        ((and (ea-p dst) (zmm-register-p src))
-                        ;; (format *error-output* "ZMM DST SRC~%")
                         (emit-avx512-inst segment dst src ,prefix #x11))
 
                        ((and (integerp src) src2 (register-p src2))
@@ -69,25 +66,19 @@
                        ((and src2 (or (zmm-register-p dst)
                                       (zmm-register-p src)
                                       (zmm-register-p src2)))
-                        ;; (format *error-output* "SEG: ~A S: ~A D: ~A P: ~A SRC: ~A~%"
-                        ;;         segment src dst ,prefix src2)
                         (emit-avx512-inst segment src dst ,prefix #x10 :vvvv src2))
 
                        ((or (zmm-register-p dst)
                             (zmm-register-p src))
-                        ;; (format *error-output* "SEG: ~A S: ~A D: ~A P: ~A~%"
-                        ;;         segment src dst ,prefix)
                         (emit-avx512-inst segment src dst ,prefix #x10))
 
                        ((and src src2 dst (xmm-register-p dst))
                         (emit-avx2-inst segment src dst ,prefix #x10 :vvvv src2 :l 0))
 
                        ((xmm-register-p dst)
-                        ;; (format *error-output* "XMM DST~%")
                         (emit-avx2-inst segment src dst ,prefix #x10 :l 0))
 
                        (t
-                        (format *error-output* "E: ~a ~a ~a~%" src src2 dst)
                         (aver (xmm-register-p src))
                         (emit-avx2-inst segment dst src ,prefix #x11 :l 0)))))))
   (def vmovsd #xf2)
