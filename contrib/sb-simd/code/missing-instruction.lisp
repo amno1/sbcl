@@ -24,12 +24,14 @@
 (defmacro define-missing-instruction
     (name &key (required-arguments '()) (optional-arguments '()) (rest-argument nil))
   (assert (find-function-record name))
-  `(defun ,name (,@required-arguments
-                 ,@optional-arguments
-                 ,@(when rest-argument `(&rest ,rest-argument)))
-     (declare (ignore ,@required-arguments
-                      ,@optional-arguments
-                      ,@(when rest-argument `(,rest-argument))))
-     (missing-instruction
-      (load-time-value
-       (find-function-record ',name)))))
+  (let ((all-args `(,@required-arguments
+                    ,@optional-arguments
+                    ,@(when rest-argument (list rest-argument)))))
+    `(defun ,name (,@required-arguments
+                   ,@optional-arguments
+                   ,@(when rest-argument `(&rest ,rest-argument)))
+       ,@(when all-args
+           `((declare (ignore ,@all-args))))
+       (missing-instruction
+        (load-time-value
+         (find-function-record ',name))))))
