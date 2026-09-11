@@ -2392,6 +2392,35 @@
     (:export
      #:u8!
      #:u16!
+     ;; mask64
+     #:mask64
+     #:mask64-value
+     #:mask64-and
+     #:mask64-or
+     #:mask64-xor
+     #:two-arg-mask64-and
+     #:two-arg-mask64-or
+     #:two-arg-mask64-xor
+     #:mask64-andc1
+     #:mask64-xnor
+     #:mask64-not
+     #:mask64-shiftl
+     #:mask64-shiftr
+     #:mask64-count
+     #:mask64-zerop
+     #:mask64-all-p
+     #:two-arg-u8.64-mask=
+     #:two-arg-u8.64-mask/=
+     #:two-arg-u8.64-mask<
+     #:two-arg-u8.64-mask<=
+     #:two-arg-u8.64-mask>
+     #:two-arg-u8.64-mask>=
+     #:u8.64-mask=
+     #:u8.64-mask/=
+     #:u8.64-mask<
+     #:u8.64-mask<=
+     #:u8.64-mask>
+     #:u8.64-mask>=
      ;; u8.64
      #:make-u8.64
      #:u8.64

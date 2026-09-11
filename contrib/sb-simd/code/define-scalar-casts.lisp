@@ -61,7 +61,14 @@
                      `((sb-c:deftransform ,name ((x) (single-float) *)
                          '(sb-simd-avx::f64-from-f32 x))
                        (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
-                         '(sb-simd-avx::f64-from-s64 x))))))
+                         '(sb-simd-avx::f64-from-s64 x))))
+                    ;; MASK64 is a bit pattern, not a number -- unlike the
+                    ;; float casts above, there's exactly one source type
+                    ;; worth optimizing here, not a family of them.
+                    #+x86-64
+                    (sb-simd-avx512bw:mask64
+                     `((sb-c:deftransform ,name ((x) ((unsigned-byte 64)) *)
+                         '(sb-ext:%make-simd-pack-512-mask x))))))
               (defun ,name (x)
                 (typecase x
                   (,name x)
@@ -92,7 +99,10 @@
                       (sb-simd-avx:f64
                        `((sb-simd-avx:f32 (call-vop sb-simd-avx::f64-from-f32 x))
                          (sb-simd-avx:s64 (call-vop sb-simd-avx::f64-from-s64 x))
-                         (real (coerce x ',name)))))
+                         (real (coerce x ',name))))
+                      #+x86-64
+                      (sb-simd-avx512bw:mask64
+                       `(((unsigned-byte 64) (sb-ext:%make-simd-pack-512-mask x)))))
                   (otherwise (,err x))))))))
      (define-scalar-casts ()
        `(progn

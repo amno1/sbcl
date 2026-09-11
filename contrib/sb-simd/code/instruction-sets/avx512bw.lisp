@@ -3,6 +3,15 @@
 (define-instruction-set :avx512bw
   (:test (avx512bw-supported-p))
   (:include :avx512f)
+  (:scalars
+   ;; A 64-bit AVX-512 mask (opmask/k) register value, boxed as
+   ;; SB-EXT:SIMD-PACK-512-MASK. Unlike the vector types above, this does
+   ;; not live in an XMM/YMM/ZMM register -- k0-k7 are a separate register
+   ;; file, moved to/from GPRs and memory only via KMOV{B,W,D,Q}. Kept
+   ;; here (rather than in AVX512F) because KMOVQ/KANDQ/... -- the 64-bit
+   ;; forms this file uses -- require AVX512BW; see the comment on
+   ;; MASK64-COUNT below for the width story in more detail.
+   (mask64 64 sb-ext:simd-pack-512-mask #:simd-pack-512-mask-type (#:mask-reg)))
   (:simd-packs
    (u8.64  u8  512 #:simd-pack-512-ub8    (#:int-avx512-reg))
    (u16.32 u16 512 #:simd-pack-512-ub16   (#:int-avx512-reg))
@@ -84,6 +93,35 @@
    (two-arg-u16.32>=      nil            (u16.32) (u16.32 u16.32) :cost 4 :encoding :custom)
    (u16.16-from-u16.32    #:vextracti32x8 (u16.16) (u16.32 imm1)  :cost 1)
    (u16.32-insert-u16.16  #:vinserti32x8 (u16.32) (u16.32 u16.16 imm1) :cost 1)
+
+   ;; mask64: boolean algebra and shifts on a whole k-register at once,
+   ;; via the dedicated k-ALU (KANDQ/KORQ/... never touch a zmm or a GPR
+   ;; ALU port at all). See DEFINE-CUSTOM-VOPS.LISP for MASK64-COUNT and
+   ;; the mask-producing comparisons (encoding :CUSTOM, so they don't
+   ;; appear here).
+   (two-arg-mask64-and #:kandq  (mask64) (mask64 mask64) :cost 1 :associative t)
+   (two-arg-mask64-or  #:korq   (mask64) (mask64 mask64) :cost 1 :associative t)
+   (two-arg-mask64-xor #:kxorq  (mask64) (mask64 mask64) :cost 1 :associative t)
+   (mask64-andc1  #:kandnq (mask64) (mask64 mask64) :cost 1)
+   (mask64-xnor   #:kxnorq (mask64) (mask64 mask64) :cost 1)
+   (mask64-not    #:knotq  (mask64) (mask64)         :cost 1)
+   (mask64-shiftl #:kshiftlq (mask64) (mask64 imm8)  :cost 1)
+   (mask64-shiftr #:kshiftrq (mask64) (mask64 imm8)  :cost 1)
+   (mask64-count  nil        (u64)    (mask64)       :cost 2 :encoding :custom)
+
+   ;; u8.64/s8.64 comparisons that stop at the k-register instead of
+   ;; widening it back into a full 0x00/0xFF vector (that widening --
+   ;; VPMOVM2B -- is what TWO-ARG-U8.64= above pays for on every call).
+   ;; Skipping it matters whenever the caller's next step is to combine
+   ;; masks (MASK64-AND/-OR), count matches (MASK64-COUNT), or use the
+   ;; mask itself as an EVEX predicate -- exactly the pattern manually
+   ;; hand-coded in the wordcount kernels this is generalizing.
+   (two-arg-u8.64-mask=   nil (mask64) (u8.64 u8.64) :cost 1 :encoding :custom)
+   (two-arg-u8.64-mask/=  nil (mask64) (u8.64 u8.64) :cost 1 :encoding :custom)
+   (two-arg-u8.64-mask<   nil (mask64) (u8.64 u8.64) :cost 1 :encoding :custom)
+   (two-arg-u8.64-mask<=  nil (mask64) (u8.64 u8.64) :cost 1 :encoding :custom)
+   (two-arg-u8.64-mask>   nil (mask64) (u8.64 u8.64) :cost 1 :encoding :custom)
+   (two-arg-u8.64-mask>=  nil (mask64) (u8.64 u8.64) :cost 1 :encoding :custom)
 
    ;; s8.64
    (s8.64!-from-s8        nil            (s8.64)  (s8)            :cost 1 :encoding :fake-vop)
@@ -179,7 +217,10 @@
    (s16.32-xor two-arg-s16.32-xor +s16-false+)
    (s16.32-max two-arg-s16.32-max nil)
    (s16.32-min two-arg-s16.32-min nil)
-   (s16.32+    two-arg-s16.32+ 0))
+   (s16.32+    two-arg-s16.32+ 0)
+   (mask64-and two-arg-mask64-and +u64-true+)
+   (mask64-or  two-arg-mask64-or  +u64-false+)
+   (mask64-xor two-arg-mask64-xor +u64-false+))
   (:reducers
    (u8.64-  two-arg-u8.64-  0)
    (u16.32- two-arg-u16.32- 0)
@@ -205,14 +246,72 @@
    (s16.32<  two-arg-s16.32<  u16.32-and +u16-true+)
    (s16.32<= two-arg-s16.32<= u16.32-and +u16-true+)
    (s16.32>  two-arg-s16.32>  u16.32-and +u16-true+)
-   (s16.32>= two-arg-s16.32>= u16.32-and +u16-true+))
+   (s16.32>= two-arg-s16.32>= u16.32-and +u16-true+)
+   ;; u8.64 comparisons that chain in the k-register domain (MASK64)
+   ;; rather than in the u8.64 vector domain -- see TWO-ARG-U8.64-MASK=
+   ;; above.
+   (u8.64-mask=   two-arg-u8.64-mask=   mask64-and +u64-true+)
+   (u8.64-mask<   two-arg-u8.64-mask<   mask64-and +u64-true+)
+   (u8.64-mask<=  two-arg-u8.64-mask<=  mask64-and +u64-true+)
+   (u8.64-mask>   two-arg-u8.64-mask>   mask64-and +u64-true+)
+   (u8.64-mask>=  two-arg-u8.64-mask>=  mask64-and +u64-true+))
   (:unequals
    (u8.64/=  two-arg-u8.64/=  u8.64-and  +u8-true+)
    (u16.32/= two-arg-u16.32/= u16.32-and +u16-true+)
    (s8.64/=  two-arg-s8.64/=  u8.64-and  +u8-true+)
-   (s16.32/= two-arg-s16.32/= u16.32-and +u16-true+))
+   (s16.32/= two-arg-s16.32/= u16.32-and +u16-true+)
+   (u8.64-mask/= two-arg-u8.64-mask/= mask64-and +u64-true+))
   (:ifs
    (u8.64-if  u8.64-blend)
    (u16.32-if u16.32-blend)
    (s8.64-if  s8.64-blend)
    (s16.32-if s16.32-blend)))
+
+;; The :SCALARS entry above drives SB-SIMD-INTERNALS's generic
+;; scalar-cast machinery (see define-scalar-casts.lisp) to generate
+;; MASK64 itself as the constructor: (mask64 x) returns X unchanged if X
+;; is already a MASK64, builds one via SB-EXT:%MAKE-SIMD-PACK-512-MASK if
+;; X is an (UNSIGNED-BYTE 64) bit pattern, and signals an error
+;; otherwise -- the same shape as every other scalar type's cast
+;; function (U8, F32, ...). Going the other way has no existing
+;; machinery to hook into (unlike U8/F32/..., a MASK64 is boxed, so
+;; unlike them it needs a real accessor, not just a type declaration),
+;; so that's provided here directly.
+(declaim (inline mask64-value))
+
+(defun mask64-value (mask)
+  "Return the 64-bit unsigned integer representation of MASK64 value MASK."
+  (declare (type sb-ext:simd-pack-512-mask mask))
+  (sb-kernel:%simd-pack-512-mask-value mask))
+
+;; MASK64-ZEROP and MASK64-ALL-P are plain boolean predicates, not typed
+;; values -- there's no record class in RECORD.LISP for a function that
+;; returns a raw generalized boolean (every existing record class,
+;; INSTRUCTION-RECORD included, assumes the result is one or more
+;; VALUE-RECORDs), so like MASK64-VALUE above they live outside the
+;; generic DSL rather than forcing a new record class into existence for
+;; two functions. KTESTQ/KORTESTQ could test this directly off the
+;; k-ALU's own flags in one instruction, but that needs a hand-written
+;; DEFKNOWN plus a (:CONDITIONAL ...) VOP -- a pattern this file doesn't
+;; otherwise use anywhere. Building on MASK64-COUNT (already written,
+;; tested, and inlinable) gets the same answer at the cost of one
+;; KMOVQ+POPCNT round trip; revisit with a real flags-based VOP if that
+;; ever shows up in a profile.
+(declaim (inline mask64-zerop mask64-all-p))
+
+(defun mask64-zerop (mask)
+  "Return true if no bit of MASK64 value MASK is set."
+  (declare (type sb-ext:simd-pack-512-mask mask))
+  ;; MASK64-COUNT's DEFUN (and its INLINE proclamation) is generated
+  ;; later, by DEFINE-INSTRUCTIONS.LISP -- this file is compiled first,
+  ;; so calling it here would otherwise provoke a "proclaiming inline
+  ;; after calls were already compiled" STYLE-WARNING, which the contrib
+  ;; build treats as fatal.
+  (declare (notinline mask64-count))
+  (zerop (mask64-count mask)))
+
+(defun mask64-all-p (mask)
+  "Return true if every bit of MASK64 value MASK is set."
+  (declare (type sb-ext:simd-pack-512-mask mask))
+  (declare (notinline mask64-count))
+  (= (mask64-count mask) 64))

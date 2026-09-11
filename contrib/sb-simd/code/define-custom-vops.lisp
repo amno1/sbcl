@@ -300,6 +300,35 @@
     (def-i16 sb-simd-avx512bw::two-arg-u16.32>  vpcmpuw 6)
     (def-i16 sb-simd-avx512bw::two-arg-u16.32>= vpcmpuw 5))
 
+  ;; u8.64 comparisons that leave their result in a k-register (MASK64)
+  ;; instead of widening it back out to a full u8.64 vector -- the same
+  ;; VPCMPUB as TWO-ARG-U8.64= above, just without the trailing VPMOVM2B.
+  (macrolet ((def-i8-mask (name inst imm)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst dst a b ,imm)))))
+    (def-i8-mask sb-simd-avx512bw::two-arg-u8.64-mask=  vpcmpub 0)
+    (def-i8-mask sb-simd-avx512bw::two-arg-u8.64-mask/= vpcmpub 4)
+    (def-i8-mask sb-simd-avx512bw::two-arg-u8.64-mask<  vpcmpub 1)
+    (def-i8-mask sb-simd-avx512bw::two-arg-u8.64-mask<= vpcmpub 2)
+    (def-i8-mask sb-simd-avx512bw::two-arg-u8.64-mask>  vpcmpub 6)
+    (def-i8-mask sb-simd-avx512bw::two-arg-u8.64-mask>= vpcmpub 5))
+
+  ;; MASK64-COUNT: number of set bits in a k-register. There's no direct
+  ;; k-register popcount instruction, so this is KMOVQ to a GPR followed
+  ;; by the ordinary scalar POPCNT -- exactly the pattern the wordcount
+  ;; kernels (kernels-assembly-512-vops.lisp) hand-wrote inline, now
+  ;; available as a reusable primitive.
+  (define-custom-vop sb-simd-avx512bw::mask64-count
+      (:args (m))
+    (:temporary (:sc unsigned-reg :from (:argument 0)) tmp)
+    (:results (r))
+    (:generator
+     (inst kmovq tmp m)
+     (inst popcnt :qword r tmp)))
+
   (define-custom-vop sb-simd-avx512f::f32.16-blend
       (:args (a) (b) (mask))
     (:temporary (:sc mask-reg) k)
