@@ -263,6 +263,7 @@
    #:avx512ifma-supported-p
    #:gfni-supported-p
    #:avx512vbmi-supported-p
+   #:avx512vbmi2-supported-p
    #:avx512fp16-supported-p
    #:avx10-supported-p
    #:avx10.1-supported-p
@@ -2675,6 +2676,34 @@
      #:u8.64-permute2
      #:u8.64-permute2-i
      #:u8.64-multishift))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512vbmi2
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512vbmi)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #18#
+    #19#
+    #20#
+    #21#
+    #22#
+    #23#
+    #24=
+    (:export
+     #:u8.64-compress
+     #:s8.64-compress
+     #:u16.32-compress
+     #:s16.32-compress
+     #:u8.64-expand
+     #:s8.64-expand
+     #:u16.32-expand
+     #:s16.32-expand))
 
   #+x86-64
   (defpackage #:sb-simd-avx512fp16

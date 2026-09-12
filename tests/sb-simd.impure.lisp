@@ -34,6 +34,7 @@
                   #+x86-64 "test-bitalg.lisp"
                   #+x86-64 "test-gfni.lisp"
                   #+x86-64 "test-vbmi.lisp"
+                  #+x86-64 "test-vbmi2.lisp"
                   "test-hairy-simd-functions.lisp"
                   "test-packages.lisp"))
     (load (merge-pathnames file #P"../contrib/sb-simd/test-suite/"))))

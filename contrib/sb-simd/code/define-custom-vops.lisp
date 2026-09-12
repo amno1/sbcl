@@ -329,6 +329,33 @@
      (inst kmovq tmp m)
      (inst popcnt :qword r tmp)))
 
+  ;; COMPRESS/EXPAND (zero-masking form): the underlying assembler
+  ;; instructions need the mask as a K1-K7 register NUMBER, encoded
+  ;; directly into the EVEX byte -- but a MASK64 value is register-
+  ;; allocated like anything else and could legally land in K0, which
+  ;; is not a valid predicate here. If that happens, copy it into a
+  ;; pinned K1 first (verified against real hardware, though this
+  ;; specific branch is naturally rare to hit in practice since K0 is
+  ;; just one of eight equally-likely allocations).
+  (macrolet ((def-mask-op (name inst)
+               `(define-custom-vop ,name
+                    (:args (src) (mask))
+                  (:temporary (:sc mask-reg :offset 1) k-scratch)
+                  (:results (dst))
+                  (:generator
+                   (let ((mask-num (if (zerop (tn-offset mask))
+                                        (progn (inst kmovq k-scratch mask) (tn-offset k-scratch))
+                                        (tn-offset mask))))
+                     (inst ,inst dst src mask-num))))))
+    (def-mask-op sb-simd-avx512vbmi2::u8.64-compress   vpcompressb-masked-z)
+    (def-mask-op sb-simd-avx512vbmi2::s8.64-compress   vpcompressb-masked-z)
+    (def-mask-op sb-simd-avx512vbmi2::u16.32-compress  vpcompressw-masked-z)
+    (def-mask-op sb-simd-avx512vbmi2::s16.32-compress  vpcompressw-masked-z)
+    (def-mask-op sb-simd-avx512vbmi2::u8.64-expand     vpexpandb-masked-z)
+    (def-mask-op sb-simd-avx512vbmi2::s8.64-expand     vpexpandb-masked-z)
+    (def-mask-op sb-simd-avx512vbmi2::u16.32-expand    vpexpandw-masked-z)
+    (def-mask-op sb-simd-avx512vbmi2::s16.32-expand    vpexpandw-masked-z))
+
   (define-custom-vop sb-simd-avx512f::f32.16-blend
       (:args (a) (b) (mask))
     (:temporary (:sc mask-reg) k)

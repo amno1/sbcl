@@ -40,6 +40,7 @@
         (:file "avx512ifma" :if-feature :x86-64)
         (:file "avx512gfni" :if-feature :x86-64)
         (:file "avx512vbmi" :if-feature :x86-64)
+        (:file "avx512vbmi2" :if-feature :x86-64)
         (:file "avx512fp16" :if-feature :x86-64)
         (:file "avx10-1" :if-feature :x86-64)
         (:file "avx10-2" :if-feature :x86-64)
