@@ -78,6 +78,15 @@
     (and (>= (cpuid 0) 7)
          (logbitp 21 (nth-value 1 (cpuid 7 0)))))
 
+  ;; GFNI is a separate CPUID feature from AVX-512 -- present on some
+  ;; CPUs with only SSE/AVX (no AVX-512 at all). This checks only the
+  ;; raw feature bit; the 512-bit ZMM forms wired up in
+  ;; instruction-sets/avx512gfni.lisp additionally require AVX512F,
+  ;; checked separately at that instruction set's :test clause.
+  (defun gfni-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 8 (nth-value 2 (cpuid 7 0)))))
+
   (defun avx512fp16-supported-p ()
     (and (>= (cpuid 0) 7)
          (avx512f-supported-p)

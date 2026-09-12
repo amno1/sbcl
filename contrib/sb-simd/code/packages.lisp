@@ -261,6 +261,7 @@
    #:avx512vnni-supported-p
    #:avx512bitalg-supported-p
    #:avx512ifma-supported-p
+   #:gfni-supported-p
    #:avx512fp16-supported-p
    #:avx10-supported-p
    #:avx10.1-supported-p
@@ -2629,6 +2630,27 @@
     (:export
      #:u64.8-madd52luq
      #:u64.8-madd52huq))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512gfni
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512ifma)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #18#
+    #19#
+    #20#
+    #21#
+    #22=
+    (:export
+     #:u8.64-gf2p8mulb
+     #:u8.64-gf2p8affineqb
+     #:u8.64-gf2p8affineinvqb))
 
   #+x86-64
   (defpackage #:sb-simd-avx512fp16
