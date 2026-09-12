@@ -740,6 +740,22 @@
 (sb-simd-test-suite:define-simple-simd-test s16.32-count (u16.32) (s16.32)
   (lambda (x) (logcount (ldb (byte 16 0) x))))
 
+(in-package #:sb-simd-avx512ifma)
+
+;; No scalar hardware instruction exists for this operation (unlike the
+;; FMADD family, which mirrors real scalar SSE/AVX forms), so the
+;; reference here is a plain Lisp reimplementation of the SDM
+;; pseudocode rather than a call to a sibling scalar function: only the
+;; low 52 bits of each multiplicand participate (bits 52-63 are
+;; ignored, not an error), the accumulator's full 64 bits do, and the
+;; 64-bit result wraps on overflow.
+(sb-simd-test-suite:define-simple-simd-test u64.8-madd52luq (u64.8) (u64.8 u64.8 u64.8)
+  (lambda (acc b c)
+    (ldb (byte 64 0) (+ acc (ldb (byte 52 0) (* (ldb (byte 52 0) b) (ldb (byte 52 0) c)))))))
+(sb-simd-test-suite:define-simple-simd-test u64.8-madd52huq (u64.8) (u64.8 u64.8 u64.8)
+  (lambda (acc b c)
+    (ldb (byte 64 0) (+ acc (ldb (byte 52 52) (* (ldb (byte 52 0) b) (ldb (byte 52 0) c)))))))
+
 (in-package #:sb-simd-avx10.1)
 
 ;;; AVX10 decouples ISA version from vector length (VLMAX). Systems with

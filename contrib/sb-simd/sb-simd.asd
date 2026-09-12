@@ -37,6 +37,7 @@
         (:file "avx512vpopcntdq" :if-feature :x86-64)
         (:file "avx512vnni" :if-feature :x86-64)
         (:file "avx512bitalg" :if-feature :x86-64)
+        (:file "avx512ifma" :if-feature :x86-64)
         (:file "avx512fp16" :if-feature :x86-64)
         (:file "avx10-1" :if-feature :x86-64)
         (:file "avx10-2" :if-feature :x86-64)
