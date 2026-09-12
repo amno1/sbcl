@@ -70,6 +70,10 @@
     (and (>= (cpuid 0) 7)
          (logbitp 11 (nth-value 2 (cpuid 7 0)))))
 
+  (defun avx512bitalg-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 12 (nth-value 2 (cpuid 7 0)))))
+
   (defun avx512fp16-supported-p ()
     (and (>= (cpuid 0) 7)
          (avx512f-supported-p)

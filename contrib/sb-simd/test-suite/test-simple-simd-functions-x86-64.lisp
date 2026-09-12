@@ -731,6 +731,15 @@
 (sb-simd-test-suite:define-simple-simd-test s64.8-count  (u64.8)  (s64.8)
   (lambda (x) (logcount (ldb (byte 64 0) x))))
 
+(in-package #:sb-simd-avx512bitalg)
+
+(sb-simd-test-suite:define-simple-simd-test u8.64-count  (u8.64)  (u8.64)  logcount)
+(sb-simd-test-suite:define-simple-simd-test u16.32-count (u16.32) (u16.32) logcount)
+(sb-simd-test-suite:define-simple-simd-test s8.64-count  (u8.64)  (s8.64)
+  (lambda (x) (logcount (ldb (byte 8 0) x))))
+(sb-simd-test-suite:define-simple-simd-test s16.32-count (u16.32) (s16.32)
+  (lambda (x) (logcount (ldb (byte 16 0) x))))
+
 (in-package #:sb-simd-avx10.1)
 
 ;;; AVX10 decouples ISA version from vector length (VLMAX). Systems with
