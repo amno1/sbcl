@@ -718,6 +718,19 @@
   (sb-simd-test-suite:is (sb-simd-test-suite::simd= (s64.8* (s64.8-broadcast -3) (s64.8-broadcast 5))
                                                     (s64.8-broadcast -15))))
 
+(in-package #:sb-simd-avx512vpopcntdq)
+
+;; Population count is bit-pattern-based, not numeric, so the signed
+;; variants are checked against LOGCOUNT of the two's-complement bit
+;; pattern (LOGCOUNT of a negative Lisp integer counts differently --
+;; the zero bits of its infinite-precision representation).
+(sb-simd-test-suite:define-simple-simd-test u32.16-count (u32.16) (u32.16) logcount)
+(sb-simd-test-suite:define-simple-simd-test u64.8-count  (u64.8)  (u64.8)  logcount)
+(sb-simd-test-suite:define-simple-simd-test s32.16-count (u32.16) (s32.16)
+  (lambda (x) (logcount (ldb (byte 32 0) x))))
+(sb-simd-test-suite:define-simple-simd-test s64.8-count  (u64.8)  (s64.8)
+  (lambda (x) (logcount (ldb (byte 64 0) x))))
+
 (in-package #:sb-simd-avx10.1)
 
 ;;; AVX10 decouples ISA version from vector length (VLMAX). Systems with
