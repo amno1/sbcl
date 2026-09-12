@@ -2452,6 +2452,7 @@
      #:u8.64<=
      #:u8.32-from-u8.64
      #:u8.64-insert-u8.32
+     #:u8.64-sad
      #:u8.64-incf
      #:u8.64-decf
      #:u8.64-aref #:u8.64-row-major-aref #:u8.64-sap-ref
@@ -2703,7 +2704,31 @@
      #:u8.64-expand
      #:s8.64-expand
      #:u16.32-expand
-     #:s16.32-expand))
+     #:s16.32-expand
+     #:u16.32-shldi
+     #:s16.32-shldi
+     #:u32.16-shldi
+     #:s32.16-shldi
+     #:u64.8-shldi
+     #:s64.8-shldi
+     #:u16.32-shrdi
+     #:s16.32-shrdi
+     #:u32.16-shrdi
+     #:s32.16-shrdi
+     #:u64.8-shrdi
+     #:s64.8-shrdi
+     #:u16.32-shldv
+     #:s16.32-shldv
+     #:u32.16-shldv
+     #:s32.16-shldv
+     #:u64.8-shldv
+     #:s64.8-shldv
+     #:u16.32-shrdv
+     #:s16.32-shrdv
+     #:u32.16-shrdv
+     #:s32.16-shrdv
+     #:u64.8-shrdv
+     #:s64.8-shrdv))
 
   #+x86-64
   (defpackage #:sb-simd-avx512fp16

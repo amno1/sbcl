@@ -64,6 +64,7 @@
    (two-arg-u8.64>=       nil            (u8.64)  (u8.64 u8.64)   :cost 4 :encoding :custom)
    (u8.32-from-u8.64      #:vextracti32x8 (u8.32) (u8.64 imm1)    :cost 1)
    (u8.64-insert-u8.32    #:vinserti32x8 (u8.64)  (u8.64 u8.32 imm1) :cost 1)
+   (u8.64-sad             #:vpsadbw      (u64.8)  (u8.64 u8.64)   :cost 1)
 
    ;; u16.32
    (u16.32!-from-u16      nil            (u16.32) (u16)           :cost 1 :encoding :fake-vop)

@@ -301,7 +301,7 @@
     (def-i16 sb-simd-avx512bw::two-arg-u16.32>= vpcmpuw 5))
 
   ;; u8.64 comparisons that leave their result in a k-register (MASK64)
-  ;; instead of widening it back out to a full u8.64 vector -- the same
+  ;; instead of widening it back out to a full u8.64 vector - the same
   ;; VPCMPUB as TWO-ARG-U8.64= above, just without the trailing VPMOVM2B.
   (macrolet ((def-i8-mask (name inst imm)
                `(define-custom-vop ,name
@@ -318,7 +318,7 @@
 
   ;; MASK64-COUNT: number of set bits in a k-register. There's no direct
   ;; k-register popcount instruction, so this is KMOVQ to a GPR followed
-  ;; by the ordinary scalar POPCNT -- exactly the pattern the wordcount
+  ;; by the ordinary scalar POPCNT - exactly the pattern the wordcount
   ;; kernels (kernels-assembly-512-vops.lisp) hand-wrote inline, now
   ;; available as a reusable primitive.
   (define-custom-vop sb-simd-avx512bw::mask64-count
@@ -331,7 +331,7 @@
 
   ;; COMPRESS/EXPAND (zero-masking form): the underlying assembler
   ;; instructions need the mask as a K1-K7 register NUMBER, encoded
-  ;; directly into the EVEX byte -- but a MASK64 value is register-
+  ;; directly into the EVEX byte - but a MASK64 value is register-
   ;; allocated like anything else and could legally land in K0, which
   ;; is not a valid predicate here. If that happens, copy it into a
   ;; pinned K1 first (verified against real hardware, though this
