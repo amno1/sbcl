@@ -258,6 +258,7 @@
    #:avx512bw-supported-p
    #:avx512vl-supported-p
    #:avx512vpopcntdq-supported-p
+   #:avx512vnni-supported-p
    #:avx512fp16-supported-p
    #:avx10-supported-p
    #:avx10.1-supported-p
@@ -2567,6 +2568,25 @@
      #:s32.16-count
      #:u64.8-count
      #:s64.8-count))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512vnni
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512vpopcntdq)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #18#
+    #19=
+    (:export
+     #:s32.16-dpbusd
+     #:s32.16-dpbusds
+     #:s32.16-dpwssd
+     #:s32.16-dpwssds))
 
   #+x86-64
   (defpackage #:sb-simd-avx512fp16

@@ -30,6 +30,7 @@
                   #+arm64 "test-horizontal-functions-arm64.lisp"
                   #+arm64 "test-arm64-regressions.lisp"
                   #+x86-64 "test-mask64.lisp"
+                  #+x86-64 "test-vnni.lisp"
                   "test-hairy-simd-functions.lisp"
                   "test-packages.lisp"))
     (load (merge-pathnames file #P"../contrib/sb-simd/test-suite/"))))
