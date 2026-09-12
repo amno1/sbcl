@@ -2607,7 +2607,8 @@
      #:u8.64-count
      #:s8.64-count
      #:u16.32-count
-     #:s16.32-count))
+     #:s16.32-count
+     #:u8.64-bit-gather))
 
   #+x86-64
   (defpackage #:sb-simd-avx512fp16
