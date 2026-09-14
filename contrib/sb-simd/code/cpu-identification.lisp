@@ -78,7 +78,7 @@
     (and (>= (cpuid 0) 7)
          (logbitp 21 (nth-value 1 (cpuid 7 0)))))
 
-  ;; GFNI is a separate CPUID feature from AVX-512 -- present on some
+  ;; GFNI is a separate CPUID feature from AVX-512, present on some
   ;; CPUs with only SSE/AVX (no AVX-512 at all). This checks only the
   ;; raw feature bit; the 512-bit ZMM forms wired up in
   ;; instruction-sets/avx512gfni.lisp additionally require AVX512F,
@@ -172,6 +172,27 @@
     nil)
 
   (defun avx512vl-supported-p ()
+    nil)
+
+  (defun avx512vpopcntdq-supported-p ()
+    nil)
+
+  (defun avx512vnni-supported-p ()
+    nil)
+
+  (defun avx512bitalg-supported-p ()
+    nil)
+
+  (defun avx512ifma-supported-p ()
+    nil)
+
+  (defun gfni-supported-p ()
+    nil)
+
+  (defun avx512vbmi-supported-p ()
+    nil)
+
+  (defun avx512vbmi2-supported-p ()
     nil)
 
   (defun avx512fp16-supported-p ()
