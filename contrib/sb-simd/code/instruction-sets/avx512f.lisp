@@ -11,6 +11,9 @@
    (u64.8  u64 512 #:simd-pack-512-ub64   (#:int-avx512-reg))
    (s32.16 s32 512 #:simd-pack-512-sb32   (#:int-avx512-reg))
    (s64.8  s64 512 #:simd-pack-512-sb64   (#:int-avx512-reg)))
+  (:mask-packs
+   (m64.8  u64 512 #:simd-pack-512-mask-type (#:mask-reg))
+   (m32.16 u32 512 #:simd-pack-512-mask-type (#:mask-reg)))
   (:simd-casts
    (f32.16 f32.16-broadcast)
    (f64.8  f64.8-broadcast)
