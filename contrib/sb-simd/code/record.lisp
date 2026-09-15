@@ -259,14 +259,18 @@
                 #-(or x86-64 sb-simd-pack-512)
                 'simd-pack-512-mask)))
       `(let ((.scalar-record. (find-value-record ',(or scalar-record-name (find-symbol "U64")))))
-         (make-instance 'mask-record
-           :name ',name
-           :scalar-record .scalar-record.
-           :bits ',bits
-           :width (the unsigned-byte (/ ,bits (value-record-bits .scalar-record.)))
-           :type ',mask-pack-type
-           :primitive-type ',(find-primitive-type primitive-type)
-           :scs ',(mapcar #'find-sc scs))))))
+         (let ((.mask-record.
+                 (make-instance 'mask-record
+                   :name ',name
+                   :scalar-record .scalar-record.
+                   :bits ',bits
+                   :width (the unsigned-byte (/ ,bits (value-record-bits .scalar-record.)))
+                   :type ',mask-pack-type
+                   :primitive-type ',(find-primitive-type primitive-type)
+                   :scs ',(mapcar #'find-sc scs))))
+           (make-instance 'scalar-cast-record
+             :name ',name
+             :result-record .mask-record.))))))
 
 (defgeneric simd-record-mask-record (simd-record &optional errorp)
   (:method ((simd-record simd-record) &optional (errorp t))
