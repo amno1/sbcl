@@ -8,6 +8,9 @@
    (u16.32 u16 512 #:simd-pack-512-ub16   (#:int-avx512-reg))
    (s8.64  s8  512 #:simd-pack-512-sb8    (#:int-avx512-reg))
    (s16.32 s16 512 #:simd-pack-512-sb16   (#:int-avx512-reg)))
+  (:mask-packs
+   (m16.32 u16 512 #:simd-pack-512-mask-type (#:mask-reg))
+   (m8.64  u8  512 #:simd-pack-512-mask-type (#:mask-reg)))
   (:simd-casts
    (u8.64  u8.64-broadcast)
    (u16.32 u16.32-broadcast)
