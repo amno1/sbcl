@@ -14,8 +14,10 @@
                               (argument-records instruction-record-argument-records)) blend
                (destructuring-bind (a-record b-record mask-record) argument-records
                  (assert (eq a-record b-record))
-                 (assert (= (value-record-bits a-record)
-                            (value-record-bits mask-record)))
+                 (assert (or (= (value-record-bits a-record)
+                                (value-record-bits mask-record))
+                             (= (value-record-simd-width a-record)
+                                (value-record-simd-width mask-record))))
                  (destructuring-bind (result-record) result-records
                    (assert (eq result-record a-record))
                    (let ((value-type (value-record-name a-record))
