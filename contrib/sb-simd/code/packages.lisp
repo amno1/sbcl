@@ -2190,11 +2190,21 @@
      #:m64.8-count
      #:m64.8-zerop
      #:m64.8-all-p
+     #:m64.8-and
+     #:m64.8-or
+     #:m64.8-xor
+     #:m64.8-andc1
+     #:m64.8-not
      #:m32.16
      #:m32.16-value
      #:m32.16-count
      #:m32.16-zerop
      #:m32.16-all-p
+     #:m32.16-and
+     #:m32.16-or
+     #:m32.16-xor
+     #:m32.16-andc1
+     #:m32.16-not
      ;; f32.16
      #:make-f32.16
      #:f32.16
@@ -2440,11 +2450,21 @@
      #:m16.32-count
      #:m16.32-zerop
      #:m16.32-all-p
+     #:m16.32-and
+     #:m16.32-or
+     #:m16.32-xor
+     #:m16.32-andc1
+     #:m16.32-not
      #:m8.64
      #:m8.64-value
      #:m8.64-count
      #:m8.64-zerop
      #:m8.64-all-p
+     #:m8.64-and
+     #:m8.64-or
+     #:m8.64-xor
+     #:m8.64-andc1
+     #:m8.64-not
      ;; u8.64
      #:make-u8.64
      #:u8.64

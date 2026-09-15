@@ -253,7 +253,21 @@
    (two-arg-s64.8>        nil            (u64.8)  (s64.8 s64.8)   :cost 4 :encoding :custom)
    (two-arg-s64.8>=       nil            (u64.8)  (s64.8 s64.8)   :cost 4 :encoding :custom)
    (s64.4-from-s64.8      #:vextracti64x4 (s64.4) (s64.8 imm1)    :cost 1)
-   (s64.8-insert-s64.4    #:vinserti64x4 (s64.8)  (s64.8 s64.4 imm1) :cost 1))
+   (s64.8-insert-s64.4    #:vinserti64x4 (s64.8)  (s64.8 s64.4 imm1) :cost 1)
+
+   ;; m64.8
+   (two-arg-m64.8-and     #:kandw        (m64.8)  (m64.8 m64.8)   :cost 1 :associative t)
+   (two-arg-m64.8-or      #:korw         (m64.8)  (m64.8 m64.8)   :cost 1 :associative t)
+   (two-arg-m64.8-xor     #:kxorw        (m64.8)  (m64.8 m64.8)   :cost 1 :associative t)
+   (m64.8-andc1           #:kandnw       (m64.8)  (m64.8 m64.8)   :cost 1)
+   (m64.8-not             #:knotw        (m64.8)  (m64.8)         :cost 1)
+
+   ;; m32.16
+   (two-arg-m32.16-and    #:kandw        (m32.16) (m32.16 m32.16) :cost 1 :associative t)
+   (two-arg-m32.16-or     #:korw         (m32.16) (m32.16 m32.16) :cost 1 :associative t)
+   (two-arg-m32.16-xor    #:kxorw        (m32.16) (m32.16 m32.16) :cost 1 :associative t)
+   (m32.16-andc1          #:kandnw       (m32.16) (m32.16 m32.16) :cost 1)
+   (m32.16-not            #:knotw        (m32.16) (m32.16)        :cost 1))
   (:loads
    (f32.16-load #:vmovups   f32.16  f32vec f32-array f32.16-aref f32.16-row-major-aref f32.16-sap-ref)
    (f64.8-load  #:vmovupd   f64.8   f64vec f64-array f64.8-aref  f64.8-row-major-aref  f64.8-sap-ref)
@@ -314,7 +328,13 @@
    (s64.8-xor  two-arg-s64.8-xor  +s64-false+)
    (s64.8-max  two-arg-s64.8-max  nil)
    (s64.8-min  two-arg-s64.8-min  nil)
-   (s64.8+     two-arg-s64.8+ 0))
+   (s64.8+     two-arg-s64.8+ 0)
+   (m64.8-and  two-arg-m64.8-and  +m64.8-true+)
+   (m64.8-or   two-arg-m64.8-or   +m64.8-false+)
+   (m64.8-xor  two-arg-m64.8-xor  +m64.8-false+)
+   (m32.16-and two-arg-m32.16-and +m32.16-true+)
+   (m32.16-or  two-arg-m32.16-or  +m32.16-false+)
+   (m32.16-xor two-arg-m32.16-xor +m32.16-false+))
   (:reducers
    (f32.16- two-arg-f32.16- 0f0)
    (f32.16/ two-arg-f32.16/ 1f0)
