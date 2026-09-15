@@ -2236,6 +2236,18 @@
      #:f32.16/=
      #:f32.16<
      #:f32.16<=
+     #:f32.16-mask=
+     #:f32.16-mask/=
+     #:f32.16-mask>
+     #:f32.16-mask<
+     #:f32.16-mask>=
+     #:f32.16-mask<=
+     #:two-arg-f32.16-mask=
+     #:two-arg-f32.16-mask/=
+     #:two-arg-f32.16-mask>
+     #:two-arg-f32.16-mask<
+     #:two-arg-f32.16-mask>=
+     #:two-arg-f32.16-mask<=
      #:f32.16>
      #:f32.16>=
      #:f32.16-sqrt
@@ -2287,6 +2299,18 @@
      #:f64.8/=
      #:f64.8<
      #:f64.8<=
+     #:f64.8-mask=
+     #:f64.8-mask/=
+     #:f64.8-mask>
+     #:f64.8-mask<
+     #:f64.8-mask>=
+     #:f64.8-mask<=
+     #:two-arg-f64.8-mask=
+     #:two-arg-f64.8-mask/=
+     #:two-arg-f64.8-mask>
+     #:two-arg-f64.8-mask<
+     #:two-arg-f64.8-mask>=
+     #:two-arg-f64.8-mask<=
      #:f64.8>
      #:f64.8>=
      #:f64.8-sqrt
@@ -2328,6 +2352,18 @@
      #:u32.16<
      #:u32.16>=
      #:u32.16<=
+     #:u32.16-mask=
+     #:u32.16-mask/=
+     #:u32.16-mask>
+     #:u32.16-mask<
+     #:u32.16-mask>=
+     #:u32.16-mask<=
+     #:two-arg-u32.16-mask=
+     #:two-arg-u32.16-mask/=
+     #:two-arg-u32.16-mask>
+     #:two-arg-u32.16-mask<
+     #:two-arg-u32.16-mask>=
+     #:two-arg-u32.16-mask<=
      #:u32.16-shiftl
      #:u32.16-shiftr
      #:u32.8-from-u32.16
@@ -2358,6 +2394,18 @@
      #:u64.8<
      #:u64.8>=
      #:u64.8<=
+     #:u64.8-mask=
+     #:u64.8-mask/=
+     #:u64.8-mask>
+     #:u64.8-mask<
+     #:u64.8-mask>=
+     #:u64.8-mask<=
+     #:two-arg-u64.8-mask=
+     #:two-arg-u64.8-mask/=
+     #:two-arg-u64.8-mask>
+     #:two-arg-u64.8-mask<
+     #:two-arg-u64.8-mask>=
+     #:two-arg-u64.8-mask<=
      #:u64.8-shiftl
      #:u64.8-shiftr
      #:u64.4-from-u64.8
@@ -2389,6 +2437,18 @@
      #:s32.16<
      #:s32.16>=
      #:s32.16<=
+     #:s32.16-mask=
+     #:s32.16-mask/=
+     #:s32.16-mask>
+     #:s32.16-mask<
+     #:s32.16-mask>=
+     #:s32.16-mask<=
+     #:two-arg-s32.16-mask=
+     #:two-arg-s32.16-mask/=
+     #:two-arg-s32.16-mask>
+     #:two-arg-s32.16-mask<
+     #:two-arg-s32.16-mask>=
+     #:two-arg-s32.16-mask<=
      #:s32.16-shiftl
      #:s32.16-shiftr
      #:s32.8-from-s32.16
@@ -2419,6 +2479,18 @@
      #:s64.8<
      #:s64.8>=
      #:s64.8<=
+     #:s64.8-mask=
+     #:s64.8-mask/=
+     #:s64.8-mask>
+     #:s64.8-mask<
+     #:s64.8-mask>=
+     #:s64.8-mask<=
+     #:two-arg-s64.8-mask=
+     #:two-arg-s64.8-mask/=
+     #:two-arg-s64.8-mask>
+     #:two-arg-s64.8-mask<
+     #:two-arg-s64.8-mask>=
+     #:two-arg-s64.8-mask<=
      #:s64.8-shiftl
      #:s64.8-shiftr
      #:s64.4-from-s64.8
@@ -2487,6 +2559,18 @@
      #:u8.64<
      #:u8.64>=
      #:u8.64<=
+     #:u8.64-mask=
+     #:u8.64-mask/=
+     #:u8.64-mask>
+     #:u8.64-mask<
+     #:u8.64-mask>=
+     #:u8.64-mask<=
+     #:two-arg-u8.64-mask=
+     #:two-arg-u8.64-mask/=
+     #:two-arg-u8.64-mask>
+     #:two-arg-u8.64-mask<
+     #:two-arg-u8.64-mask>=
+     #:two-arg-u8.64-mask<=
      #:u8.32-from-u8.64
      #:u8.64-insert-u8.32
      #:u8.64-incf
@@ -2515,6 +2599,18 @@
      #:u16.32<
      #:u16.32>=
      #:u16.32<=
+     #:u16.32-mask=
+     #:u16.32-mask/=
+     #:u16.32-mask>
+     #:u16.32-mask<
+     #:u16.32-mask>=
+     #:u16.32-mask<=
+     #:two-arg-u16.32-mask=
+     #:two-arg-u16.32-mask/=
+     #:two-arg-u16.32-mask>
+     #:two-arg-u16.32-mask<
+     #:two-arg-u16.32-mask>=
+     #:two-arg-u16.32-mask<=
      #:u16.16-from-u16.32
      #:u16.32-insert-u16.16
      #:u16.32-incf
@@ -2543,6 +2639,18 @@
      #:s8.64<
      #:s8.64>=
      #:s8.64<=
+     #:s8.64-mask=
+     #:s8.64-mask/=
+     #:s8.64-mask>
+     #:s8.64-mask<
+     #:s8.64-mask>=
+     #:s8.64-mask<=
+     #:two-arg-s8.64-mask=
+     #:two-arg-s8.64-mask/=
+     #:two-arg-s8.64-mask>
+     #:two-arg-s8.64-mask<
+     #:two-arg-s8.64-mask>=
+     #:two-arg-s8.64-mask<=
      #:s8.32-from-s8.64
      #:s8.64-insert-s8.32
      #:s8.64-incf
@@ -2571,6 +2679,18 @@
      #:s16.32<
      #:s16.32>=
      #:s16.32<=
+     #:s16.32-mask=
+     #:s16.32-mask/=
+     #:s16.32-mask>
+     #:s16.32-mask<
+     #:s16.32-mask>=
+     #:s16.32-mask<=
+     #:two-arg-s16.32-mask=
+     #:two-arg-s16.32-mask/=
+     #:two-arg-s16.32-mask>
+     #:two-arg-s16.32-mask<
+     #:two-arg-s16.32-mask>=
+     #:two-arg-s16.32-mask<=
      #:s16.16-from-s16.32
      #:s16.32-insert-s16.16
      #:s16.32-incf
