@@ -135,7 +135,10 @@
                     `((declaim (inline ,val-fn ,cnt-fn ,zero-fn ,all-fn))
                       (defun ,val-fn (mask)
                         (declare (type ,name mask))
-                        (mask-value mask))
+                        #+x86-64
+                        (ldb (byte ,width 0) (sb-kernel:%simd-pack-512-mask-value mask))
+                        #-x86-64
+                        (ldb (byte ,width 0) (phony-simd-pack-512-mask-value mask)))
                       (defun ,cnt-fn (mask)
                         (declare (type ,name mask))
                         (logcount (mask-value mask)))
