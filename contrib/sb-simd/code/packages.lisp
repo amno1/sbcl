@@ -31,6 +31,15 @@
    #:+u16-false+
    #:+u32-false+
    #:+u64-false+
+   #:+m64.8-true+
+   #:+m32.16-true+
+   #:+m16.32-true+
+   #:+m8.64-true+
+   #:+m64.8-false+
+   #:+m32.16-false+
+   #:+m16.32-false+
+   #:+m8.64-false+
+   #:mask-value
    #:+s8-true+
    #:+s16-true+
    #:+s32-true+
@@ -311,6 +320,15 @@
      #:+u16-false+
      #:+u32-false+
      #:+u64-false+
+     #:+m64.8-true+
+     #:+m32.16-true+
+     #:+m16.32-true+
+     #:+m8.64-true+
+     #:+m64.8-false+
+     #:+m32.16-false+
+     #:+m16.32-false+
+     #:+m8.64-false+
+     #:mask-value
      #:+s8-true+
      #:+s16-true+
      #:+s32-true+
@@ -2168,7 +2186,15 @@
      #:p512
      ;; mask types
      #:m64.8
+     #:m64.8-value
+     #:m64.8-count
+     #:m64.8-zerop
+     #:m64.8-all-p
      #:m32.16
+     #:m32.16-value
+     #:m32.16-count
+     #:m32.16-zerop
+     #:m32.16-all-p
      ;; f32.16
      #:make-f32.16
      #:f32.16
@@ -2410,7 +2436,15 @@
      #:u16!
      ;; mask types
      #:m16.32
+     #:m16.32-value
+     #:m16.32-count
+     #:m16.32-zerop
+     #:m16.32-all-p
      #:m8.64
+     #:m8.64-value
+     #:m8.64-count
+     #:m8.64-zerop
+     #:m8.64-all-p
      ;; u8.64
      #:make-u8.64
      #:u8.64

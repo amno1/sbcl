@@ -4,6 +4,17 @@
 ;;; either suitably convert its argument to that value record's type, or
 ;;; signal an error.
 
+(defgeneric mask-value (mask)
+  (:documentation "Returns the integer bit pattern of MASK."))
+
+#+x86-64
+(defmethod mask-value ((mask sb-ext:simd-pack-512-mask))
+  (sb-kernel:%simd-pack-512-mask-value mask))
+
+#-x86-64
+(defmethod mask-value ((mask phony-simd-pack-512-mask))
+  (phony-simd-pack-512-mask-value mask))
+
 (macrolet
     ((call-vop (instruction-record-name &rest arguments)
        (with-accessors ((instruction-set instruction-record-instruction-set)
@@ -112,7 +123,28 @@
                         sb-simd-avx512bw:m16.32
                         sb-simd-avx512bw:m8.64)
                        `(((unsigned-byte 64) (make-phony-simd-pack-512-mask :value x)))))
-                  (otherwise (,err x))))))))
+                  (otherwise (,err x))))
+              ,@(when (and (mask-record-p (find-value-record name nil))
+                           (instruction-set-available-p instruction-set))
+                  (let* ((rec (find-value-record name))
+                         (width (mask-record-width rec))
+                         (val-fn (mksym (symbol-package name) name "-VALUE"))
+                         (cnt-fn (mksym (symbol-package name) name "-COUNT"))
+                         (zero-fn (mksym (symbol-package name) name "-ZEROP"))
+                         (all-fn (mksym (symbol-package name) name "-ALL-P")))
+                    `((declaim (inline ,val-fn ,cnt-fn ,zero-fn ,all-fn))
+                      (defun ,val-fn (mask)
+                        (declare (type ,name mask))
+                        (mask-value mask))
+                      (defun ,cnt-fn (mask)
+                        (declare (type ,name mask))
+                        (logcount (mask-value mask)))
+                      (defun ,zero-fn (mask)
+                        (declare (type ,name mask))
+                        (zerop (mask-value mask)))
+                      (defun ,all-fn (mask)
+                        (declare (type ,name mask))
+                        (= (logcount (mask-value mask)) ,width)))))))))
      (define-scalar-casts ()
        `(progn
           ,@(loop for scalar-cast-record in (filter-function-records #'scalar-cast-record-p)
