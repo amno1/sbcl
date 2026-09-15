@@ -61,7 +61,14 @@
                      `((sb-c:deftransform ,name ((x) (single-float) *)
                          '(sb-simd-avx::f64-from-f32 x))
                        (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
-                         '(sb-simd-avx::f64-from-s64 x))))))
+                         '(sb-simd-avx::f64-from-s64 x))))
+                    #+x86-64
+                    ((sb-simd-avx512f:m64.8
+                      sb-simd-avx512f:m32.16
+                      sb-simd-avx512bw:m16.32
+                      sb-simd-avx512bw:m8.64)
+                     `((sb-c:deftransform ,name ((x) ((unsigned-byte 64)) *)
+                         '(sb-ext:%make-simd-pack-512-mask x))))))
               (defun ,name (x)
                 (typecase x
                   (,name x)
@@ -92,7 +99,19 @@
                       (sb-simd-avx:f64
                        `((sb-simd-avx:f32 (call-vop sb-simd-avx::f64-from-f32 x))
                          (sb-simd-avx:s64 (call-vop sb-simd-avx::f64-from-s64 x))
-                         (real (coerce x ',name)))))
+                         (real (coerce x ',name))))
+                      #+x86-64
+                      ((sb-simd-avx512f:m64.8
+                        sb-simd-avx512f:m32.16
+                        sb-simd-avx512bw:m16.32
+                        sb-simd-avx512bw:m8.64)
+                       `(((unsigned-byte 64) (sb-ext:%make-simd-pack-512-mask x))))
+                      #-x86-64
+                      ((sb-simd-avx512f:m64.8
+                        sb-simd-avx512f:m32.16
+                        sb-simd-avx512bw:m16.32
+                        sb-simd-avx512bw:m8.64)
+                       `(((unsigned-byte 64) (make-phony-simd-pack-512-mask :value x)))))
                   (otherwise (,err x))))))))
      (define-scalar-casts ()
        `(progn
