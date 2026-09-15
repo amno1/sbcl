@@ -143,7 +143,21 @@
    (two-arg-s16.32>       nil            (u16.32) (s16.32 s16.32) :cost 4 :encoding :custom)
    (two-arg-s16.32>=      nil            (u16.32) (s16.32 s16.32) :cost 4 :encoding :custom)
    (s16.16-from-s16.32    #:vextracti32x8 (s16.16) (s16.32 imm1)  :cost 1)
-   (s16.32-insert-s16.16  #:vinserti32x8 (s16.32) (s16.32 s16.16 imm1) :cost 1))
+   (s16.32-insert-s16.16  #:vinserti32x8 (s16.32) (s16.32 s16.16 imm1) :cost 1)
+
+   ;; m16.32
+   (two-arg-m16.32-and    #:kandd        (m16.32) (m16.32 m16.32) :cost 1 :associative t)
+   (two-arg-m16.32-or     #:kord         (m16.32) (m16.32 m16.32) :cost 1 :associative t)
+   (two-arg-m16.32-xor    #:kxord        (m16.32) (m16.32 m16.32) :cost 1 :associative t)
+   (m16.32-andc1          #:kandnd       (m16.32) (m16.32 m16.32) :cost 1)
+   (m16.32-not            #:knotd        (m16.32) (m16.32)        :cost 1)
+
+   ;; m8.64
+   (two-arg-m8.64-and     #:kandq        (m8.64)  (m8.64 m8.64)   :cost 1 :associative t)
+   (two-arg-m8.64-or      #:korq         (m8.64)  (m8.64 m8.64)   :cost 1 :associative t)
+   (two-arg-m8.64-xor     #:kxorq        (m8.64)  (m8.64 m8.64)   :cost 1 :associative t)
+   (m8.64-andc1           #:kandnq       (m8.64)  (m8.64 m8.64)   :cost 1)
+   (m8.64-not             #:knotq        (m8.64)  (m8.64)         :cost 1))
   (:loads
    (u8.64-load  #:vmovdqu8  u8.64   u8vec  u8-array  u8.64-aref  u8.64-row-major-aref  u8.64-sap-ref)
    (u16.32-load #:vmovdqu16 u16.32  u16vec u16-array u16.32-aref u16.32-row-major-aref u16.32-sap-ref)
@@ -182,7 +196,13 @@
    (s16.32-xor two-arg-s16.32-xor +s16-false+)
    (s16.32-max two-arg-s16.32-max nil)
    (s16.32-min two-arg-s16.32-min nil)
-   (s16.32+    two-arg-s16.32+ 0))
+   (s16.32+    two-arg-s16.32+ 0)
+   (m16.32-and two-arg-m16.32-and +m16.32-true+)
+   (m16.32-or  two-arg-m16.32-or  +m16.32-false+)
+   (m16.32-xor two-arg-m16.32-xor +m16.32-false+)
+   (m8.64-and  two-arg-m8.64-and  +m8.64-true+)
+   (m8.64-or   two-arg-m8.64-or   +m8.64-false+)
+   (m8.64-xor  two-arg-m8.64-xor  +m8.64-false+))
   (:reducers
    (u8.64-  two-arg-u8.64-  0)
    (u16.32- two-arg-u16.32- 0)
