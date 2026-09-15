@@ -179,7 +179,7 @@
   (typep x 'simd-record))
 
 (defun scalar-record-p (x)
-  (typep x '(and value-record (not simd-record))))
+  (typep x '(and value-record (not (or simd-record mask-record)))))
 
 #-(or x86-64 sb-simd-pack-256)
 (progn
@@ -193,7 +193,10 @@
   (defstruct phony-simd-pack-512)
   (deftype simd-pack-512 (&optional element-type)
     (declare (ignore element-type))
-    'phony-simd-pack-512))
+    'phony-simd-pack-512)
+  (defstruct phony-simd-pack-512-mask)
+  (deftype simd-pack-512-mask ()
+    'phony-simd-pack-512-mask))
 
 (defmethod decode-record-definition ((_ (eql 'simd-record)) expr)
   (destructuring-bind (name scalar-record-name bits primitive-type scs) expr
@@ -219,6 +222,73 @@
            :type ',simd-pack-type
            :primitive-type ',(find-primitive-type primitive-type)
            :scs ',(mapcar #'find-sc scs))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Mask Record
+
+(defclass mask-record (value-record)
+  (;; Define aliases for inherited slots.
+   (%name :reader mask-record-name)
+   (%instruction-set :reader mask-record-instruction-set)
+   (%type :reader mask-record-type)
+   (%primitive-type :reader mask-record-primitive-type)
+   (%bits :reader mask-record-bits)
+   (%scs :reader mask-record-scs)
+   ;; The scalar record of the elements of the SIMD pack this mask corresponds to.
+   (%scalar-record
+    :type value-record
+    :initarg :scalar-record
+    :initform (required-argument :scalar-record)
+    :reader mask-record-scalar-record)
+   ;; The number of mask lanes / bits.
+   (%width
+    :type unsigned-byte
+    :initarg :width
+    :initform (required-argument :width)
+    :reader mask-record-width
+    :reader value-record-simd-width)))
+
+(defun mask-record-p (x)
+  (typep x 'mask-record))
+
+(defmethod decode-record-definition ((_ (eql 'mask-record)) expr)
+  (destructuring-bind (name scalar-record-name bits primitive-type scs) expr
+    (let ((mask-pack-type
+            (or (find-symbol "SIMD-PACK-512-MASK" "SB-EXT")
+                #-(or x86-64 sb-simd-pack-512)
+                'simd-pack-512-mask)))
+      `(let ((.scalar-record. (find-value-record ',(or scalar-record-name (find-symbol "U64")))))
+         (make-instance 'mask-record
+           :name ',name
+           :scalar-record .scalar-record.
+           :bits ',bits
+           :width (the unsigned-byte (/ ,bits (value-record-bits .scalar-record.)))
+           :type ',mask-pack-type
+           :primitive-type ',(find-primitive-type primitive-type)
+           :scs ',(mapcar #'find-sc scs))))))
+
+(defgeneric simd-record-mask-record (simd-record &optional errorp)
+  (:method ((simd-record simd-record) &optional (errorp t))
+    (let* ((scalar (simd-record-scalar-record simd-record))
+           (bits (value-record-bits scalar))
+           (width (value-record-simd-width simd-record))
+           (pkg (instruction-set-package (record-instruction-set simd-record)))
+           (mask-sym (find-symbol (format nil "M~D.~D" bits width) pkg)))
+      (if (and mask-sym (find-value-record mask-sym nil))
+          (find-value-record mask-sym)
+          (when errorp
+            (error "No mask record found for ~S." (record-name simd-record)))))))
+
+(defgeneric mask-record-simd-records (mask-record)
+  (:method ((mask-record mask-record))
+    (let ((width (mask-record-width mask-record))
+          (bits (value-record-bits (mask-record-scalar-record mask-record))))
+      (filter-value-records
+       (lambda (rec)
+         (and (simd-record-p rec)
+              (= (value-record-simd-width rec) width)
+              (= (value-record-bits (simd-record-scalar-record rec)) bits)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
