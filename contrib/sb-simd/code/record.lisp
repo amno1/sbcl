@@ -194,7 +194,8 @@
   (deftype simd-pack-512 (&optional element-type)
     (declare (ignore element-type))
     'phony-simd-pack-512)
-  (defstruct phony-simd-pack-512-mask)
+  (defstruct phony-simd-pack-512-mask
+    (value 0 :type (unsigned-byte 64)))
   (deftype simd-pack-512-mask ()
     'phony-simd-pack-512-mask))
 
