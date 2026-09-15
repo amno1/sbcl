@@ -103,6 +103,18 @@
    #:simd-record-bits
    #:simd-record-scs
    #:simd-record-scalar-record
+   #:mask-record
+   #:mask-record-p
+   #:mask-record-name
+   #:mask-record-instruction-set
+   #:mask-record-type
+   #:mask-record-primitive-type
+   #:mask-record-bits
+   #:mask-record-scs
+   #:mask-record-scalar-record
+   #:mask-record-width
+   #:simd-record-mask-record
+   #:mask-record-simd-records
    #:function-record
    #:function-record-p
    #:function-record-name

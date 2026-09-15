@@ -103,7 +103,7 @@
 ;;; Defining Instruction Sets
 
 (defparameter *instruction-set-options*
-  '(:include :test :scalars :simd-packs :simd-casts :reinterpret-casts
+  '(:include :test :scalars :simd-packs :mask-packs :simd-casts :reinterpret-casts
     :instructions :loads :stores :reffers
     :associatives :reducers :comparisons :unequals :ifs))
 
@@ -127,7 +127,7 @@
     ;; The macro expansion of an instruction set is a very large expression
     ;; that is evaluated exactly once, so compiling it would be a waste of
     ;; resources.  Instead, we use SBCL's built-in interpreter.
-    `(let (#+(or sb-eval sb-fasteval)(sb-ext:*evaluator-mode* :interpret))
+    `(let (#+sb-eval(sb-ext:*evaluator-mode* :interpret))
        (eval
         '(let ((*instruction-set*
                 (make-instance 'instruction-set
@@ -139,6 +139,7 @@
                  :includes (list ,@(decode :include #'decode-include)))))
           ,@(decode :scalars (record-decoder 'value-record))
           ,@(decode :simd-packs (record-decoder 'simd-record))
+          ,@(decode :mask-packs (record-decoder 'mask-record))
           ,@(decode :instructions (record-decoder 'instruction-record))
           ,@(decode :loads (record-decoder 'load-record))
           ,@(decode :stores (record-decoder 'store-record))
