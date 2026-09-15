@@ -299,6 +299,90 @@
     (def-i16 sb-simd-avx512bw::two-arg-u16.32>  vpcmpuw 6)
     (def-i16 sb-simd-avx512bw::two-arg-u16.32>= vpcmpuw 5))
 
+  (macrolet ((def-mask-cmp-f (name inst cmp)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst ,cmp dst a b))))
+             (def-mask-cmp-i (name inst imm)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst dst a b ,imm)))))
+    ;; AVX-512F mask comparisons
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f32.16-mask=  vcmpps :eq)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f32.16-mask/= vcmpps :neq)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f32.16-mask<  vcmpps :lt)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f32.16-mask<= vcmpps :le)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f32.16-mask>  vcmpps :gt)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f32.16-mask>= vcmpps :ge)
+
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f64.8-mask=   vcmppd :eq)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f64.8-mask/=  vcmppd :neq)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f64.8-mask<   vcmppd :lt)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f64.8-mask<=  vcmppd :le)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f64.8-mask>   vcmppd :gt)
+    (def-mask-cmp-f sb-simd-avx512f::two-arg-f64.8-mask>=  vcmppd :ge)
+
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s32.16-mask=  vpcmpd  0)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s32.16-mask/= vpcmpd  4)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s32.16-mask<  vpcmpd  1)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s32.16-mask<= vpcmpd  2)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s32.16-mask>  vpcmpd  6)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s32.16-mask>= vpcmpd  5)
+
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u32.16-mask=  vpcmpud 0)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u32.16-mask/= vpcmpud 4)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u32.16-mask<  vpcmpud 1)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u32.16-mask<= vpcmpud 2)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u32.16-mask>  vpcmpud 6)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u32.16-mask>= vpcmpud 5)
+
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s64.8-mask=   vpcmpq  0)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s64.8-mask/=  vpcmpq  4)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s64.8-mask<   vpcmpq  1)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s64.8-mask<=  vpcmpq  2)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s64.8-mask>   vpcmpq  6)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-s64.8-mask>=  vpcmpq  5)
+
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u64.8-mask=   vpcmpuq 0)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u64.8-mask/=  vpcmpuq 4)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u64.8-mask<   vpcmpuq 1)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u64.8-mask<=  vpcmpuq 2)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u64.8-mask>   vpcmpuq 6)
+    (def-mask-cmp-i sb-simd-avx512f::two-arg-u64.8-mask>=  vpcmpuq 5)
+
+    ;; AVX-512BW mask comparisons
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s8.64-mask=  vpcmpb  0)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s8.64-mask/= vpcmpb  4)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s8.64-mask<  vpcmpb  1)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s8.64-mask<= vpcmpb  2)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s8.64-mask>  vpcmpb  6)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s8.64-mask>= vpcmpb  5)
+
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u8.64-mask=  vpcmpub 0)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u8.64-mask/= vpcmpub 4)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u8.64-mask<  vpcmpub 1)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u8.64-mask<= vpcmpub 2)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u8.64-mask>  vpcmpub 6)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u8.64-mask>= vpcmpub 5)
+
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s16.32-mask=  vpcmpw  0)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s16.32-mask/= vpcmpw  4)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s16.32-mask<  vpcmpw  1)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s16.32-mask<= vpcmpw  2)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s16.32-mask>  vpcmpw  6)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-s16.32-mask>= vpcmpw  5)
+
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask=  vpcmpuw 0)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask/= vpcmpuw 4)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask<  vpcmpuw 1)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask<= vpcmpuw 2)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask>  vpcmpuw 6)
+    (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask>= vpcmpuw 5))
+
   (define-custom-vop sb-simd-avx512f::f32.16-blend
       (:args (a) (b) (mask))
     (:temporary (:sc mask-reg) k)
