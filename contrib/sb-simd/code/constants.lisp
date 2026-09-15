@@ -23,6 +23,16 @@
 (defconstant +u32-false+ 0)
 (defconstant +u64-false+ 0)
 
+(defconstant +m64.8-true+   +u8-true+)
+(defconstant +m32.16-true+  +u16-true+)
+(defconstant +m16.32-true+  +u32-true+)
+(defconstant +m8.64-true+   +u64-true+)
+
+(defconstant +m64.8-false+  0)
+(defconstant +m32.16-false+ 0)
+(defconstant +m16.32-false+ 0)
+(defconstant +m8.64-false+  0)
+
 (defconstant most-positive-s8  (1- (expt 2 (1-  8))))
 (defconstant most-positive-s16 (1- (expt 2 (1- 16))))
 (defconstant most-positive-s32 (1- (expt 2 (1- 32))))
