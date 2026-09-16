@@ -78,6 +78,26 @@
 ;;; (Bit 15 is currently unused by other dstate properties.)
 (defconstant +evex-v-prime+ #b1000000000000000)
 
+;;; VSIB support
+
+;;; Mark that the instruction uses vector-index SIB addressing.
+(defconstant +vsib+ #x10000)   ; choose an unused dstate property bit
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (declaim (ftype (function (t t t) *) print-vsib/mem)))
+
+(define-arg-type evex-vsib-disp4
+  :prefilter (lambda (dstate mod r/m)
+               (dstate-setprop dstate +vsib+)
+               (decode-mod-r/m dstate mod r/m 'fpr :disp-n 4))
+  :printer #'print-vsib/mem)
+
+(define-arg-type evex-vsib-disp8
+  :prefilter (lambda (dstate mod r/m)
+               (dstate-setprop dstate +vsib+)
+               (decode-mod-r/m dstate mod r/m 'fpr :disp-n 8))
+  :printer #'print-vsib/mem)
+
 (define-arg-type vex-l
   :prefilter  (lambda (dstate value)
                 (dstate-setprop dstate (if (plusp value) +vex-l+ 0))))
@@ -318,7 +338,6 @@
 ;;; Byte 1: R(7) X(6) B(5) R'(4) 00(3:2) mm(1:0)
 ;;; Byte 2: W(7) vvvv(6:3) 1(2) pp(1:0)
 ;;; Byte 3: z(7) L'(6) L(5) b(4) V'(3) aaa(2:0)
-
 (define-instruction-format (evex 32)
   (evex-prefix :field (byte 8 0) :value #x62)
   ;; Byte 1
@@ -326,12 +345,13 @@
   (x        :field (byte 1 14) :type 'vex-x)
   (b        :field (byte 1 13) :type 'vex-b)
   (r-prime  :field (byte 1 12) :type 'evex-r-prime)
-  (reserved :field (byte 2 10) :value #b00) ; distinguishes EVEX from BOUND
-  (mm       :field (byte 2 8))
+  (evex-u   :field (byte 1 10))
+  (reserved :field (byte 1 11) :value 0)                ; bit 3 remains reserved (must be 0)
+  (mm       :field (byte 2 8))                          ; bits 1:0 of byte 1
   ;; Byte 2
   (w          :field (byte 1 23) :type 'evex-w)
   (vvvv       :field (byte 4 19) :type 'evex-ymm-vvvv-reg)
-  (evex-fixed :field (byte 1 18) :value 1 :type 'evex-fixed) ; must be 1 for EVEX
+  (evex-fixed :field (byte 1 18) :value 1 :type 'evex-fixed)
   (pp         :field (byte 2 16))
   ;; Byte 3
   (z-bit   :field (byte 1 31))
@@ -339,6 +359,11 @@
   (evex-b  :field (byte 1 28))
   (v-prime :field (byte 1 27) :type 'evex-v-prime)
   (aaa     :field (byte 3 24) :type 'opmask-reg))
+
+(define-instruction-format (evex-op (+ 32 8)
+                                    :include evex
+                                    :default-printer '(:name))
+    (op :field (byte 8 32)))
 
 (defmacro define-evex-instruction-format ((format-name length-in-bits
                                            &key default-printer include)
@@ -349,6 +374,49 @@
                                              'evex)
                                :default-printer ,default-printer)
      ,@(subst 32 'start arg-specs)))
+
+;;; EVEX Mask Register Formats (Exclusively EVEX - No VEX macro)
+(define-evex-instruction-format (kreg-kreg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg))
+
+(define-evex-instruction-format (kreg-reg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'reg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg))
+
+(define-evex-instruction-format (reg-kreg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'reg))
+
+(define-evex-instruction-format (kreg-kreg/mem-k 16
+                                :default-printer '(:name :tab reg ", " vvvv ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg)
+  (vvvv    :type 'k-vvvv-reg))
+
+(define-evex-instruction-format (kreg-kreg/mem-imm 16
+                                :default-printer '(:name :tab reg ", " reg/mem ", " imm))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg)
+  (imm     :type 'imm-byte))
 
 (define-evex-instruction-format (ymm-ymm/mem 16
                                  :default-printer '(:name :tab reg ", " reg/mem))
@@ -418,6 +486,89 @@
   (reg     :field (byte 3 (+ 32 11))
            :type 'reg))
 
+;;; VEX Mask Register Formats (Needed for KTEST, KAND, KOR, etc.)
+;; (define-instruction-format (vex2 16)
+;;   (vex :field (byte 8 0) :value #xC5)
+;;   (r :field (byte 1 (+ 8 7)) :type 'vex-r)
+;;   (vvvv :field (byte 4 (+ 8 3)) :type 'ymm-vvvv-reg)
+;;   (l  :field (byte 1 (+ 8 2)) :type 'vex-l)
+;;   (pp :field (byte 2 (+ 8 0)))
+;;   ;; Implicit bits for 2-byte VEX. This allows the disassembler
+;;   ;; to correctly reject instructions requiring W=1 (like KTESTQ)
+;;   (m-mmmm :field (byte 0 0) :value 1)
+;;   (w :field (byte 0 0) :value 0))
+
+(define-vex-instruction-format (kreg-kreg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg))
+
+(define-vex-instruction-format (kreg-reg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'reg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg))
+
+(define-vex-instruction-format (reg-kreg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'reg))
+
+(define-evex-instruction-format (kreg-reg/mem-imm 16
+                                :default-printer '(:name :tab reg ", " reg/mem ", " imm))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'reg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg)
+  (imm     :type 'imm-byte))
+
+(define-instruction-format (vex3-kreg-reg/mem-imm 24
+                            :default-printer '(:name :tab reg ", " reg/mem ", " imm8))
+  (pp     :field (byte 2 0))
+  (m-mmmm :field (byte 5 0))
+  (op     :field (byte 8 0))
+  (w      :field (byte 1 7))
+  (l      :field (byte 1 2)))
+
+
+(define-evex-instruction-format (vsib-disp4 24
+                                 :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'evex-vsib-disp4)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'ymmreg))
+
+(define-evex-instruction-format (vsib-disp8 24
+                                 :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'evex-vsib-disp8)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'ymmreg))
+
+(define-evex-instruction-format (vsib-prefetch-disp4 24
+                                 :default-printer '(:name :tab reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'evex-vsib-disp4)
+  (/i      :field (byte 3 (+ start 11))))
+
+(define-evex-instruction-format (vsib-prefetch-disp8 24
+                                 :default-printer '(:name :tab reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'evex-vsib-disp8)
+  (/i      :field (byte 3 (+ start 11))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun vex-encode-pp (pp)
@@ -433,11 +584,26 @@
       (#x0F38 #b00010)
       (#x0F3A #b00011)))
 
-  (defun evex-encode-mm (m-mmmm)
-    (ecase m-mmmm
-      (#x0F   #b01)
-      (#x0F38 #b10)
-      (#x0F3A #b11))))
+  ;; Return (values mm u) for the given opcode map number.
+  ;; Map 1 = 0F, 2 = 0F38, 3 = 0F3A, 5 = MAP5, 6 = MAP6, etc.
+  (defun evex-encode-map (opcode-prefix)
+    (ecase opcode-prefix
+      (1 (values #b01 0))   ; 0F
+      (2 (values #b10 0))   ; 0F38
+      (3 (values #b11 0))   ; 0F3A
+      (9 (values #b01 1))   ; MAP5
+      (10 (values #b10 1)))) ; MAP6
+
+  ;; (defun evex-encode-map (opcode-prefix)
+  ;;   (case opcode-prefix
+  ;;     (1 (values #b01 0))
+  ;;     (2 (values #b10 0))
+  ;;     (3 (values #b11 0))
+  ;;     ;; Add correct mappings for MAP5/6. These are examples and may need verification.
+  ;;     (5 (values #b01 1))               ; MAP5 typically uses mm=01, U=1
+  ;;     (6 (values #b10 1))               ; MAP6 typically uses mm=10, U=1
+  ;;     (t (values #b00 0))))
+  )
 
 (defun emit-two-byte-vex (segment r vvvv l pp)
   (emit-bytes segment
@@ -522,28 +688,29 @@
 ;;; P2: W(7) vvvv(6:3) 1(2) pp(1:0)
 ;;; P3: z(7) L'(6) L(5) b(4) V'(3) aaa(2:0)
 ;;; R, X, B, R', V' are inverted. vvvv is inverted.
-
-(defun emit-evex (segment r x b r-prime opcode-prefix w vvvv pp z ll evex-b v-prime aaa)
-  (emit-bytes segment
-              #x62
-              ;; P1: R X B R' 00 mm
-              (logior (ash (logxor 1 r) 7)
-                      (ash (logxor 1 x) 6)
-                      (ash (logxor 1 b) 5)
-                      (ash (logxor 1 r-prime) 4)
-                      ;; bits 3:2 are reserved (0)
-                      (evex-encode-mm opcode-prefix))
-              ;; P2: W vvvv 1 pp
-              (logior (ash w 7)
-                      (ash (logandc1 vvvv #b1111) 3)
-                      #b100  ; bit 2 always 1
-                      (vex-encode-pp pp))
-              ;; P3: z L'L b V' aaa
-              (logior (ash z 7)
-                      (ash ll 5)
-                      (ash evex-b 4)
-                      (ash (logxor 1 v-prime) 3)
-                      aaa)))
+(defun emit-evex (segment r x b r-prime map w vvvv pp z ll evex-b v-prime aaa)
+  (multiple-value-bind (mm u) (evex-encode-map map)
+    (emit-bytes segment
+                #x62
+                ;; P0: R X B R' U 0 mm
+                (logior (ash (logxor 1 r) 7)
+                        (ash (logxor 1 x) 6)
+                        (ash (logxor 1 b) 5)
+                        (ash (logxor 1 r-prime) 4)
+                        (ash u 2)
+                        ;; bit 3 is reserved and must be zero
+                        mm)
+                ;; P1: W vvvv 1 pp
+                (logior (ash w 7)
+                        (ash (logandc1 vvvv #b1111) 3)
+                        #b100
+                        (vex-encode-pp pp))
+                ;; P2: z L'L b V' aaa
+                (logior (ash z 7)
+                        (ash ll 5)
+                        (ash evex-b 4)
+                        (ash (logxor 1 v-prime) 3)
+                        aaa))))
 
 (defun determine-evex-flags (thing reg ll vvvv)
   "Extract EVEX prefix flags from operands.
@@ -606,7 +773,7 @@ EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
 (defun emit-avx512-inst (segment thing reg prefix opcode
                          &key (remaining-bytes 0)
                               ll
-                              (opcode-prefix #x0F)
+                              (map 1)      ; map number: 1=0F, 2=0F38, 3=0F3A, 9=MAP5, 10=MAP6
                               (w 0)
                               vvvv
                               (aaa 0)
@@ -614,17 +781,10 @@ EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
                               (evex-b 0)
                               vm
                               (disp-n 0))
-  "Emit an EVEX-encoded instruction.
-DISP-N is the compressed displacement scale factor (Intel tuple N).
-Common values: 64 for full 512-bit loads, 32 for 256-bit or half-vector,
-16 for 128-bit or quarter-vector, 8 for qword, 4 for dword.
-Default is 0 (force disp32, never use disp8) for safety -- the CPU
-always applies compression to EVEX disp8, so using the wrong N
-produces silently wrong addresses."
   (multiple-value-bind (ll r x b r-prime v-prime)
       (determine-evex-flags thing reg ll vvvv)
     (let ((vvvv-num (if vvvv (reg-id-num (reg-id vvvv)) 0)))
-      (emit-evex segment r x b r-prime opcode-prefix w
+      (emit-evex segment r x b r-prime map w
                  vvvv-num prefix z ll evex-b v-prime aaa))
     (emit-bytes segment opcode)
     (emit-ea segment thing reg
@@ -640,29 +800,30 @@ produces silently wrong addresses."
                             evex-w
                             vvvv
                             is4
-                            vm)
+                         vm)
+    (declare (ignorable evex-w))
   ;; Auto-detect ZMM operands and delegate to EVEX encoding
-  (flet ((evex-reg-p (r)
-           (and (register-p r)
-                (or (is-zmm-id-p (reg-id r))
-                    (>= (reg-id-num (reg-id r)) 16)))))
-    (when (or (evex-reg-p reg)
-              (evex-reg-p thing)
-              (evex-reg-p vvvv))
-      (return-from emit-avx2-inst
-        (emit-avx512-inst segment thing reg prefix opcode
-                          :remaining-bytes remaining-bytes
-                          ;; Don't pass VEX L as EVEX L'L; let determine-evex-flags
-                          ;; auto-detect the vector length from register types.
-                          :ll nil
-                          :opcode-prefix opcode-prefix
-                          :w (or evex-w w)
-                          :vvvv vvvv
-                          :vm vm
-                          ;; Force disp32 for auto-promoted VEX instructions:
-                          ;; the correct N depends on tuple type which varies
-                          ;; per instruction. disp-n=0 disables disp8 entirely.
-                          :disp-n 0))))
+  ;; (flet ((evex-reg-p (r)
+  ;;          (and (register-p r)
+  ;;               (or (is-zmm-id-p (reg-id r))
+  ;;                   (>= (reg-id-num (reg-id r)) 16)))))
+  ;;   (when (or (evex-reg-p reg)
+  ;;             (evex-reg-p thing)
+  ;;             (evex-reg-p vvvv))
+  ;;     (return-from emit-avx2-inst
+  ;;       (emit-avx512-inst segment thing reg prefix opcode
+  ;;                         :remaining-bytes remaining-bytes
+  ;;                         ;; Don't pass VEX L as EVEX L'L; let determine-evex-flags
+  ;;                         ;; auto-detect the vector length from register types.
+  ;;                         :ll nil
+  ;;                         :opcode-prefix opcode-prefix
+  ;;                         :w (or evex-w w)
+  ;;                         :vvvv vvvv
+  ;;                         :vm vm
+  ;;                         ;; Force disp32 for auto-promoted VEX instructions:
+  ;;                         ;; the correct N depends on tuple type which varies
+  ;;                         ;; per instruction. disp-n=0 disables disp8 entirely.
+  ;;                         :disp-n 0))))
   (emit-vex segment vvvv thing reg prefix opcode-prefix l w)
   (emit-bytes segment opcode)
   (when is4
@@ -673,44 +834,45 @@ produces silently wrong addresses."
   (when is4
     (emit-byte segment (ash (reg-id-num (reg-id is4)) 4))))
 
-(defun emit-avx512-inst-imm (segment thing reg imm prefix opcode /i
-                             &key ll
-                                  (w 0)
-                                  (opcode-prefix #x0F)
-                                  (aaa 0) (z 0) (evex-b 0))
-  "Emit EVEX-encoded instruction with /i field and immediate byte.
-THING is the destination (NDD, encoded in vvvv).
-REG is the source (encoded in ModR/M.r/m).
-/I is encoded in ModR/M.reg bits 5:3."
-  (aver (<= 0 /i 7))
-  ;; thing = destination -> goes in vvvv (NDD encoding)
-  ;; reg = source -> goes in r/m
-  (multiple-value-bind (ll r x b r-prime v-prime)
-      (determine-evex-flags reg nil ll thing)
-    (let ((vvvv-num (if thing (reg-id-num (reg-id thing)) 0)))
-      (emit-evex segment r x b r-prime opcode-prefix w
-                 vvvv-num prefix z ll evex-b v-prime aaa)))
-  (emit-bytes segment opcode)
-  (emit-byte segment (logior (ash (logior #b11000 /i) 3)
-                             (reg-encoding reg segment)))
-  (emit-byte segment imm))
+;; (defun emit-avx512-inst-imm (segment thing reg imm prefix opcode /i
+;;                              &key ll
+;;                                   (w 0)
+;;                                   (opcode-prefix #x0F)
+;;                                   (aaa 0) (z 0) (evex-b 0))
+;;   "Emit EVEX-encoded instruction with /i field and immediate byte.
+;; THING is the destination (NDD, encoded in vvvv).
+;; REG is the source (encoded in ModR/M.r/m).
+;; /I is encoded in ModR/M.reg bits 5:3."
+;;   (aver (<= 0 /i 7))
+;;   ;; thing = destination -> goes in vvvv (NDD encoding)
+;;   ;; reg = source -> goes in r/m
+;;   (multiple-value-bind (ll r x b r-prime v-prime)
+;;       (determine-evex-flags reg nil ll thing)
+;;     (let ((vvvv-num (if thing (reg-id-num (reg-id thing)) 0)))
+;;       (emit-evex segment r x b r-prime opcode-prefix w
+;;                  vvvv-num prefix z ll evex-b v-prime aaa)))
+;;   (emit-bytes segment opcode)
+;;   (emit-byte segment (logior (ash (logior #b11000 /i) 3)
+;;                              (reg-encoding reg segment)))
+;;   (emit-byte segment imm))
 
 (defun emit-avx2-inst-imm (segment thing reg imm prefix opcode /i
                            &key l
                                 (w 0)
                                 evex-w
                                 (opcode-prefix #x0F))
+  (declare (ignorable evex-w))
   (aver (<= 0 /i 7))
-  (flet ((evex-reg-p (r)
-           (and (register-p r)
-                (or (is-zmm-id-p (reg-id r))
-                    (>= (reg-id-num (reg-id r)) 16)))))
-    ;; Auto-detect ZMM operands and delegate to EVEX encoding
-    (when (or (evex-reg-p reg)
-              (evex-reg-p thing))
-      (return-from emit-avx2-inst-imm
-        (emit-avx512-inst-imm segment thing reg imm prefix opcode /i
-                              :ll l :w (or evex-w w) :opcode-prefix opcode-prefix))))
+  ;; (flet ((evex-reg-p (r)
+  ;;          (and (register-p r)
+  ;;               (or (is-zmm-id-p (reg-id r))
+  ;;                   (>= (reg-id-num (reg-id r)) 16)))))
+  ;;   ;; Auto-detect ZMM operands and delegate to EVEX encoding
+  ;;   (when (or (evex-reg-p reg)
+  ;;             (evex-reg-p thing))
+  ;;     (return-from emit-avx2-inst-imm
+  ;;       (emit-avx512-inst-imm segment thing reg imm prefix opcode /i
+  ;;                             :ll l :w (or evex-w w) :opcode-prefix opcode-prefix))))
   (emit-vex segment thing reg nil prefix opcode-prefix l w)
   (emit-bytes segment opcode)
   (emit-byte segment (logior (ash (logior #b11000 /i) 3)
@@ -733,7 +895,7 @@ REG is the source (encoded in ModR/M.r/m).
                                       nds
                                       disp-n)
   (let ((fields `((pp ,(vex-encode-pp prefix))
-                  (mm ,(evex-encode-mm opcode-prefix))
+                  (mm ,(evex-encode-map opcode-prefix))
                   (op ,opcode)
                   ,@(and w `((w ,w)))
                   ,@(and ll `((ll ,ll)))
@@ -782,7 +944,8 @@ REG is the source (encoded in ModR/M.r/m).
                                       w
                                       l
                                       nds
-                                      evex)
+                                   evex)
+    (declare (ignorable evex))
     (let ((fields `((pp ,(vex-encode-pp prefix))
                     (m-mmmm ,(vex-encode-m-mmmm opcode-prefix))
                     (op ,opcode)
@@ -823,18 +986,19 @@ REG is the source (encoded in ModR/M.r/m).
        ;; instructions reuse those opcodes). Map 0F38 has many conflicts
        ;; (broadcasts, vmaskmov vs vscalef, etc.), so we only include the
        ;; FMA range (#x96-#xBF) which is safe. Map 0F3A is skipped entirely.
-       (when (or evex
-                 (= opcode-prefix #x0F)
-                 (and (= opcode-prefix #x0F38)
-                      (<= #x96 opcode #xbf)))
-         (avx512-inst-printer-list inst-format-stem prefix opcode
-                                   :more-fields more-fields
-                                   :printer printer
-                                   :opcode-prefix opcode-prefix
-                                   :reg-mem-size reg-mem-size
-                                   :xmmreg-mem-size xmmreg-mem-size
-                                   :w w
-                                   :nds nds))))))
+       ;; (when (or evex
+       ;;           (= opcode-prefix #x0F)
+       ;;           (and (= opcode-prefix #x0F38)
+       ;;                (<= #x96 opcode #xbf)))
+       ;;   (avx512-inst-printer-list inst-format-stem prefix opcode
+       ;;                             :more-fields more-fields
+       ;;                             :printer printer
+       ;;                             :opcode-prefix opcode-prefix
+       ;;                             :reg-mem-size reg-mem-size
+       ;;                             :xmmreg-mem-size xmmreg-mem-size
+       ;;                             :w w
+       ;;                             :nds nds))
+       ))))
 
 (macrolet
     ((def (name opcode /i)
@@ -1294,6 +1458,7 @@ REG is the source (encoded in ModR/M.r/m).
                (t
                 (aver (xmm-register-p src))
                 (emit-avx2-inst segment dst src #x66 #x7e :l 0 :w w)))))
+
   (define-instruction vmovd (segment dst src)
     (:emitter (move-ymm<->gpr segment dst src 0))
     . #.(append (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x6e
@@ -1303,6 +1468,7 @@ REG is the source (encoded in ModR/M.r/m).
                                         :more-fields '((reg/mem nil :type 'sized-reg/mem))
                                         :printer '(:name :tab reg/mem ", " reg)
                                         :w 0)))
+
   (define-instruction vmovq (segment dst src)
     (:emitter
      (cond ((or (gpr-p src) (gpr-p dst))
@@ -1908,4 +2074,3 @@ REG is the source (encoded in ModR/M.r/m).
   (def blsr 1)
   (def blsmsk 2)
   (def blsi 3))
-

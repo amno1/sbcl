@@ -1028,6 +1028,7 @@
   (not (logbitp 0 reg-id)))
 (defun gpr-id-size-class (reg-id) ; an integer 0..3 identifying the size
   (ldb (byte 2 1) reg-id))
+
 (defun reg-id-num (reg-id)
   (ldb (byte 5 3) reg-id))
 
