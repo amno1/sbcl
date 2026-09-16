@@ -739,10 +739,13 @@ EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
                     ((and vvvv (register-p vvvv) (xmm-register-p vvvv))
                      (fpr-size vvvv))
                     (t #b00)))
-          ;; R from reg (ModR/M reg field) - bit 3
-          (r (if (null reg) 0 (reg-bit3 (reg-id reg))))
+          ;; R from reg (ModR/M reg field) - bit 3. REG may be a literal
+          ;; 0-7 fixed opcode-extension digit instead of a real register
+          ;; (e.g. PSRLDQ's /3) - same convention DETERMINE-VEX-FLAGS
+          ;; already uses for its own REG argument.
+          (r (if (or (null reg) (integerp reg)) 0 (reg-bit3 (reg-id reg))))
           ;; R' from reg - bit 4
-          (r-prime (if (or (null reg) (k-register-p reg)) 0 (reg-bit4 (reg-id reg))))
+          (r-prime (if (or (null reg) (integerp reg) (k-register-p reg)) 0 (reg-bit4 (reg-id reg))))
           ;; X from EA index, or bit 4 of r/m reg for register-direct
           ;; In EVEX, X doubles as B' (bit 4 of r/m) when mod=11 (reg-direct)
           (x (cond ((and (ea-p thing)
