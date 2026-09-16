@@ -8415,13 +8415,21 @@
  (:PRINTER EVEX-YMM-YMM/MEM-IMM ((PP 1) (MM 3) (EVEX-U 0) (OP 5) (W 1) (LL 0))
   '(:NAME :TAB REG ", " REG/MEM))
  (:EMITTER
-  (PROGN
-   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 5 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
-                     (IF (OR (EQ Z :Z) (EQL Z 1))
-                         1
-                         0)))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (EMIT-AVX512-INST SEGMENT SRC1 DST 102 5 :W 1 :MAP 3 :EVEX-B 0 :DISP-N
+                         (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                         (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0))
+       (EMIT-BYTE SEGMENT SRC2))
+      (EMIT-AVX512-INST SEGMENT SRC2 DST 102 13 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B
+                        0 :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
+                        (MASK-ARG-NUMBER K) :Z
+                        (IF (OR (EQ Z :Z) (EQL Z 1))
+                            1
+                            0)))))
 
 (DEFINE-INSTRUCTION VPERMILPS-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
  (:PRINTER EVEX-YMM-YMM/MEM ((PP 1) (MM 2) (EVEX-U 0) (OP 12) (W 0) (LL 2))
@@ -8437,13 +8445,21 @@
  (:PRINTER EVEX-YMM-YMM/MEM-IMM ((PP 1) (MM 3) (EVEX-U 0) (OP 4) (W 0) (LL 0))
   '(:NAME :TAB REG ", " REG/MEM))
  (:EMITTER
-  (PROGN
-   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 4 :VVVV SRC1 :W 0 :MAP 2 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
-                     (IF (OR (EQ Z :Z) (EQL Z 1))
-                         1
-                         0)))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (EMIT-AVX512-INST SEGMENT SRC1 DST 102 4 :W 0 :MAP 3 :EVEX-B 0 :DISP-N
+                         (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                         (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0))
+       (EMIT-BYTE SEGMENT SRC2))
+      (EMIT-AVX512-INST SEGMENT SRC2 DST 102 12 :VVVV SRC1 :W 0 :MAP 2 :EVEX-B
+                        0 :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
+                        (MASK-ARG-NUMBER K) :Z
+                        (IF (OR (EQ Z :Z) (EQL Z 1))
+                            1
+                            0)))))
 
 (DEFINE-INSTRUCTION VPERMPD-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
  (:PRINTER EVEX-YMM-YMM/MEM ((PP 1) (MM 2) (EVEX-U 0) (OP 22) (W 1) (LL 2))
@@ -8455,13 +8471,21 @@
  (:PRINTER EVEX-YMM-YMM/MEM-IMM ((PP 1) (MM 3) (EVEX-U 0) (OP 1) (W 1) (LL 1))
   '(:NAME :TAB REG ", " REG/MEM))
  (:EMITTER
-  (PROGN
-   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 1 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
-                     (IF (OR (EQ Z :Z) (EQL Z 1))
-                         1
-                         0)))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (EMIT-AVX512-INST SEGMENT SRC1 DST 102 1 :W 1 :MAP 3 :EVEX-B 0 :DISP-N
+                         (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                         (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0))
+       (EMIT-BYTE SEGMENT SRC2))
+      (EMIT-AVX512-INST SEGMENT SRC2 DST 102 22 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B
+                        0 :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
+                        (MASK-ARG-NUMBER K) :Z
+                        (IF (OR (EQ Z :Z) (EQL Z 1))
+                            1
+                            0)))))
 
 (DEFINE-INSTRUCTION VPERMPS-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
  (:PRINTER EVEX-YMM-YMM/MEM ((PP 1) (MM 2) (EVEX-U 0) (OP 22) (W 0) (LL 2))
@@ -8487,13 +8511,21 @@
  (:PRINTER EVEX-YMM-YMM/MEM-IMM ((PP 1) (MM 3) (EVEX-U 0) (OP 0) (W 1) (LL 1))
   '(:NAME :TAB REG ", " REG/MEM))
  (:EMITTER
-  (PROGN
-   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 0 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
-                     (IF (OR (EQ Z :Z) (EQL Z 1))
-                         1
-                         0)))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (EMIT-AVX512-INST SEGMENT SRC1 DST 102 0 :W 1 :MAP 3 :EVEX-B 0 :DISP-N
+                         (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                         (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0))
+       (EMIT-BYTE SEGMENT SRC2))
+      (EMIT-AVX512-INST SEGMENT SRC2 DST 102 54 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B
+                        0 :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
+                        (MASK-ARG-NUMBER K) :Z
+                        (IF (OR (EQ Z :Z) (EQL Z 1))
+                            1
+                            0)))))
 
 (DEFINE-INSTRUCTION VPERMT2B-MASKED (SEGMENT DST SRC2 SRC3 K &OPTIONAL (Z 0))
  (:PRINTER EVEX-YMM-YMM/MEM ((PP 1) (MM 2) (EVEX-U 0) (OP 125) (W 0) (LL 2))
@@ -10718,12 +10750,11 @@
  (:EMITTER
   (PROGN
    (EMIT-AVX512-INST SEGMENT SRC1 1 102 114 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
+                     :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                     (MASK-ARG-NUMBER K) :Z
                      (IF (OR (EQ Z :Z) (EQL Z 1))
                          1
-                         0)
-                     :REMAINING-BYTES 1)
+                         0))
    (EMIT-BYTE SEGMENT SRC2))))
 
 (DEFINE-INSTRUCTION VPROLQ-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
@@ -10736,12 +10767,11 @@
  (:EMITTER
   (PROGN
    (EMIT-AVX512-INST SEGMENT SRC1 1 102 114 :VVVV DST :W 1 :MAP 1 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
+                     :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                     (MASK-ARG-NUMBER K) :Z
                      (IF (OR (EQ Z :Z) (EQL Z 1))
                          1
-                         0)
-                     :REMAINING-BYTES 1)
+                         0))
    (EMIT-BYTE SEGMENT SRC2))))
 
 (DEFINE-INSTRUCTION VPROLVD-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
@@ -10786,12 +10816,11 @@
  (:EMITTER
   (PROGN
    (EMIT-AVX512-INST SEGMENT SRC1 0 102 114 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
+                     :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                     (MASK-ARG-NUMBER K) :Z
                      (IF (OR (EQ Z :Z) (EQL Z 1))
                          1
-                         0)
-                     :REMAINING-BYTES 1)
+                         0))
    (EMIT-BYTE SEGMENT SRC2))))
 
 (DEFINE-INSTRUCTION VPRORQ-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
@@ -10804,12 +10833,11 @@
  (:EMITTER
   (PROGN
    (EMIT-AVX512-INST SEGMENT SRC1 0 102 114 :VVVV DST :W 1 :MAP 1 :EVEX-B 0
-                     :DISP-N (FULL-VECTOR-DISP-N DST) :AAA (MASK-ARG-NUMBER K)
-                     :Z
+                     :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1 :AAA
+                     (MASK-ARG-NUMBER K) :Z
                      (IF (OR (EQ Z :Z) (EQL Z 1))
                          1
-                         0)
-                     :REMAINING-BYTES 1)
+                         0))
    (EMIT-BYTE SEGMENT SRC2))))
 
 (DEFINE-INSTRUCTION VPRORVD-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
@@ -11329,8 +11357,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 6 102 114 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -11359,8 +11387,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 6 102 115 :VVVV DST :W 1 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -11437,8 +11465,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 6 102 113 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -11467,8 +11495,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 4 102 114 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -11545,8 +11573,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 4 102 113 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -11593,8 +11621,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 2 102 114 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -11623,8 +11651,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 2 102 115 :VVVV DST :W 1 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -11701,8 +11729,8 @@
   (IF (INTEGERP SRC2)
       (PROGN
        (EMIT-AVX512-INST SEGMENT SRC1 2 102 113 :VVVV DST :W 0 :MAP 1 :EVEX-B 0
-                         :DISP-N (FULL-VECTOR-DISP-N DST) :AAA
-                         (MASK-ARG-NUMBER K) :Z
+                         :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES 1
+                         :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))
@@ -18739,14 +18767,24 @@
 
 (DEFINE-INSTRUCTION VPERMQ (SEGMENT DST SRC1 SRC2)
  (:EMITTER
-  (PROGN
-   (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
-       (EMIT-AVX512-INST SEGMENT SRC2 DST 102 54 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B
-                         0 :DISP-N (FULL-VECTOR-DISP-N DST))
-       (PROGN
-        (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 1)
-        (EMIT-BYTE SEGMENT 54)
-        (EMIT-EA SEGMENT SRC2 DST))))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1)
+           (EMIT-AVX512-INST SEGMENT SRC1 DST 102 0 :W 1 :MAP 3 :EVEX-B 0
+                             :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES
+                             1)
+           (PROGN
+            (EMIT-VEX SEGMENT NIL SRC1 DST 102 3898 NIL 1)
+            (EMIT-BYTE SEGMENT 0)
+            (EMIT-EA SEGMENT SRC1 DST)))
+       (EMIT-BYTE SEGMENT SRC2))
+      (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
+          (EMIT-AVX512-INST SEGMENT SRC2 DST 102 54 :VVVV SRC1 :W 1 :MAP 2
+                            :EVEX-B 0 :DISP-N (FULL-VECTOR-DISP-N DST))
+          (PROGN
+           (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 1)
+           (EMIT-BYTE SEGMENT 54)
+           (EMIT-EA SEGMENT SRC2 DST))))))
 
 (DEFINE-INSTRUCTION VPERMQ-MASKED-BCAST
  (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
@@ -18793,14 +18831,24 @@
 
 (DEFINE-INSTRUCTION VPERMPD (SEGMENT DST SRC1 SRC2)
  (:EMITTER
-  (PROGN
-   (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
-       (EMIT-AVX512-INST SEGMENT SRC2 DST 102 22 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B
-                         0 :DISP-N (FULL-VECTOR-DISP-N DST))
-       (PROGN
-        (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 1)
-        (EMIT-BYTE SEGMENT 22)
-        (EMIT-EA SEGMENT SRC2 DST))))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1)
+           (EMIT-AVX512-INST SEGMENT SRC1 DST 102 1 :W 1 :MAP 3 :EVEX-B 0
+                             :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES
+                             1)
+           (PROGN
+            (EMIT-VEX SEGMENT NIL SRC1 DST 102 3898 NIL 1)
+            (EMIT-BYTE SEGMENT 1)
+            (EMIT-EA SEGMENT SRC1 DST)))
+       (EMIT-BYTE SEGMENT SRC2))
+      (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
+          (EMIT-AVX512-INST SEGMENT SRC2 DST 102 22 :VVVV SRC1 :W 1 :MAP 2
+                            :EVEX-B 0 :DISP-N (FULL-VECTOR-DISP-N DST))
+          (PROGN
+           (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 1)
+           (EMIT-BYTE SEGMENT 22)
+           (EMIT-EA SEGMENT SRC2 DST))))))
 
 (DEFINE-INSTRUCTION VPERMPD-MASKED-BCAST
  (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
@@ -18820,14 +18868,24 @@
 
 (DEFINE-INSTRUCTION VPERMILPS (SEGMENT DST SRC1 SRC2)
  (:EMITTER
-  (PROGN
-   (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
-       (EMIT-AVX512-INST SEGMENT SRC2 DST 102 12 :VVVV SRC1 :W 0 :MAP 2 :EVEX-B
-                         0 :DISP-N (FULL-VECTOR-DISP-N DST))
-       (PROGN
-        (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 0)
-        (EMIT-BYTE SEGMENT 12)
-        (EMIT-EA SEGMENT SRC2 DST))))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1)
+           (EMIT-AVX512-INST SEGMENT SRC1 DST 102 4 :W 0 :MAP 3 :EVEX-B 0
+                             :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES
+                             1)
+           (PROGN
+            (EMIT-VEX SEGMENT NIL SRC1 DST 102 3898 NIL 0)
+            (EMIT-BYTE SEGMENT 4)
+            (EMIT-EA SEGMENT SRC1 DST)))
+       (EMIT-BYTE SEGMENT SRC2))
+      (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
+          (EMIT-AVX512-INST SEGMENT SRC2 DST 102 12 :VVVV SRC1 :W 0 :MAP 2
+                            :EVEX-B 0 :DISP-N (FULL-VECTOR-DISP-N DST))
+          (PROGN
+           (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 0)
+           (EMIT-BYTE SEGMENT 12)
+           (EMIT-EA SEGMENT SRC2 DST))))))
 
 (DEFINE-INSTRUCTION VPERMILPS-MASKED-BCAST
  (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
@@ -18847,14 +18905,24 @@
 
 (DEFINE-INSTRUCTION VPERMILPD (SEGMENT DST SRC1 SRC2)
  (:EMITTER
-  (PROGN
-   (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
-       (EMIT-AVX512-INST SEGMENT SRC2 DST 102 13 :VVVV SRC1 :W 1 :MAP 2 :EVEX-B
-                         0 :DISP-N (FULL-VECTOR-DISP-N DST))
-       (PROGN
-        (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 1)
-        (EMIT-BYTE SEGMENT 13)
-        (EMIT-EA SEGMENT SRC2 DST))))))
+  (IF (INTEGERP SRC2)
+      (PROGN
+       (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1)
+           (EMIT-AVX512-INST SEGMENT SRC1 DST 102 5 :W 1 :MAP 3 :EVEX-B 0
+                             :DISP-N (FULL-VECTOR-DISP-N DST) :REMAINING-BYTES
+                             1)
+           (PROGN
+            (EMIT-VEX SEGMENT NIL SRC1 DST 102 3898 NIL 1)
+            (EMIT-BYTE SEGMENT 5)
+            (EMIT-EA SEGMENT SRC1 DST)))
+       (EMIT-BYTE SEGMENT SRC2))
+      (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
+          (EMIT-AVX512-INST SEGMENT SRC2 DST 102 13 :VVVV SRC1 :W 1 :MAP 2
+                            :EVEX-B 0 :DISP-N (FULL-VECTOR-DISP-N DST))
+          (PROGN
+           (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 3896 NIL 1)
+           (EMIT-BYTE SEGMENT 13)
+           (EMIT-EA SEGMENT SRC2 DST))))))
 
 (DEFINE-INSTRUCTION VPERMILPD-MASKED-BCAST
  (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
