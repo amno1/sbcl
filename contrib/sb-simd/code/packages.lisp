@@ -2248,6 +2248,20 @@
      #:two-arg-f32.16-mask<
      #:two-arg-f32.16-mask>=
      #:two-arg-f32.16-mask<=
+     #:f32.16-masked-z+
+     #:f32.16-masked-z-
+     #:f32.16-masked-z*
+     #:f32.16-masked-z/
+     #:f32.16-masked-z-max
+     #:f32.16-masked-z-min
+     #:f32.16-masked-z-sqrt
+     #:f32.16-masked+
+     #:f32.16-masked-
+     #:f32.16-masked*
+     #:f32.16-masked/
+     #:f32.16-masked-max
+     #:f32.16-masked-min
+     #:f32.16-masked-sqrt
      #:f32.16>
      #:f32.16>=
      #:f32.16-sqrt
@@ -2311,6 +2325,20 @@
      #:two-arg-f64.8-mask<
      #:two-arg-f64.8-mask>=
      #:two-arg-f64.8-mask<=
+     #:f64.8-masked-z+
+     #:f64.8-masked-z-
+     #:f64.8-masked-z*
+     #:f64.8-masked-z/
+     #:f64.8-masked-z-max
+     #:f64.8-masked-z-min
+     #:f64.8-masked-z-sqrt
+     #:f64.8-masked+
+     #:f64.8-masked-
+     #:f64.8-masked*
+     #:f64.8-masked/
+     #:f64.8-masked-max
+     #:f64.8-masked-min
+     #:f64.8-masked-sqrt
      #:f64.8>
      #:f64.8>=
      #:f64.8-sqrt
@@ -2364,6 +2392,20 @@
      #:two-arg-u32.16-mask<
      #:two-arg-u32.16-mask>=
      #:two-arg-u32.16-mask<=
+     #:u32.16-masked-z+
+     #:u32.16-masked-z-
+     #:u32.16-masked-z*
+     #:u32.16-masked-z-and
+     #:u32.16-masked-z-andc1
+     #:u32.16-masked-z-or
+     #:u32.16-masked-z-xor
+     #:u32.16-masked+
+     #:u32.16-masked-
+     #:u32.16-masked*
+     #:u32.16-masked-and
+     #:u32.16-masked-andc1
+     #:u32.16-masked-or
+     #:u32.16-masked-xor
      #:u32.16-shiftl
      #:u32.16-shiftr
      #:u32.8-from-u32.16
@@ -2406,6 +2448,18 @@
      #:two-arg-u64.8-mask<
      #:two-arg-u64.8-mask>=
      #:two-arg-u64.8-mask<=
+     #:u64.8-masked-z+
+     #:u64.8-masked-z-
+     #:u64.8-masked-z-and
+     #:u64.8-masked-z-andc1
+     #:u64.8-masked-z-or
+     #:u64.8-masked-z-xor
+     #:u64.8-masked+
+     #:u64.8-masked-
+     #:u64.8-masked-and
+     #:u64.8-masked-andc1
+     #:u64.8-masked-or
+     #:u64.8-masked-xor
      #:u64.8-shiftl
      #:u64.8-shiftr
      #:u64.4-from-u64.8
@@ -2449,6 +2503,20 @@
      #:two-arg-s32.16-mask<
      #:two-arg-s32.16-mask>=
      #:two-arg-s32.16-mask<=
+     #:s32.16-masked-z+
+     #:s32.16-masked-z-
+     #:s32.16-masked-z*
+     #:s32.16-masked-z-and
+     #:s32.16-masked-z-andc1
+     #:s32.16-masked-z-or
+     #:s32.16-masked-z-xor
+     #:s32.16-masked+
+     #:s32.16-masked-
+     #:s32.16-masked*
+     #:s32.16-masked-and
+     #:s32.16-masked-andc1
+     #:s32.16-masked-or
+     #:s32.16-masked-xor
      #:s32.16-shiftl
      #:s32.16-shiftr
      #:s32.8-from-s32.16
@@ -2491,6 +2559,18 @@
      #:two-arg-s64.8-mask<
      #:two-arg-s64.8-mask>=
      #:two-arg-s64.8-mask<=
+     #:s64.8-masked-z+
+     #:s64.8-masked-z-
+     #:s64.8-masked-z-and
+     #:s64.8-masked-z-andc1
+     #:s64.8-masked-z-or
+     #:s64.8-masked-z-xor
+     #:s64.8-masked+
+     #:s64.8-masked-
+     #:s64.8-masked-and
+     #:s64.8-masked-andc1
+     #:s64.8-masked-or
+     #:s64.8-masked-xor
      #:s64.8-shiftl
      #:s64.8-shiftr
      #:s64.4-from-s64.8

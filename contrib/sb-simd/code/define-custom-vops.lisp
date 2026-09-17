@@ -383,6 +383,133 @@
     (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask>  vpcmpuw 6)
     (def-mask-cmp-i sb-simd-avx512bw::two-arg-u16.32-mask>= vpcmpuw 5))
 
+  ;; AVX-512F masked arithmetic
+  (macrolet ((def-masked-z-binop (name inst)
+               `(define-custom-vop ,name
+                    (:args (mask) (a) (b))
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst dst a b mask :z))))
+             (def-masked-binop (name move-inst inst)
+               `(define-custom-vop ,name
+                    (:args (mask) (default :target dst) (a :to :save) (b :to :save))
+                  (:results (dst))
+                  (:generator
+                   (unless (location= dst default)
+                     (inst ,move-inst dst default))
+                   (inst ,inst dst a b mask 0))))
+             (def-masked-z-unop (name inst)
+               `(define-custom-vop ,name
+                    (:args (mask) (a))
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst dst a mask :z))))
+             (def-masked-unop (name move-inst inst)
+               `(define-custom-vop ,name
+                    (:args (mask) (default :target dst) (a :to :save))
+                  (:results (dst))
+                  (:generator
+                   (unless (location= dst default)
+                     (inst ,move-inst dst default))
+                   (inst ,inst dst a mask 0)))))
+    ;; f32.16
+    (def-masked-z-binop sb-simd-avx512f::f32.16-masked-z+     vaddps-masked)
+    (def-masked-z-binop sb-simd-avx512f::f32.16-masked-z-     vsubps-masked)
+    (def-masked-z-binop sb-simd-avx512f::f32.16-masked-z*     vmulps-masked)
+    (def-masked-z-binop sb-simd-avx512f::f32.16-masked-z/     vdivps-masked)
+    (def-masked-z-binop sb-simd-avx512f::f32.16-masked-z-max  vmaxps-masked)
+    (def-masked-z-binop sb-simd-avx512f::f32.16-masked-z-min  vminps-masked)
+    (def-masked-z-unop  sb-simd-avx512f::f32.16-masked-z-sqrt vsqrtps-masked)
+
+    (def-masked-binop   sb-simd-avx512f::f32.16-masked+     vmovaps vaddps-masked)
+    (def-masked-binop   sb-simd-avx512f::f32.16-masked-     vmovaps vsubps-masked)
+    (def-masked-binop   sb-simd-avx512f::f32.16-masked*     vmovaps vmulps-masked)
+    (def-masked-binop   sb-simd-avx512f::f32.16-masked/     vmovaps vdivps-masked)
+    (def-masked-binop   sb-simd-avx512f::f32.16-masked-max  vmovaps vmaxps-masked)
+    (def-masked-binop   sb-simd-avx512f::f32.16-masked-min  vmovaps vminps-masked)
+    (def-masked-unop    sb-simd-avx512f::f32.16-masked-sqrt vmovaps vsqrtps-masked)
+
+    ;; f64.8
+    (def-masked-z-binop sb-simd-avx512f::f64.8-masked-z+     vaddpd-masked)
+    (def-masked-z-binop sb-simd-avx512f::f64.8-masked-z-     vsubpd-masked)
+    (def-masked-z-binop sb-simd-avx512f::f64.8-masked-z*     vmulpd-masked)
+    (def-masked-z-binop sb-simd-avx512f::f64.8-masked-z/     vdivpd-masked)
+    (def-masked-z-binop sb-simd-avx512f::f64.8-masked-z-max  vmaxpd-masked)
+    (def-masked-z-binop sb-simd-avx512f::f64.8-masked-z-min  vminpd-masked)
+    (def-masked-z-unop  sb-simd-avx512f::f64.8-masked-z-sqrt vsqrtpd-masked)
+
+    (def-masked-binop   sb-simd-avx512f::f64.8-masked+     vmovapd vaddpd-masked)
+    (def-masked-binop   sb-simd-avx512f::f64.8-masked-     vmovapd vsubpd-masked)
+    (def-masked-binop   sb-simd-avx512f::f64.8-masked*     vmovapd vmulpd-masked)
+    (def-masked-binop   sb-simd-avx512f::f64.8-masked/     vmovapd vdivpd-masked)
+    (def-masked-binop   sb-simd-avx512f::f64.8-masked-max  vmovapd vmaxpd-masked)
+    (def-masked-binop   sb-simd-avx512f::f64.8-masked-min  vmovapd vminpd-masked)
+    (def-masked-unop    sb-simd-avx512f::f64.8-masked-sqrt vmovapd vsqrtpd-masked)
+
+    ;; u32.16
+    (def-masked-z-binop sb-simd-avx512f::u32.16-masked-z+      vpaddd-masked)
+    (def-masked-z-binop sb-simd-avx512f::u32.16-masked-z-      vpsubd-masked)
+    (def-masked-z-binop sb-simd-avx512f::u32.16-masked-z*      vpmulld-masked)
+    (def-masked-z-binop sb-simd-avx512f::u32.16-masked-z-and   vpandd-masked)
+    (def-masked-z-binop sb-simd-avx512f::u32.16-masked-z-andc1 vpandnd-masked)
+    (def-masked-z-binop sb-simd-avx512f::u32.16-masked-z-or    vpord-masked)
+    (def-masked-z-binop sb-simd-avx512f::u32.16-masked-z-xor   vpxord-masked)
+
+    (def-masked-binop   sb-simd-avx512f::u32.16-masked+      vmovdqa32 vpaddd-masked)
+    (def-masked-binop   sb-simd-avx512f::u32.16-masked-      vmovdqa32 vpsubd-masked)
+    (def-masked-binop   sb-simd-avx512f::u32.16-masked*      vmovdqa32 vpmulld-masked)
+    (def-masked-binop   sb-simd-avx512f::u32.16-masked-and   vmovdqa32 vpandd-masked)
+    (def-masked-binop   sb-simd-avx512f::u32.16-masked-andc1 vmovdqa32 vpandnd-masked)
+    (def-masked-binop   sb-simd-avx512f::u32.16-masked-or    vmovdqa32 vpord-masked)
+    (def-masked-binop   sb-simd-avx512f::u32.16-masked-xor   vmovdqa32 vpxord-masked)
+
+    ;; s32.16
+    (def-masked-z-binop sb-simd-avx512f::s32.16-masked-z+      vpaddd-masked)
+    (def-masked-z-binop sb-simd-avx512f::s32.16-masked-z-      vpsubd-masked)
+    (def-masked-z-binop sb-simd-avx512f::s32.16-masked-z*      vpmulld-masked)
+    (def-masked-z-binop sb-simd-avx512f::s32.16-masked-z-and   vpandd-masked)
+    (def-masked-z-binop sb-simd-avx512f::s32.16-masked-z-andc1 vpandnd-masked)
+    (def-masked-z-binop sb-simd-avx512f::s32.16-masked-z-or    vpord-masked)
+    (def-masked-z-binop sb-simd-avx512f::s32.16-masked-z-xor   vpxord-masked)
+
+    (def-masked-binop   sb-simd-avx512f::s32.16-masked+      vmovdqa32 vpaddd-masked)
+    (def-masked-binop   sb-simd-avx512f::s32.16-masked-      vmovdqa32 vpsubd-masked)
+    (def-masked-binop   sb-simd-avx512f::s32.16-masked*      vmovdqa32 vpmulld-masked)
+    (def-masked-binop   sb-simd-avx512f::s32.16-masked-and   vmovdqa32 vpandd-masked)
+    (def-masked-binop   sb-simd-avx512f::s32.16-masked-andc1 vmovdqa32 vpandnd-masked)
+    (def-masked-binop   sb-simd-avx512f::s32.16-masked-or    vmovdqa32 vpord-masked)
+    (def-masked-binop   sb-simd-avx512f::s32.16-masked-xor   vmovdqa32 vpxord-masked)
+
+    ;; u64.8
+    (def-masked-z-binop sb-simd-avx512f::u64.8-masked-z+      vpaddq-masked)
+    (def-masked-z-binop sb-simd-avx512f::u64.8-masked-z-      vpsubq-masked)
+    (def-masked-z-binop sb-simd-avx512f::u64.8-masked-z-and   vpandq-masked)
+    (def-masked-z-binop sb-simd-avx512f::u64.8-masked-z-andc1 vpandnq-masked)
+    (def-masked-z-binop sb-simd-avx512f::u64.8-masked-z-or    vporq-masked)
+    (def-masked-z-binop sb-simd-avx512f::u64.8-masked-z-xor   vpxorq-masked)
+
+    (def-masked-binop   sb-simd-avx512f::u64.8-masked+      vmovdqa64 vpaddq-masked)
+    (def-masked-binop   sb-simd-avx512f::u64.8-masked-      vmovdqa64 vpsubq-masked)
+    (def-masked-binop   sb-simd-avx512f::u64.8-masked-and   vmovdqa64 vpandq-masked)
+    (def-masked-binop   sb-simd-avx512f::u64.8-masked-andc1 vmovdqa64 vpandnq-masked)
+    (def-masked-binop   sb-simd-avx512f::u64.8-masked-or    vmovdqa64 vporq-masked)
+    (def-masked-binop   sb-simd-avx512f::u64.8-masked-xor   vmovdqa64 vpxorq-masked)
+
+    ;; s64.8
+    (def-masked-z-binop sb-simd-avx512f::s64.8-masked-z+      vpaddq-masked)
+    (def-masked-z-binop sb-simd-avx512f::s64.8-masked-z-      vpsubq-masked)
+    (def-masked-z-binop sb-simd-avx512f::s64.8-masked-z-and   vpandq-masked)
+    (def-masked-z-binop sb-simd-avx512f::s64.8-masked-z-andc1 vpandnq-masked)
+    (def-masked-z-binop sb-simd-avx512f::s64.8-masked-z-or    vporq-masked)
+    (def-masked-z-binop sb-simd-avx512f::s64.8-masked-z-xor   vpxorq-masked)
+
+    (def-masked-binop   sb-simd-avx512f::s64.8-masked+      vmovdqa64 vpaddq-masked)
+    (def-masked-binop   sb-simd-avx512f::s64.8-masked-      vmovdqa64 vpsubq-masked)
+    (def-masked-binop   sb-simd-avx512f::s64.8-masked-and   vmovdqa64 vpandq-masked)
+    (def-masked-binop   sb-simd-avx512f::s64.8-masked-andc1 vmovdqa64 vpandnq-masked)
+    (def-masked-binop   sb-simd-avx512f::s64.8-masked-or    vmovdqa64 vporq-masked)
+    (def-masked-binop   sb-simd-avx512f::s64.8-masked-xor   vmovdqa64 vpxorq-masked))
+
   (define-custom-vop sb-simd-avx512f::f32.16-blend
       (:args (a) (b) (mask))
     (:temporary (:sc mask-reg) k)
