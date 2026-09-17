@@ -1813,6 +1813,7 @@ REG is the source (encoded in ModR/M.r/m).
              `(define-instruction ,name (segment dst src imm)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem-imm prefix op
                                           :w 1 :l 1
+                                          :evex t
                                           :opcode-prefix #x0f3a
                                           :printer '(:name :tab reg ", " reg/mem ", " imm))
                 (:emitter
@@ -1828,6 +1829,7 @@ REG is the source (encoded in ModR/M.r/m).
              `(define-instruction ,name (segment dst src src2)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 op
                                           :w 0 :l 1
+                                          :evex t
                                           :nds t
                                           :opcode-prefix #x0f38)
                 (:emitter
@@ -2208,98 +2210,3 @@ REG is the source (encoded in ModR/M.r/m).
   (def blsr 1)
   (def blsmsk 2)
   (def blsi 3))
-
-;;; KMOV - Move to/from opmask registers
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun kmov-printer-list (format-stem prefix opcode w &key printer)
-    (let ((pp (vex-encode-pp prefix))
-          (m-mmmm (vex-encode-m-mmmm #x0F)))
-      (flet ((make-printer (inst-format fields)
-               `(:printer ,inst-format ,fields
-                          ,@(when printer `(',printer)))))
-        (if (eql w 1)
-            (list
-             (make-printer
-              (symbolicate "VEX3-" format-stem)
-              `((pp ,pp)
-                (m-mmmm ,m-mmmm)
-                (w ,w)
-                (l 0)
-                (op ,opcode))))
-            (list
-             (make-printer
-              (symbolicate "VEX2-" format-stem)
-              `((pp ,pp)
-                (l 0)
-                (op ,opcode)))
-             (make-printer
-              (symbolicate "VEX3-" format-stem)
-              `((pp ,pp)
-                (m-mmmm ,m-mmmm)
-                (w ,w)
-                (l 0)
-                (op ,opcode)))))))))
-
-;;; These use VEX encoding (not EVEX), with k registers in ModR/M fields
-(macrolet ((def (name kk-prefix gr-prefix store-mem-prefix load-mem-prefix
-                     op-k-k op-k-r op-r-k op-m-k op-k-m w &optional (gr-w w))
-             `(define-instruction ,name (segment dst src)
-                (:emitter
-                 (cond
-                   ((and (k-register-p dst) (k-register-p src))
-                    ;; VEX: k1 <- k2
-                    (emit-vex segment nil src dst ,kk-prefix #x0F 0 ,w)
-                    (emit-bytes segment ,op-k-k)
-                    (emit-ea segment src dst))
-
-                   ((and (k-register-p dst) (gpr-p src))
-                    ;; VEX: k1 <- r32/r64
-                    (emit-vex segment nil src dst ,gr-prefix #x0F 0 ,gr-w)
-                    (emit-bytes segment ,op-k-r)
-                    (emit-ea segment src dst))
-
-                   ((and (gpr-p dst) (k-register-p src))
-                    ;; VEX: r32/r64 <- k1
-                    (emit-vex segment nil src dst ,gr-prefix #x0F 0 ,gr-w)
-                    (emit-bytes segment ,op-r-k)
-                    (emit-ea segment src dst))
-
-                   ((and (k-register-p dst) (or (ea-p src) (tn-p src)))
-                    ;; VEX: k1 <- m8/m16/m32/m64
-                    (emit-vex segment nil src dst ,load-mem-prefix #x0F 0 ,w)
-                    (emit-bytes segment ,op-k-m)
-                    (emit-ea segment src dst))
-
-                   ((and (or (ea-p dst) (tn-p dst)) (k-register-p src))
-                    ;; VEX: m8/m16/m32/m64 <- k1
-                    (emit-vex segment nil dst src ,store-mem-prefix #x0F 0 ,w)
-                    (emit-bytes segment ,op-m-k)
-                    (emit-ea segment dst src))
-
-                   (t
-                    (error "invalid operands for ~A: ~S, ~S" ',name dst src))))
-
-                ;; printers:
-                ;; K <- K and K <- memory share the same opcode
-                ;; and are both decoded by kreg-kreg/mem.
-                ,@(kmov-printer-list 'kreg-kreg/mem kk-prefix op-k-k w)
-
-                ;; K <- GPR
-                ,@(kmov-printer-list 'kreg-reg/mem gr-prefix op-k-r gr-w)
-
-                ;; GPR <- K
-                ,@(kmov-printer-list 'reg-kreg/mem gr-prefix op-r-k gr-w)
-
-                ;; memory <- K
-                ;; ModRM.reg = K, ModRM.r/m = memory.
-                ;; kreg-kreg/mem can decode r/m as memory.
-                ,@(kmov-printer-list 'kreg-kreg/mem store-mem-prefix op-m-k w
-                                     :printer '(:name :tab reg/mem ", " reg)))))
-
-  ;;         kk    gr    store load  k<-k k<-r r<-k m<-k k<-m  w  gr-w
-  (def kmovw nil   nil   nil   nil   #x90 #x92 #x93 #x91 #x90  0  0)
-  (def kmovb #x66  #x66  #x66  #x66  #x90 #x92 #x93 #x91 #x90  0  0)
-  (def kmovd #x66  #xf2  #x66  #x66  #x90 #x92 #x93 #x91 #x90  1  0)
-  (def kmovq nil   #xf2  nil   nil   #x90 #x92 #x93 #x91 #x90  1  1))
-
