@@ -2282,6 +2282,10 @@
      #:f32.16-decf
      #:f32.16-aref #:f32.16-row-major-aref #:f32.16-sap-ref
      #:f32.16-non-temporal-aref #:f32.16-non-temporal-row-major-aref #:f32.16-non-temporal-sap-ref
+     #:f32.16-load-masked-z #:f32.16-load-masked #:f32.16-store-masked
+     #:f32.16-aref-masked-z #:f32.16-aref-masked
+     #:f32.16-row-major-aref-masked-z #:f32.16-row-major-aref-masked
+     #:f32.16-sap-ref-masked-z #:f32.16-sap-ref-masked
      ;; f64.8
      #:make-f64.8
      #:f64.8
@@ -2357,6 +2361,10 @@
      #:f64.8-decf
      #:f64.8-aref #:f64.8-row-major-aref #:f64.8-sap-ref
      #:f64.8-non-temporal-aref #:f64.8-non-temporal-row-major-aref #:f64.8-non-temporal-sap-ref
+     #:f64.8-load-masked-z #:f64.8-load-masked #:f64.8-store-masked
+     #:f64.8-aref-masked-z #:f64.8-aref-masked
+     #:f64.8-row-major-aref-masked-z #:f64.8-row-major-aref-masked
+     #:f64.8-sap-ref-masked-z #:f64.8-sap-ref-masked
      ;; u32.16
      #:make-u32.16
      #:u32.16
@@ -2414,6 +2422,10 @@
      #:u32.16-decf
      #:u32.16-aref #:u32.16-row-major-aref #:u32.16-sap-ref
      #:u32.16-non-temporal-aref #:u32.16-non-temporal-row-major-aref #:u32.16-non-temporal-sap-ref
+     #:u32.16-load-masked-z #:u32.16-load-masked #:u32.16-store-masked
+     #:u32.16-aref-masked-z #:u32.16-aref-masked
+     #:u32.16-row-major-aref-masked-z #:u32.16-row-major-aref-masked
+     #:u32.16-sap-ref-masked-z #:u32.16-sap-ref-masked
      ;; u64.8
      #:make-u64.8
      #:u64.8
@@ -2468,6 +2480,10 @@
      #:u64.8-decf
      #:u64.8-aref #:u64.8-row-major-aref #:u64.8-sap-ref
      #:u64.8-non-temporal-aref #:u64.8-non-temporal-row-major-aref #:u64.8-non-temporal-sap-ref
+     #:u64.8-load-masked-z #:u64.8-load-masked #:u64.8-store-masked
+     #:u64.8-aref-masked-z #:u64.8-aref-masked
+     #:u64.8-row-major-aref-masked-z #:u64.8-row-major-aref-masked
+     #:u64.8-sap-ref-masked-z #:u64.8-sap-ref-masked
      ;; s32.16
      #:make-s32.16
      #:s32.16
@@ -2525,6 +2541,10 @@
      #:s32.16-decf
      #:s32.16-aref #:s32.16-row-major-aref #:s32.16-sap-ref
      #:s32.16-non-temporal-aref #:s32.16-non-temporal-row-major-aref #:s32.16-non-temporal-sap-ref
+     #:s32.16-load-masked-z #:s32.16-load-masked #:s32.16-store-masked
+     #:s32.16-aref-masked-z #:s32.16-aref-masked
+     #:s32.16-row-major-aref-masked-z #:s32.16-row-major-aref-masked
+     #:s32.16-sap-ref-masked-z #:s32.16-sap-ref-masked
      ;; s64.8
      #:make-s64.8
      #:s64.8
@@ -2578,7 +2598,11 @@
      #:s64.8-incf
      #:s64.8-decf
      #:s64.8-aref #:s64.8-row-major-aref #:s64.8-sap-ref
-     #:s64.8-non-temporal-aref #:s64.8-non-temporal-row-major-aref #:s64.8-non-temporal-sap-ref))
+     #:s64.8-non-temporal-aref #:s64.8-non-temporal-row-major-aref #:s64.8-non-temporal-sap-ref
+     #:s64.8-load-masked-z #:s64.8-load-masked #:s64.8-store-masked
+     #:s64.8-aref-masked-z #:s64.8-aref-masked
+     #:s64.8-row-major-aref-masked-z #:s64.8-row-major-aref-masked
+     #:s64.8-sap-ref-masked-z #:s64.8-sap-ref-masked))
 
   #+x86-64
   (defpackage #:sb-simd-avx512bw

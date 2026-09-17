@@ -1277,6 +1277,59 @@
   (def vsqrtps-masked nil  #x51 0)
   (def vsqrtpd-masked #x66 #x51 1))
 
+;;; EVEX masked moves: (inst name dst src mask &optional zeroing)
+;;; Loads from memory (or register) when DST is a register (supports {k} and {k}{z}).
+;;; Stores to memory when DST is an EA (supports {k}).
+(macrolet ((def (name prefix opcode-from opcode-to w &optional (opcode-prefix #x0f))
+             `(define-instruction ,name (segment dst src mask &optional (zeroing 0))
+                ,@(loop for k from 1 to 7
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode-from
+                         :opcode-prefix opcode-prefix
+                         :w w :disp-n 64
+                         :more-fields `((aaa ,k) (z-bit 0))
+                         :printer '(:name :tab reg ", " reg/mem " {" aaa "}"))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode-from
+                         :opcode-prefix opcode-prefix
+                         :w w :disp-n 64
+                         :more-fields `((aaa ,k) (z-bit 1))
+                         :printer '(:name :tab reg ", " reg/mem " {" aaa "} {z}"))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode-to
+                         :opcode-prefix opcode-prefix
+                         :w w :disp-n 64
+                         :more-fields `((aaa ,k) (z-bit 0))
+                         :printer '(:name :tab reg/mem ", " reg " {" aaa "}")))
+                (:emitter
+                 (let ((mask-num (cond ((integerp mask) mask)
+                                       ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                       (t (error "Invalid mask ~S" mask))))
+                       (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                   (cond ((xmm-register-p dst)
+                          (emit-avx512-inst segment src dst ,prefix ,opcode-from
+                                            :opcode-prefix ,opcode-prefix
+                                            :w ,w
+                                            :aaa mask-num
+                                            :z z-num
+                                            :disp-n (full-vector-disp-n dst)))
+                         (t
+                          (aver (xmm-register-p src))
+                          (emit-avx512-inst segment dst src ,prefix ,opcode-to
+                                            :opcode-prefix ,opcode-prefix
+                                            :w ,w
+                                            :aaa mask-num
+                                            :z 0
+                                            :disp-n (full-vector-disp-n src)))))))))
+  (def vmovups-masked   nil  #x10 #x11 0)
+  (def vmovupd-masked   #x66 #x10 #x11 1)
+  (def vmovdqu32-masked #xf3 #x6f #x7f 0)
+  (def vmovdqu64-masked #xf3 #x6f #x7f 1))
+
+
 ;;;; ---- EVEX gather/scatter (ZMM width) ----
 
 ;;; EVEX gather: dst {k1}, vm (index in vector register, mask in k1-k7)
