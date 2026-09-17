@@ -265,3 +265,135 @@
         (is (= (first vals-m) -20))
         (is (every (lambda (x) (= x 777)) (subseq vals-m 1 8)))))))
 
+(define-test vector-masked-memory-avx512f
+  (let ((open-sb-simd-avx512f (find-package "SB-SIMD-AVX512F")))
+    (when (and open-sb-simd-avx512f (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512f)))
+      ;; 1. f32.16 masked memory operations
+      (let* ((arr (make-array 16 :element-type 'single-float
+                                 :initial-contents (loop for i from 0 below 16 collect (float (1+ i) 1.0f0))))
+             (def (sb-simd-avx512f:f32.16 99.0f0))
+             (m #b0000000000011111) ;; lanes 0..4 active
+             (z-load (sb-simd-avx512f:f32.16-load-masked-z m arr 0))
+             (m-load (sb-simd-avx512f:f32.16-load-masked m def arr 0))
+             (vals-z (multiple-value-list (sb-simd-avx512f:f32.16-values z-load)))
+             (vals-m (multiple-value-list (sb-simd-avx512f:f32.16-values m-load))))
+        (loop for i from 0 below 5 do (is (= (nth i vals-z) (float (1+ i) 1.0f0))))
+        (is (every #'zerop (subseq vals-z 5 16)))
+        (loop for i from 0 below 5 do (is (= (nth i vals-m) (float (1+ i) 1.0f0))))
+        (is (every (lambda (x) (= x 99.0f0)) (subseq vals-m 5 16)))
+        ;; masked store
+        (let ((to-store (sb-simd-avx512f:f32.16 777.0f0))
+              (store-m #b0000000000000101)) ;; lanes 0 and 2
+          (sb-simd-avx512f:f32.16-store-masked store-m to-store arr 0)
+          (is (= (aref arr 0) 777.0f0))
+          (is (= (aref arr 1) 2.0f0))
+          (is (= (aref arr 2) 777.0f0))
+          (is (= (aref arr 3) 4.0f0)))
+        ;; aref-masked and setf
+        (is (= (first (multiple-value-list (sb-simd-avx512f:f32.16-values (sb-simd-avx512f:f32.16-aref-masked-z 1 arr 0)))) 777.0f0))
+        (setf (sb-simd-avx512f:f32.16-aref-masked 1 arr 1) (sb-simd-avx512f:f32.16 555.0f0))
+        (is (= (aref arr 1) 555.0f0))
+        ;; row-major-aref-masked
+        (is (= (first (multiple-value-list (sb-simd-avx512f:f32.16-values (sb-simd-avx512f:f32.16-row-major-aref-masked-z 1 arr 1)))) 555.0f0))
+        ;; sap-ref-masked
+        (sb-sys:with-pinned-objects (arr)
+          (let ((sap (sb-sys:vector-sap arr)))
+            (is (= (first (multiple-value-list (sb-simd-avx512f:f32.16-values (sb-simd-avx512f:f32.16-sap-ref-masked-z 1 sap 0)))) 777.0f0))
+            (setf (sb-simd-avx512f:f32.16-sap-ref-masked 1 sap 3) (sb-simd-avx512f:f32.16 333.0f0))
+            (is (= (aref arr 3) 333.0f0))))
+        ;; tail bounds checking on short array
+        (let ((short-arr (make-array 5 :element-type 'single-float :initial-contents '(1.0f0 2.0f0 3.0f0 4.0f0 5.0f0))))
+          ;; mask #b11111 (5 elements) on size 5 array at index 0 must succeed
+          (let ((tail (sb-simd-avx512f:f32.16-load-masked-z #b11111 short-arr 0)))
+            (is (= (first (multiple-value-list (sb-simd-avx512f:f32.16-values tail))) 1.0f0)))
+          ;; mask #b111111 (6 elements) on size 5 array at index 0 must signal bounds error
+          (signals error (sb-simd-avx512f:f32.16-load-masked-z #b111111 short-arr 0))
+          ;; mask 0 on size 5 array at index 0 succeeds
+          (let ((tail-zero (sb-simd-avx512f:f32.16-load-masked-z 0 short-arr 0)))
+            (is (every #'zerop (multiple-value-list (sb-simd-avx512f:f32.16-values tail-zero)))))))
+
+      ;; 2. f64.8 masked memory operations
+      (let* ((arr (make-array 8 :element-type 'double-float
+                                :initial-contents (loop for i from 0 below 8 collect (float (1+ i) 1.0d0))))
+             (def (sb-simd-avx512f:f64.8 88.0d0))
+             (m #b00000111) ;; 3 elements
+             (z-load (sb-simd-avx512f:f64.8-load-masked-z m arr 0))
+             (m-load (sb-simd-avx512f:f64.8-load-masked m def arr 0))
+             (vals-z (multiple-value-list (sb-simd-avx512f:f64.8-values z-load)))
+             (vals-m (multiple-value-list (sb-simd-avx512f:f64.8-values m-load))))
+        (loop for i from 0 below 3 do (is (= (nth i vals-z) (float (1+ i) 1.0d0))))
+        (is (every #'zerop (subseq vals-z 3 8)))
+        (loop for i from 0 below 3 do (is (= (nth i vals-m) (float (1+ i) 1.0d0))))
+        (is (every (lambda (x) (= x 88.0d0)) (subseq vals-m 3 8)))
+        ;; store
+        (setf (sb-simd-avx512f:f64.8-aref-masked #b01 arr 2) (sb-simd-avx512f:f64.8 222.0d0))
+        (is (= (aref arr 2) 222.0d0))
+        ;; sap
+        (sb-sys:with-pinned-objects (arr)
+          (let ((sap (sb-sys:vector-sap arr)))
+            (setf (sb-simd-avx512f:f64.8-sap-ref-masked-z #b01 sap 4) (sb-simd-avx512f:f64.8 444.0d0))
+            (is (= (aref arr 4) 444.0d0))))
+        ;; tail bounds check
+        (let ((short-arr (make-array 3 :element-type 'double-float :initial-contents '(10.0d0 20.0d0 30.0d0))))
+          (is (= (first (multiple-value-list (sb-simd-avx512f:f64.8-values (sb-simd-avx512f:f64.8-load-masked-z #b111 short-arr 0)))) 10.0d0))
+          (signals error (sb-simd-avx512f:f64.8-load-masked-z #b1111 short-arr 0))))
+
+      ;; 3. u32.16 masked memory operations
+      (let* ((arr (make-array 16 :element-type '(unsigned-byte 32)
+                                 :initial-contents (loop for i from 0 below 16 collect (* 10 (1+ i)))))
+             (m #b0000000000000011)
+             (z-load (sb-simd-avx512f:u32.16-load-masked-z m arr 0))
+             (vals-z (multiple-value-list (sb-simd-avx512f:u32.16-values z-load))))
+        (is (= (nth 0 vals-z) 10))
+        (is (= (nth 1 vals-z) 20))
+        (is (every #'zerop (subseq vals-z 2 16)))
+        (setf (sb-simd-avx512f:u32.16-aref-masked #b01 arr 5) (sb-simd-avx512f:u32.16 #xDEADBEEF))
+        (is (= (aref arr 5) #xDEADBEEF)))
+
+      ;; 4. s32.16 masked memory operations
+      (let* ((arr (make-array 16 :element-type '(signed-byte 32)
+                                 :initial-contents (loop for i from 0 below 16 collect (- (1+ i)))))
+             (m #b0000000000000101)
+             (z-load (sb-simd-avx512f:s32.16-load-masked-z m arr 0))
+             (vals-z (multiple-value-list (sb-simd-avx512f:s32.16-values z-load))))
+        (is (= (nth 0 vals-z) -1))
+        (is (= (nth 1 vals-z) 0))
+        (is (= (nth 2 vals-z) -3))
+        (setf (sb-simd-avx512f:s32.16-aref-masked #b01 arr 1) (sb-simd-avx512f:s32.16 -999))
+        (is (= (aref arr 1) -999)))
+
+      ;; 5. u64.8 masked memory operations
+      (let* ((arr (make-array 8 :element-type '(unsigned-byte 64)
+                                :initial-contents (loop for i from 0 below 8 collect (ash #x12345678 i))))
+             (m #b00000011)
+             (z-load (sb-simd-avx512f:u64.8-load-masked-z m arr 0))
+             (vals-z (multiple-value-list (sb-simd-avx512f:u64.8-values z-load))))
+        (is (= (nth 0 vals-z) #x12345678))
+        (is (= (nth 1 vals-z) (ash #x12345678 1)))
+        (is (every #'zerop (subseq vals-z 2 8)))
+        (setf (sb-simd-avx512f:u64.8-aref-masked #b01 arr 7) (sb-simd-avx512f:u64.8 #xCAFEBABEDEADBEEF))
+        (is (= (aref arr 7) #xCAFEBABEDEADBEEF)))
+
+      ;; 6. s64.8 masked memory operations
+      (let* ((arr (make-array 8 :element-type '(signed-byte 64)
+                                :initial-contents (loop for i from 0 below 8 collect (- 100 (* 50 i)))))
+             (m #b00000101)
+             (z-load (sb-simd-avx512f:s64.8-load-masked-z m arr 0))
+             (vals-z (multiple-value-list (sb-simd-avx512f:s64.8-values z-load))))
+        (is (= (nth 0 vals-z) 100))
+        (is (= (nth 1 vals-z) 0))
+        (is (= (nth 2 vals-z) 0))
+        (setf (sb-simd-avx512f:s64.8-aref-masked #b01 arr 3) (sb-simd-avx512f:s64.8 -1234567890123))
+        (is (= (aref arr 3) -1234567890123)))
+
+      ;; 7. 2D multidimensional aref masked
+      (let ((grid (make-array '(4 8) :element-type 'single-float :initial-element 0.0f0)))
+        (setf (sb-simd-avx512f:f32.16-aref-masked #b111 grid 1 2) (sb-simd-avx512f:f32.16 42.0f0))
+        (is (= (aref grid 1 2) 42.0f0))
+        (is (= (aref grid 1 3) 42.0f0))
+        (is (= (aref grid 1 4) 42.0f0))
+        (is (= (aref grid 1 5) 0.0f0))
+        (let ((loaded (sb-simd-avx512f:f32.16-aref-masked-z #b111 grid 1 2)))
+          (is (= (first (multiple-value-list (sb-simd-avx512f:f32.16-values loaded))) 42.0f0)))))))
+
+
