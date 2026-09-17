@@ -179,3 +179,116 @@
                   for name = (store-record-name store-record)
                   collect `(define-setf-aref ,name)))))
   (define-arefs))
+
+(defun array-row-major-masked-simd-index (array mask &rest subscripts)
+  (let* ((rank (array-rank array))
+         (length (length subscripts))
+         (int-mask (if (integerp mask) mask (mask-value mask)))
+         (active-width (if (zerop int-mask) 0 (integer-length int-mask))))
+    (unless (= rank length)
+      (wrong-number-of-subscripts array length))
+    (let ((stride 1)
+          (index 0))
+      (declare (index stride index))
+      (loop for axis from (1- rank) downto 0
+            for subscript = (nth axis subscripts)
+            for dimension = (array-dimension array axis)
+            for width = (max 1 active-width) then 1 do
+              (unless (< -1 subscript (1+ (- dimension width)))
+                (invalid-subscript subscript array axis (1+ (- dimension width))))
+              (incf index (* stride subscript))
+              (setf stride (* stride dimension)))
+      index)))
+
+#+x86-64
+(macrolet
+    ((def-masked-aref (type-name element-type)
+       (let* ((pkg (find-package "SB-SIMD-AVX512F"))
+              (load-z            (mksym pkg type-name "-LOAD-MASKED-Z"))
+              (load-m            (mksym pkg type-name "-LOAD-MASKED"))
+              (store             (mksym pkg type-name "-STORE-MASKED"))
+              (aref-z            (mksym pkg type-name "-AREF-MASKED-Z"))
+              (aref-m            (mksym pkg type-name "-AREF-MASKED"))
+              (row-major-aref-z  (mksym pkg type-name "-ROW-MAJOR-AREF-MASKED-Z"))
+              (row-major-aref-m  (mksym pkg type-name "-ROW-MAJOR-AREF-MASKED"))
+              (type-cast         (mksym pkg type-name)))
+         `(progn
+            ;; Row-major arefs
+            (define-inline ,row-major-aref-z (mask array index)
+              (declare (type (array ,element-type) array)
+                       (type index index))
+              (,load-z mask array index))
+
+            (define-inline (setf ,row-major-aref-z) (value mask array index)
+              (declare (type (array ,element-type) array)
+                       (type index index))
+              (,store mask (,type-cast value) array index))
+
+            (define-inline ,row-major-aref-m (mask default array index)
+              (declare (type (array ,element-type) array)
+                       (type index index))
+              (,load-m mask (,type-cast default) array index))
+
+            (define-inline (setf ,row-major-aref-m) (value mask array index)
+              (declare (type (array ,element-type) array)
+                       (type index index))
+              (,store mask (,type-cast value) array index))
+
+            ;; Multidimensional arefs
+            (defun ,aref-z (mask array &rest indices)
+              (declare (type (array ,element-type) array))
+              (,load-z
+               mask
+               array
+               (apply #'array-row-major-masked-simd-index array mask indices)))
+
+            (define-compiler-macro ,aref-z (mask array &rest indices)
+              (if (= (length indices) 1)
+                  `(,',load-z ,mask ,array ,(first indices))
+                  `(,',load-z ,mask ,array (array-row-major-masked-simd-index ,array ,mask ,@indices))))
+
+            (defun (setf ,aref-z) (value mask array &rest indices)
+              (declare (type (array ,element-type) array))
+              (,store
+               mask
+               (,type-cast value)
+               array
+               (apply #'array-row-major-masked-simd-index array mask indices)))
+
+            (define-compiler-macro (setf ,aref-z) (value mask array &rest indices)
+              (if (= (length indices) 1)
+                  `(,',store ,mask (,',type-cast ,value) ,array ,(first indices))
+                  `(,',store ,mask (,',type-cast ,value) ,array (array-row-major-masked-simd-index ,array ,mask ,@indices))))
+
+            (defun ,aref-m (mask default array &rest indices)
+              (declare (type (array ,element-type) array))
+              (,load-m
+               mask
+               (,type-cast default)
+               array
+               (apply #'array-row-major-masked-simd-index array mask indices)))
+
+            (define-compiler-macro ,aref-m (mask default array &rest indices)
+              (if (= (length indices) 1)
+                  `(,',load-m ,mask (,',type-cast ,default) ,array ,(first indices))
+                  `(,',load-m ,mask (,',type-cast ,default) ,array (array-row-major-masked-simd-index ,array ,mask ,@indices))))
+
+            (defun (setf ,aref-m) (value mask array &rest indices)
+              (declare (type (array ,element-type) array))
+              (,store
+               mask
+               (,type-cast value)
+               array
+               (apply #'array-row-major-masked-simd-index array mask indices)))
+
+            (define-compiler-macro (setf ,aref-m) (value mask array &rest indices)
+              (if (= (length indices) 1)
+                  `(,',store ,mask (,',type-cast ,value) ,array ,(first indices))
+                  `(,',store ,mask (,',type-cast ,value) ,array (array-row-major-masked-simd-index ,array ,mask ,@indices))))))))
+  (def-masked-aref f32.16 single-float)
+  (def-masked-aref f64.8  double-float)
+  (def-masked-aref u32.16 (unsigned-byte 32))
+  (def-masked-aref s32.16 (signed-byte 32))
+  (def-masked-aref u64.8  (unsigned-byte 64))
+  (def-masked-aref s64.8  (signed-byte 64)))
+
