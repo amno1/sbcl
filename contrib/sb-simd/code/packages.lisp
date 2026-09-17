@@ -2286,6 +2286,11 @@
      #:f32.16-aref-masked-z #:f32.16-aref-masked
      #:f32.16-row-major-aref-masked-z #:f32.16-row-major-aref-masked
      #:f32.16-sap-ref-masked-z #:f32.16-sap-ref-masked
+     #:f32.16-compress-z #:f32.16-compress
+     #:f32.16-expand-z #:f32.16-expand
+     #:f32.16-compress-store #:f32.16-sap-compress-store
+     #:f32.16-expand-load-z #:f32.16-expand-load
+     #:f32.16-sap-expand-load-z #:f32.16-sap-expand-load
      ;; f64.8
      #:make-f64.8
      #:f64.8
@@ -2365,6 +2370,11 @@
      #:f64.8-aref-masked-z #:f64.8-aref-masked
      #:f64.8-row-major-aref-masked-z #:f64.8-row-major-aref-masked
      #:f64.8-sap-ref-masked-z #:f64.8-sap-ref-masked
+     #:f64.8-compress-z #:f64.8-compress
+     #:f64.8-expand-z #:f64.8-expand
+     #:f64.8-compress-store #:f64.8-sap-compress-store
+     #:f64.8-expand-load-z #:f64.8-expand-load
+     #:f64.8-sap-expand-load-z #:f64.8-sap-expand-load
      ;; u32.16
      #:make-u32.16
      #:u32.16
@@ -2426,6 +2436,11 @@
      #:u32.16-aref-masked-z #:u32.16-aref-masked
      #:u32.16-row-major-aref-masked-z #:u32.16-row-major-aref-masked
      #:u32.16-sap-ref-masked-z #:u32.16-sap-ref-masked
+     #:u32.16-compress-z #:u32.16-compress
+     #:u32.16-expand-z #:u32.16-expand
+     #:u32.16-compress-store #:u32.16-sap-compress-store
+     #:u32.16-expand-load-z #:u32.16-expand-load
+     #:u32.16-sap-expand-load-z #:u32.16-sap-expand-load
      ;; u64.8
      #:make-u64.8
      #:u64.8
@@ -2484,6 +2499,11 @@
      #:u64.8-aref-masked-z #:u64.8-aref-masked
      #:u64.8-row-major-aref-masked-z #:u64.8-row-major-aref-masked
      #:u64.8-sap-ref-masked-z #:u64.8-sap-ref-masked
+     #:u64.8-compress-z #:u64.8-compress
+     #:u64.8-expand-z #:u64.8-expand
+     #:u64.8-compress-store #:u64.8-sap-compress-store
+     #:u64.8-expand-load-z #:u64.8-expand-load
+     #:u64.8-sap-expand-load-z #:u64.8-sap-expand-load
      ;; s32.16
      #:make-s32.16
      #:s32.16
@@ -2545,6 +2565,11 @@
      #:s32.16-aref-masked-z #:s32.16-aref-masked
      #:s32.16-row-major-aref-masked-z #:s32.16-row-major-aref-masked
      #:s32.16-sap-ref-masked-z #:s32.16-sap-ref-masked
+     #:s32.16-compress-z #:s32.16-compress
+     #:s32.16-expand-z #:s32.16-expand
+     #:s32.16-compress-store #:s32.16-sap-compress-store
+     #:s32.16-expand-load-z #:s32.16-expand-load
+     #:s32.16-sap-expand-load-z #:s32.16-sap-expand-load
      ;; s64.8
      #:make-s64.8
      #:s64.8
@@ -2602,7 +2627,12 @@
      #:s64.8-load-masked-z #:s64.8-load-masked #:s64.8-store-masked
      #:s64.8-aref-masked-z #:s64.8-aref-masked
      #:s64.8-row-major-aref-masked-z #:s64.8-row-major-aref-masked
-     #:s64.8-sap-ref-masked-z #:s64.8-sap-ref-masked))
+     #:s64.8-sap-ref-masked-z #:s64.8-sap-ref-masked
+     #:s64.8-compress-z #:s64.8-compress
+     #:s64.8-expand-z #:s64.8-expand
+     #:s64.8-compress-store #:s64.8-sap-compress-store
+     #:s64.8-expand-load-z #:s64.8-expand-load
+     #:s64.8-sap-expand-load-z #:s64.8-sap-expand-load))
 
   #+x86-64
   (defpackage #:sb-simd-avx512bw
