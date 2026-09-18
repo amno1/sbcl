@@ -2295,6 +2295,10 @@
      #:f32.16-broadcast-aref-masked-z #:f32.16-broadcast-sap-ref-masked-z
      #:f32.16-broadcast-aref-masked #:f32.16-broadcast-sap-ref-masked
      #:f32.16-broadcast-f32.4 #:f32.16-broadcast-f32.8
+     #:f32.16-gather #:f32.16-gather-masked-z #:f32.16-gather-masked
+     #:f32.16-sap-gather #:f32.16-sap-gather-masked-z #:f32.16-sap-gather-masked
+     #:f32.16-scatter #:f32.16-scatter-masked
+     #:f32.16-sap-scatter #:f32.16-sap-scatter-masked
      ;; f64.8
      #:make-f64.8
      #:f64.8
@@ -2383,6 +2387,10 @@
      #:f64.8-broadcast-aref-masked-z #:f64.8-broadcast-sap-ref-masked-z
      #:f64.8-broadcast-aref-masked #:f64.8-broadcast-sap-ref-masked
      #:f64.8-broadcast-f64.2 #:f64.8-broadcast-f64.4
+     #:f64.8-gather #:f64.8-gather-masked-z #:f64.8-gather-masked
+     #:f64.8-sap-gather #:f64.8-sap-gather-masked-z #:f64.8-sap-gather-masked
+     #:f64.8-scatter #:f64.8-scatter-masked
+     #:f64.8-sap-scatter #:f64.8-sap-scatter-masked
      ;; u32.16
      #:make-u32.16
      #:u32.16
@@ -2454,6 +2462,10 @@
      #:u32.16-broadcast-aref-masked-z #:u32.16-broadcast-sap-ref-masked-z
      #:u32.16-broadcast-aref-masked #:u32.16-broadcast-sap-ref-masked
      #:u32.16-broadcast-u32.4 #:u32.16-broadcast-u32.8
+     #:u32.16-gather #:u32.16-gather-masked-z #:u32.16-gather-masked
+     #:u32.16-sap-gather #:u32.16-sap-gather-masked-z #:u32.16-sap-gather-masked
+     #:u32.16-scatter #:u32.16-scatter-masked
+     #:u32.16-sap-scatter #:u32.16-sap-scatter-masked
      ;; u64.8
      #:make-u64.8
      #:u64.8
@@ -2522,6 +2534,10 @@
      #:u64.8-broadcast-aref-masked-z #:u64.8-broadcast-sap-ref-masked-z
      #:u64.8-broadcast-aref-masked #:u64.8-broadcast-sap-ref-masked
      #:u64.8-broadcast-u64.2 #:u64.8-broadcast-u64.4
+     #:u64.8-gather #:u64.8-gather-masked-z #:u64.8-gather-masked
+     #:u64.8-sap-gather #:u64.8-sap-gather-masked-z #:u64.8-sap-gather-masked
+     #:u64.8-scatter #:u64.8-scatter-masked
+     #:u64.8-sap-scatter #:u64.8-sap-scatter-masked
      ;; s32.16
      #:make-s32.16
      #:s32.16
@@ -2593,6 +2609,10 @@
      #:s32.16-broadcast-aref-masked-z #:s32.16-broadcast-sap-ref-masked-z
      #:s32.16-broadcast-aref-masked #:s32.16-broadcast-sap-ref-masked
      #:s32.16-broadcast-s32.4 #:s32.16-broadcast-s32.8
+     #:s32.16-gather #:s32.16-gather-masked-z #:s32.16-gather-masked
+     #:s32.16-sap-gather #:s32.16-sap-gather-masked-z #:s32.16-sap-gather-masked
+     #:s32.16-scatter #:s32.16-scatter-masked
+     #:s32.16-sap-scatter #:s32.16-sap-scatter-masked
      ;; s64.8
      #:make-s64.8
      #:s64.8
@@ -2660,7 +2680,11 @@
      #:s64.8-broadcast-aref #:s64.8-broadcast-sap-ref
      #:s64.8-broadcast-aref-masked-z #:s64.8-broadcast-sap-ref-masked-z
      #:s64.8-broadcast-aref-masked #:s64.8-broadcast-sap-ref-masked
-     #:s64.8-broadcast-s64.2 #:s64.8-broadcast-s64.4))
+     #:s64.8-broadcast-s64.2 #:s64.8-broadcast-s64.4
+     #:s64.8-gather #:s64.8-gather-masked-z #:s64.8-gather-masked
+     #:s64.8-sap-gather #:s64.8-sap-gather-masked-z #:s64.8-sap-gather-masked
+     #:s64.8-scatter #:s64.8-scatter-masked
+     #:s64.8-sap-scatter #:s64.8-sap-scatter-masked))
 
   #+x86-64
   (defpackage #:sb-simd-avx512bw
