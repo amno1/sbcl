@@ -307,7 +307,7 @@
           (let ((tail (sb-simd-avx512f:f32.16-load-masked-z #b11111 short-arr 0)))
             (is (= (first (multiple-value-list (sb-simd-avx512f:f32.16-values tail))) 1.0f0)))
           ;; mask #b111111 (6 elements) on size 5 array at index 0 must signal bounds error
-          (signals error (sb-simd-avx512f:f32.16-load-masked-z #b111111 short-arr 0))
+          (signals error (sb-simd-avx512f:f32.16-load-masked-z (identity #b111111) short-arr 0))
           ;; mask 0 on size 5 array at index 0 succeeds
           (let ((tail-zero (sb-simd-avx512f:f32.16-load-masked-z 0 short-arr 0)))
             (is (every #'zerop (multiple-value-list (sb-simd-avx512f:f32.16-values tail-zero)))))))
@@ -336,7 +336,7 @@
         ;; tail bounds check
         (let ((short-arr (make-array 3 :element-type 'double-float :initial-contents '(10.0d0 20.0d0 30.0d0))))
           (is (= (first (multiple-value-list (sb-simd-avx512f:f64.8-values (sb-simd-avx512f:f64.8-load-masked-z #b111 short-arr 0)))) 10.0d0))
-          (signals error (sb-simd-avx512f:f64.8-load-masked-z #b1111 short-arr 0))))
+          (signals error (sb-simd-avx512f:f64.8-load-masked-z (identity #b1111) short-arr 0))))
 
       ;; 3. u32.16 masked memory operations
       (let* ((arr (make-array 16 :element-type '(unsigned-byte 32)
@@ -468,9 +468,9 @@
             (is (equal (subseq vals 4 16) '(-5f0 -6f0 -7f0 -8f0 -9f0 -10f0 -11f0 -12f0 -13f0 -14f0 -15f0 -16f0))))
           ;; Bounds checking: index 8 with 3 active elements exceeds length 10
           (signals error
-            (sb-simd-avx512f:f32.16-compress-store m v arr 8))
+            (sb-simd-avx512f:f32.16-compress-store m v arr (identity 8)))
           (signals error
-            (sb-simd-avx512f:f32.16-expand-load-z m arr 8))))
+            (sb-simd-avx512f:f32.16-expand-load-z m arr (identity 8)))))
 
       ;; 2. f64.8 Register & Memory Compress/Expand
       (let* ((v (sb-simd-avx512f:make-f64.8 10d0 20d0 30d0 40d0 50d0 60d0 70d0 80d0))
@@ -899,6 +899,115 @@
              (vals-s (multiple-value-list (sb-simd-avx512bw:s16.32-values vs))))
         (is (every (lambda (x) (= x 12345)) vals-u))
         (is (every (lambda (x) (= x -12345)) vals-s))))))
+
+;;; Vector Gather and Scatter
+(define-test vector-gather-scatter-avx512f
+  (let ((open-sb-simd-avx512f (find-package "SB-SIMD-AVX512F")))
+    (when (and open-sb-simd-avx512f (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512f)))
+      ;; 1. f32.16
+      (let ((arr (make-array 40 :element-type 'single-float :initial-element 0f0)))
+        (dotimes (i 40) (setf (aref arr i) (* (float i 1f0) 10f0)))
+        (let* ((idx (sb-simd-avx512f:make-u32.16 0 2 4 6 8 10 12 14 16 18 20 22 24 26 28 30))
+               (gathered (sb-simd-avx512f:f32.16-gather arr idx 5))
+               (vals (multiple-value-list (sb-simd-avx512f:f32.16-values gathered))))
+          (is (= (nth 0 vals) 50f0))
+          (is (= (nth 1 vals) 70f0))
+          (is (= (nth 15 vals) 350f0)))
+        ;; Masked Merging Gather
+        (let* ((idx (sb-simd-avx512f:make-u32.16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
+               (default (sb-simd-avx512f:f32.16 -999f0))
+               (mask (sb-simd-avx512f:m32.16 #b1010101010101010))
+               (gathered (sb-simd-avx512f:f32.16-gather-masked mask default arr idx))
+               (vals (multiple-value-list (sb-simd-avx512f:f32.16-values gathered))))
+          (dotimes (i 16)
+            (if (logbitp i #b1010101010101010)
+                (is (= (nth i vals) (* (float i 1f0) 10f0)))
+                (is (= (nth i vals) -999f0)))))
+        ;; Scatter and setf
+        (let ((idx (sb-simd-avx512f:make-u32.16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
+              (vals (sb-simd-avx512f:make-f32.16 1f0 2f0 3f0 4f0 5f0 6f0 7f0 8f0 9f0 10f0 11f0 12f0 13f0 14f0 15f0 16f0)))
+          (setf (sb-simd-avx512f:f32.16-gather arr idx) vals)
+          (dotimes (i 16)
+            (is (= (aref arr i) (float (1+ i) 1f0))))))
+
+      ;; 2. f64.8
+      (let ((arr (make-array 24 :element-type 'double-float :initial-element 0d0)))
+        (dotimes (i 24) (setf (aref arr i) (* (float i 1d0) 100d0)))
+        (let* ((idx (sb-simd-avx512f:make-u64.8 7 6 5 4 3 2 1 0))
+               (mask (sb-simd-avx512f:m64.8 #b10101010))
+               (gathered (sb-simd-avx512f:f64.8-gather-masked-z mask arr idx 4))
+               (vals (multiple-value-list (sb-simd-avx512f:f64.8-values gathered))))
+          (is (= (nth 0 vals) 0d0))
+          (is (= (nth 1 vals) 1000d0))
+          (is (= (nth 7 vals) 400d0)))
+        ;; Mask immutability check
+        (let* ((idx (sb-simd-avx512f:make-u64.8 8 9 10 11 12 13 14 15))
+               (vals (sb-simd-avx512f:f64.8 999d0))
+               (mask (sb-simd-avx512f:m64.8 #b00001111)))
+          (sb-simd-avx512f:f64.8-scatter-masked mask vals arr idx)
+          (is (= (sb-simd-avx512f:m64.8-value mask) #b00001111))
+          (is (= (aref arr 8) 999d0))
+          (is (= (aref arr 11) 999d0))
+          (is (= (aref arr 12) 1200d0))))
+
+      ;; 3. u32.16 & s32.16
+      (let ((uarr (make-array 32 :element-type '(unsigned-byte 32) :initial-element 0))
+            (sarr (make-array 32 :element-type '(signed-byte 32) :initial-element 0)))
+        (dotimes (i 32)
+          (setf (aref uarr i) (* i 5))
+          (setf (aref sarr i) (- (* i 5) 50)))
+        (let* ((idx (sb-simd-avx512f:make-u32.16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
+               (ug (sb-simd-avx512f:u32.16-gather uarr idx))
+               (sg (sb-simd-avx512f:s32.16-gather sarr idx))
+               (uvals (multiple-value-list (sb-simd-avx512f:u32.16-values ug)))
+               (svals (multiple-value-list (sb-simd-avx512f:s32.16-values sg))))
+          (dotimes (i 16)
+            (is (= (nth i uvals) (* i 5)))
+            (is (= (nth i svals) (- (* i 5) 50)))))
+        ;; Scatter
+        (let ((idx (sb-simd-avx512f:make-u32.16 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31))
+              (uval (sb-simd-avx512f:u32.16 42))
+              (sval (sb-simd-avx512f:s32.16 -42)))
+          (sb-simd-avx512f:u32.16-scatter uval uarr idx)
+          (sb-simd-avx512f:s32.16-scatter sval sarr idx)
+          (dotimes (i 16)
+            (is (= (aref uarr (+ 16 i)) 42))
+            (is (= (aref sarr (+ 16 i)) -42))))))
+
+      ;; 4. u64.8 & s64.8
+      (let ((uarr (make-array 16 :element-type '(unsigned-byte 64) :initial-element 0))
+            (sarr (make-array 16 :element-type '(signed-byte 64) :initial-element 0)))
+        (dotimes (i 16)
+          (setf (aref uarr i) (ash 1 i))
+          (setf (aref sarr i) (- (ash 1 i))))
+        (let* ((idx (sb-simd-avx512f:make-u64.8 0 2 4 6 1 3 5 7))
+               (ug (sb-simd-avx512f:u64.8-gather uarr idx))
+               (sg (sb-simd-avx512f:s64.8-gather sarr idx))
+               (uvals (multiple-value-list (sb-simd-avx512f:u64.8-values ug)))
+               (svals (multiple-value-list (sb-simd-avx512f:s64.8-values sg))))
+          (is (= (nth 0 uvals) 1))
+          (is (= (nth 1 uvals) 4))
+          (is (= (nth 0 svals) -1))
+          (is (= (nth 1 svals) -4))))))
+
+(define-test sap-gather-scatter-avx512f
+  (let ((open-sb-simd-avx512f (find-package "SB-SIMD-AVX512F")))
+    (when (and open-sb-simd-avx512f (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512f)))
+      (sb-alien:with-alien ((buf (array sb-alien:float 40)))
+        (let ((sap (sb-alien:alien-sap buf)))
+          (dotimes (i 40)
+            (setf (sb-alien:deref buf i) (* (float i 1f0) 2.5f0)))
+          (let* ((idx (sb-simd-avx512f:make-u32.16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
+                 (gathered (sb-simd-avx512f:f32.16-sap-gather sap idx 3))
+                 (vals (multiple-value-list (sb-simd-avx512f:f32.16-values gathered))))
+            (dotimes (i 16)
+              (is (= (nth i vals) (* (float (+ i 3) 1f0) 2.5f0))))
+            ;; SAP Scatter
+            (let ((vals (sb-simd-avx512f:f32.16 123.5f0)))
+              (sb-simd-avx512f:f32.16-sap-scatter vals sap idx 4)
+              (dotimes (i 16)
+                (is (= (sb-alien:deref buf (+ i 4)) 123.5f0))))))))))
+
 
 
 
