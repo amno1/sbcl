@@ -97,7 +97,10 @@
    (f32.16-compress       nil            (f32.16) (m32.16 f32.16 f32.16) :cost 3 :encoding :custom)
    (f32.16-expand-z       nil            (f32.16) (m32.16 f32.16)        :cost 3 :encoding :custom)
    (f32.16-expand         nil            (f32.16) (m32.16 f32.16 f32.16) :cost 3 :encoding :custom)
+   (f32.16-broadcast-f32.4 nil           (f32.16) (f32.4)                :cost 1 :encoding :custom)
+   (f32.16-broadcast-f32.8 nil           (f32.16) (f32.8)                :cost 1 :encoding :custom)
    (f32.16-horizontal-and nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)
+
    (f32.16-horizontal-or  nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)
    (f32.16-horizontal-xor nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)
    (f32.16-horizontal-max nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)
@@ -168,7 +171,10 @@
    (f64.8-compress        nil            (f64.8)  (m64.8 f64.8 f64.8)   :cost 3 :encoding :custom)
    (f64.8-expand-z        nil            (f64.8)  (m64.8 f64.8)         :cost 3 :encoding :custom)
    (f64.8-expand          nil            (f64.8)  (m64.8 f64.8 f64.8)   :cost 3 :encoding :custom)
+   (f64.8-broadcast-f64.2 nil            (f64.8)  (f64.2)               :cost 1 :encoding :custom)
+   (f64.8-broadcast-f64.4 nil            (f64.8)  (f64.4)               :cost 1 :encoding :custom)
    (f64.8-horizontal-and  nil            (f64)    (f64.8)         :cost 5 :encoding :fake-vop)
+
    (f64.8-horizontal-or   nil            (f64)    (f64.8)         :cost 5 :encoding :fake-vop)
    (f64.8-horizontal-xor  nil            (f64)    (f64.8)         :cost 5 :encoding :fake-vop)
    (f64.8-horizontal-max  nil            (f64)    (f64.8)         :cost 5 :encoding :fake-vop)
@@ -236,7 +242,11 @@
    (u32.16-compress       nil            (u32.16) (m32.16 u32.16 u32.16) :cost 3 :encoding :custom)
    (u32.16-expand-z       nil            (u32.16) (m32.16 u32.16)        :cost 3 :encoding :custom)
    (u32.16-expand         nil            (u32.16) (m32.16 u32.16 u32.16) :cost 3 :encoding :custom)
+   (u32.16-from-mask      nil            (u32.16) (m32.16)               :cost 1 :encoding :custom)
+   (u32.16-broadcast-u32.4 nil           (u32.16) (u32.4)                :cost 1 :encoding :custom)
+   (u32.16-broadcast-u32.8 nil           (u32.16) (u32.8)                :cost 1 :encoding :custom)
    (u32.8-from-u32.16     #:vextracti32x8 (u32.8) (u32.16 imm1)   :cost 1)
+
    (u32.16-insert-u32.8   #:vinserti32x8 (u32.16) (u32.16 u32.8 imm1) :cost 1)
 
    ;; u64.8
@@ -287,7 +297,11 @@
    (u64.8-compress        nil            (u64.8)  (m64.8 u64.8 u64.8)   :cost 3 :encoding :custom)
    (u64.8-expand-z        nil            (u64.8)  (m64.8 u64.8)         :cost 3 :encoding :custom)
    (u64.8-expand          nil            (u64.8)  (m64.8 u64.8 u64.8)   :cost 3 :encoding :custom)
+   (u64.8-from-mask       nil            (u64.8)  (m64.8)               :cost 1 :encoding :custom)
+   (u64.8-broadcast-u64.2 nil            (u64.8)  (u64.2)               :cost 1 :encoding :custom)
+   (u64.8-broadcast-u64.4 nil            (u64.8)  (u64.4)               :cost 1 :encoding :custom)
    (u64.4-from-u64.8      #:vextracti64x4 (u64.4) (u64.8 imm1)    :cost 1)
+
    (u64.8-insert-u64.4    #:vinserti64x4 (u64.8)  (u64.8 u64.4 imm1) :cost 1)
 
    ;; s32.16
@@ -341,7 +355,11 @@
    (s32.16-compress       nil            (s32.16) (m32.16 s32.16 s32.16) :cost 3 :encoding :custom)
    (s32.16-expand-z       nil            (s32.16) (m32.16 s32.16)        :cost 3 :encoding :custom)
    (s32.16-expand         nil            (s32.16) (m32.16 s32.16 s32.16) :cost 3 :encoding :custom)
+   (s32.16-from-mask      nil            (s32.16) (m32.16)               :cost 1 :encoding :custom)
+   (s32.16-broadcast-s32.4 nil           (s32.16) (s32.4)                :cost 1 :encoding :custom)
+   (s32.16-broadcast-s32.8 nil           (s32.16) (s32.8)                :cost 1 :encoding :custom)
    (s32.8-from-s32.16     #:vextracti32x8 (s32.8) (s32.16 imm1)   :cost 1)
+
    (s32.16-insert-s32.8   #:vinserti32x8 (s32.16) (s32.16 s32.8 imm1) :cost 1)
 
    ;; s64.8
@@ -392,7 +410,11 @@
    (s64.8-compress        nil            (s64.8)  (m64.8 s64.8 s64.8)   :cost 3 :encoding :custom)
    (s64.8-expand-z        nil            (s64.8)  (m64.8 s64.8)         :cost 3 :encoding :custom)
    (s64.8-expand          nil            (s64.8)  (m64.8 s64.8 s64.8)   :cost 3 :encoding :custom)
+   (s64.8-from-mask       nil            (s64.8)  (m64.8)               :cost 1 :encoding :custom)
+   (s64.8-broadcast-s64.2 nil            (s64.8)  (s64.2)               :cost 1 :encoding :custom)
+   (s64.8-broadcast-s64.4 nil            (s64.8)  (s64.4)               :cost 1 :encoding :custom)
    (s64.4-from-s64.8      #:vextracti64x4 (s64.4) (s64.8 imm1)    :cost 1)
+
    (s64.8-insert-s64.4    #:vinserti64x4 (s64.8)  (s64.8 s64.4 imm1) :cost 1)
 
    ;; m64.8
