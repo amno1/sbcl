@@ -2291,6 +2291,10 @@
      #:f32.16-compress-store #:f32.16-sap-compress-store
      #:f32.16-expand-load-z #:f32.16-expand-load
      #:f32.16-sap-expand-load-z #:f32.16-sap-expand-load
+     #:f32.16-broadcast-aref #:f32.16-broadcast-sap-ref
+     #:f32.16-broadcast-aref-masked-z #:f32.16-broadcast-sap-ref-masked-z
+     #:f32.16-broadcast-aref-masked #:f32.16-broadcast-sap-ref-masked
+     #:f32.16-broadcast-f32.4 #:f32.16-broadcast-f32.8
      ;; f64.8
      #:make-f64.8
      #:f64.8
@@ -2375,6 +2379,10 @@
      #:f64.8-compress-store #:f64.8-sap-compress-store
      #:f64.8-expand-load-z #:f64.8-expand-load
      #:f64.8-sap-expand-load-z #:f64.8-sap-expand-load
+     #:f64.8-broadcast-aref #:f64.8-broadcast-sap-ref
+     #:f64.8-broadcast-aref-masked-z #:f64.8-broadcast-sap-ref-masked-z
+     #:f64.8-broadcast-aref-masked #:f64.8-broadcast-sap-ref-masked
+     #:f64.8-broadcast-f64.2 #:f64.8-broadcast-f64.4
      ;; u32.16
      #:make-u32.16
      #:u32.16
@@ -2441,6 +2449,11 @@
      #:u32.16-compress-store #:u32.16-sap-compress-store
      #:u32.16-expand-load-z #:u32.16-expand-load
      #:u32.16-sap-expand-load-z #:u32.16-sap-expand-load
+     #:u32.16-from-mask
+     #:u32.16-broadcast-aref #:u32.16-broadcast-sap-ref
+     #:u32.16-broadcast-aref-masked-z #:u32.16-broadcast-sap-ref-masked-z
+     #:u32.16-broadcast-aref-masked #:u32.16-broadcast-sap-ref-masked
+     #:u32.16-broadcast-u32.4 #:u32.16-broadcast-u32.8
      ;; u64.8
      #:make-u64.8
      #:u64.8
@@ -2504,6 +2517,11 @@
      #:u64.8-compress-store #:u64.8-sap-compress-store
      #:u64.8-expand-load-z #:u64.8-expand-load
      #:u64.8-sap-expand-load-z #:u64.8-sap-expand-load
+     #:u64.8-from-mask
+     #:u64.8-broadcast-aref #:u64.8-broadcast-sap-ref
+     #:u64.8-broadcast-aref-masked-z #:u64.8-broadcast-sap-ref-masked-z
+     #:u64.8-broadcast-aref-masked #:u64.8-broadcast-sap-ref-masked
+     #:u64.8-broadcast-u64.2 #:u64.8-broadcast-u64.4
      ;; s32.16
      #:make-s32.16
      #:s32.16
@@ -2570,6 +2588,11 @@
      #:s32.16-compress-store #:s32.16-sap-compress-store
      #:s32.16-expand-load-z #:s32.16-expand-load
      #:s32.16-sap-expand-load-z #:s32.16-sap-expand-load
+     #:s32.16-from-mask
+     #:s32.16-broadcast-aref #:s32.16-broadcast-sap-ref
+     #:s32.16-broadcast-aref-masked-z #:s32.16-broadcast-sap-ref-masked-z
+     #:s32.16-broadcast-aref-masked #:s32.16-broadcast-sap-ref-masked
+     #:s32.16-broadcast-s32.4 #:s32.16-broadcast-s32.8
      ;; s64.8
      #:make-s64.8
      #:s64.8
@@ -2632,7 +2655,12 @@
      #:s64.8-expand-z #:s64.8-expand
      #:s64.8-compress-store #:s64.8-sap-compress-store
      #:s64.8-expand-load-z #:s64.8-expand-load
-     #:s64.8-sap-expand-load-z #:s64.8-sap-expand-load))
+     #:s64.8-sap-expand-load-z #:s64.8-sap-expand-load
+     #:s64.8-from-mask
+     #:s64.8-broadcast-aref #:s64.8-broadcast-sap-ref
+     #:s64.8-broadcast-aref-masked-z #:s64.8-broadcast-sap-ref-masked-z
+     #:s64.8-broadcast-aref-masked #:s64.8-broadcast-sap-ref-masked
+     #:s64.8-broadcast-s64.2 #:s64.8-broadcast-s64.4))
 
   #+x86-64
   (defpackage #:sb-simd-avx512bw
