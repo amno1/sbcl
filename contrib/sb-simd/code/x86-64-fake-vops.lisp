@@ -1521,18 +1521,6 @@
     (sb-simd-avx2::%s8.32-values (%s8.32!-from-p512 x))
     (sb-simd-avx2::%s8.32-values (%s8.32-from-s8.64 x 1))))
 
-(define-fake-vop u8.64-broadcast (x)
-  (%u8.64-broadcastvec (%u8.64!-from-p256 (sb-simd-avx::%u8.32!-from-u8 x))))
-
-(define-fake-vop s8.64-broadcast (x)
-  (%s8.64-broadcastvec (%s8.64!-from-p256 (sb-simd-avx::%s8.32!-from-s8 x))))
-
-(define-fake-vop u16.32-broadcast (x)
-  (%u16.32-broadcastvec (%u16.32!-from-p256 (sb-simd-avx::%u16.16!-from-u16 x))))
-
-(define-fake-vop s16.32-broadcast (x)
-  (%s16.32-broadcastvec (%s16.32!-from-p256 (sb-simd-avx::%s16.16!-from-s16 x))))
-
 (define-fake-vop u8.64!-from-u8 (x)
   (%u8.64-broadcast x))
 

@@ -636,6 +636,31 @@
                                                                :z z-num
                                                                :disp-n (if (zerop w) 4 8))))))
                  (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
+                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
+             (register-masked-broadcast (name opcode w disp-n)
+               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
+                      (sym-vm  (intern (string name) "SB-VM"))
+                      (fn (lambda (segment dst src mask &optional (zeroing 0))
+                            (let ((mask-num (cond ((integerp mask) mask)
+                                                  ((sb-x86-64-asm::k-register-p mask) (sb-x86-64-asm::reg-num mask))
+                                                  (t (error "Invalid mask ~S" mask))))
+                                  (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                              (sb-x86-64-asm::emit-avx512-inst segment src dst #x66 opcode
+                                                               :opcode-prefix #x0f38
+                                                               :w w
+                                                               :aaa mask-num
+                                                               :z z-num
+                                                               :disp-n disp-n)))))
+                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
+                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
+             (register-broadcast-gpr (name opcode)
+               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
+                      (sym-vm  (intern (string name) "SB-VM"))
+                      (fn (lambda (segment dst src)
+                            (sb-x86-64-asm::emit-avx512-inst segment src dst #x66 opcode
+                                                             :opcode-prefix #x0f38
+                                                             :w 0))))
+                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
                  (setf (gethash sym-vm sb-assem::*inst-encoder*) fn))))
         (register-masked-move 'vmovups-masked   nil  #x10 #x11 0)
         (register-masked-move 'vmovupd-masked   #x66 #x10 #x11 1)
@@ -648,7 +673,13 @@
         (register-masked-expand   'vexpandps-masked    #x66 #x88 0)
         (register-masked-expand   'vexpandpd-masked    #x66 #x88 1)
         (register-masked-expand   'vpexpandd-masked    #x66 #x89 0)
-        (register-masked-expand   'vpexpandq-masked    #x66 #x89 1))))
+        (register-masked-expand   'vpexpandq-masked    #x66 #x89 1)
+        (register-masked-broadcast 'vbroadcastss-masked #x18 0 4)
+        (register-masked-broadcast 'vbroadcastsd-masked #x19 1 8)
+        (register-masked-broadcast 'vpbroadcastd-masked #x58 0 4)
+        (register-masked-broadcast 'vpbroadcastq-masked #x59 1 8)
+        (register-broadcast-gpr 'vpbroadcastb-gpr #x7a)
+        (register-broadcast-gpr 'vpbroadcastw-gpr #x7b))))
 
   (macrolet
       ((def-masked-vref-vops (type-name reg-sc stack-sc mask-name mask-sc mnemonic move-inst vec-name bytes-per-element)
@@ -976,7 +1007,131 @@
       (def-expand-z   sb-simd-avx512f::s64.8-expand-z    vpexpandq-masked)
       (def-expand     sb-simd-avx512f::s64.8-expand      vmovdqa64 vpexpandq-masked))
 
+    ;; Subvector broadcast custom VOPs
+    (define-custom-vop sb-simd-avx512f:f32.16-broadcast-f32.4
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshuff32x4 dst src src 0)))
+
+    (define-custom-vop sb-simd-avx512f:f32.16-broadcast-f32.8
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshuff32x4 dst src src #x44)))
+
+    (define-custom-vop sb-simd-avx512f:f64.8-broadcast-f64.2
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshuff64x2 dst src src 0)))
+
+    (define-custom-vop sb-simd-avx512f:f64.8-broadcast-f64.4
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshuff64x2 dst src src #x44)))
+
+    (define-custom-vop sb-simd-avx512f:u32.16-broadcast-u32.4
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi32x4 dst src src 0)))
+
+    (define-custom-vop sb-simd-avx512f:u32.16-broadcast-u32.8
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi32x4 dst src src #x44)))
+
+    (define-custom-vop sb-simd-avx512f:s32.16-broadcast-s32.4
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi32x4 dst src src 0)))
+
+    (define-custom-vop sb-simd-avx512f:s32.16-broadcast-s32.8
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi32x4 dst src src #x44)))
+
+    (define-custom-vop sb-simd-avx512f:u64.8-broadcast-u64.2
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi64x2 dst src src 0)))
+
+    (define-custom-vop sb-simd-avx512f:u64.8-broadcast-u64.4
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi64x2 dst src src #x44)))
+
+    (define-custom-vop sb-simd-avx512f:s64.8-broadcast-s64.2
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi64x2 dst src src 0)))
+
+    (define-custom-vop sb-simd-avx512f:s64.8-broadcast-s64.4
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vshufi64x2 dst src src #x44)))
+
+    ;; Mask-to-vector broadcast custom VOPs
+    (define-custom-vop sb-simd-avx512f:u32.16-from-mask
+        (:args (mask))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastmw2d dst mask)))
+
+    (define-custom-vop sb-simd-avx512f:s32.16-from-mask
+        (:args (mask))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastmw2d dst mask)))
+
+    (define-custom-vop sb-simd-avx512f:u64.8-from-mask
+        (:args (mask))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastmb2q dst mask)))
+
+    (define-custom-vop sb-simd-avx512f:s64.8-from-mask
+        (:args (mask))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastmb2q dst mask)))
+
+    ;; Native AVX-512BW byte/word broadcast custom VOPs
+    (define-custom-vop sb-simd-avx512bw:u8.64-broadcast
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastb-gpr dst src)))
+
+    (define-custom-vop sb-simd-avx512bw:s8.64-broadcast
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastb-gpr dst src)))
+
+    (define-custom-vop sb-simd-avx512bw:u16.32-broadcast
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastw-gpr dst src)))
+
+    (define-custom-vop sb-simd-avx512bw:s16.32-broadcast
+        (:args (src))
+      (:results (dst))
+      (:generator
+       (inst vpbroadcastw-gpr dst src)))
+
     ;; Memory compress and expand VOPs
+
     (macrolet
         ((def-compress-expand-memory-vops (type-name reg-sc mask-name compress-inst expand-inst move-inst vec-name bytes-per-element)
            (let* ((pkg (find-package "SB-SIMD-AVX512F"))
@@ -1241,7 +1396,255 @@
       (def-compress-expand-memory-vops u32.16 int-avx512-reg    m32.16 vpcompressd-masked vpexpandd-masked vmovdqa32 u32vec 4)
       (def-compress-expand-memory-vops s32.16 int-avx512-reg    m32.16 vpcompressd-masked vpexpandd-masked vmovdqa32 s32vec 4)
       (def-compress-expand-memory-vops u64.8  int-avx512-reg    m64.8  vpcompressq-masked vpexpandq-masked vmovdqa64 u64vec 8)
-      (def-compress-expand-memory-vops s64.8  int-avx512-reg    m64.8  vpcompressq-masked vpexpandq-masked vmovdqa64 s64vec 8)))
+      (def-compress-expand-memory-vops s64.8  int-avx512-reg    m64.8  vpcompressq-masked vpexpandq-masked vmovdqa64 s64vec 8))
+
+    ;; Memory scalar broadcast VOPs
+    (macrolet
+        ((def-broadcast-memory-vops (type-name reg-sc mask-name unmasked-inst masked-inst move-inst vec-name bytes-per-element)
+           (let* ((pkg (find-package "SB-SIMD-AVX512F"))
+                  (bc-name           (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-AREF"))
+                  (bc-c-name         (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-AREF-C"))
+                  (sap-bc-name       (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-SAP-REF"))
+                  (sap-bc-c-name     (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-SAP-REF-C"))
+                  (bc-z-name         (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-AREF-MASKED-Z"))
+                  (bc-z-c-name       (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-AREF-MASKED-Z-C"))
+                  (sap-bc-z-name     (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-SAP-REF-MASKED-Z"))
+                  (sap-bc-z-c-name   (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-SAP-REF-MASKED-Z-C"))
+                  (bc-m-name         (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-AREF-MASKED"))
+                  (bc-m-c-name       (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-AREF-MASKED-C"))
+                  (sap-bc-m-name     (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-SAP-REF-MASKED"))
+                  (sap-bc-m-c-name   (sb-simd-internals:mksym pkg "%" type-name "-BROADCAST-SAP-REF-MASKED-C"))
+
+                  (val-rec           (sb-simd-internals:find-value-record (sb-simd-internals:mksym pkg type-name)))
+                  (vec-rec           (sb-simd-internals:find-value-record (sb-simd-internals:mksym pkg vec-name)))
+                  (mask-rec          (sb-simd-internals:find-value-record (sb-simd-internals:mksym pkg mask-name)))
+
+                  (value-type        (sb-simd-internals:value-record-type val-rec))
+                  (value-primitive-type (sb-simd-internals:value-record-primitive-type val-rec))
+                  (value-scs         `(,reg-sc))
+
+                  (vector-type       (sb-simd-internals:value-record-type vec-rec))
+                  (vector-primitive-type (sb-simd-internals:value-record-primitive-type vec-rec))
+
+                  (mask-type         (sb-simd-internals:value-record-type mask-rec))
+                  (mask-primitive-type (sb-simd-internals:value-record-primitive-type mask-rec))
+
+                  (displacement
+                    (multiple-value-bind (lo hi)
+                        (displacement-bounds other-pointer-lowtag (* 8 bytes-per-element) vector-data-offset)
+                      `(integer ,lo ,hi))))
+             (multiple-value-bind (index-scs scale)
+                 (if (>= bytes-per-element (ash 1 n-fixnum-tag-bits))
+                     (values '(any-reg signed-reg unsigned-reg) `(index-scale ,bytes-per-element index))
+                     (values '(signed-reg unsigned-reg) bytes-per-element))
+               `(progn
+                  ;; 1. Unmasked broadcast from array
+                  (defknown ,bc-name (,vector-type index ,displacement)
+                      (values ,value-type &optional)
+                      (always-translatable)
+                    :overwrite-fndb-silently t)
+                  (define-vop (,bc-name)
+                    (:translate ,bc-name)
+                    (:args (vector :scs (descriptor-reg))
+                           (index :scs ,index-scs))
+                    (:info addend)
+                    (:arg-types ,vector-primitive-type positive-fixnum (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 2
+                      (let ((ea (ea (+ (* vector-data-offset n-word-bytes)
+                                       (* addend ,bytes-per-element)
+                                       (- other-pointer-lowtag))
+                                    vector index ,scale)))
+                        (inst ,unmasked-inst result ea))))
+                  (define-vop (,bc-c-name)
+                    (:translate ,bc-name)
+                    (:args (vector :scs (descriptor-reg)))
+                    (:info index addend)
+                    (:arg-types ,vector-primitive-type (:constant low-index) (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 1
+                      (let ((ea (ea (+ (* vector-data-offset n-word-bytes)
+                                       (* ,bytes-per-element (+ index addend))
+                                       (- other-pointer-lowtag))
+                                    vector)))
+                        (inst ,unmasked-inst result ea))))
+
+                  ;; 2. Unmasked broadcast from SAP
+                  (defknown ,sap-bc-name (sb-alien:system-area-pointer index ,displacement)
+                      (values ,value-type &optional)
+                      (always-translatable)
+                    :overwrite-fndb-silently t)
+                  (define-vop (,sap-bc-name)
+                    (:translate ,sap-bc-name)
+                    (:args (sap :scs (sap-reg))
+                           (index :scs ,index-scs))
+                    (:info addend)
+                    (:arg-types sb-alien:system-area-pointer positive-fixnum (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 2
+                      (let ((ea (ea (* addend ,bytes-per-element) sap index ,scale)))
+                        (inst ,unmasked-inst result ea))))
+                  (define-vop (,sap-bc-c-name)
+                    (:translate ,sap-bc-name)
+                    (:args (sap :scs (sap-reg)))
+                    (:info index addend)
+                    (:arg-types sb-alien:system-area-pointer (:constant low-index) (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 1
+                      (let ((ea (ea (* ,bytes-per-element (+ index addend)) sap)))
+                        (inst ,unmasked-inst result ea))))
+
+                  ;; 3. Masked-Z broadcast from array
+                  (defknown ,bc-z-name (,mask-type ,vector-type index ,displacement)
+                      (values ,value-type &optional)
+                      (always-translatable)
+                    :overwrite-fndb-silently t)
+                  (define-vop (,bc-z-name)
+                    (:translate ,bc-z-name)
+                    (:args (mask :scs (mask-reg))
+                           (vector :scs (descriptor-reg))
+                           (index :scs ,index-scs))
+                    (:info addend)
+                    (:arg-types ,mask-primitive-type ,vector-primitive-type positive-fixnum (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 2
+                      (let ((ea (ea (+ (* vector-data-offset n-word-bytes)
+                                       (* addend ,bytes-per-element)
+                                       (- other-pointer-lowtag))
+                                    vector index ,scale)))
+                        (inst ,masked-inst result ea mask :z))))
+                  (define-vop (,bc-z-c-name)
+                    (:translate ,bc-z-name)
+                    (:args (mask :scs (mask-reg))
+                           (vector :scs (descriptor-reg)))
+                    (:info index addend)
+                    (:arg-types ,mask-primitive-type ,vector-primitive-type (:constant low-index) (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 1
+                      (let ((ea (ea (+ (* vector-data-offset n-word-bytes)
+                                       (* ,bytes-per-element (+ index addend))
+                                       (- other-pointer-lowtag))
+                                    vector)))
+                        (inst ,masked-inst result ea mask :z))))
+
+                  ;; 4. Masked-Z broadcast from SAP
+                  (defknown ,sap-bc-z-name (,mask-type sb-alien:system-area-pointer index ,displacement)
+                      (values ,value-type &optional)
+                      (always-translatable)
+                    :overwrite-fndb-silently t)
+                  (define-vop (,sap-bc-z-name)
+                    (:translate ,sap-bc-z-name)
+                    (:args (mask :scs (mask-reg))
+                           (sap :scs (sap-reg))
+                           (index :scs ,index-scs))
+                    (:info addend)
+                    (:arg-types ,mask-primitive-type sb-alien:system-area-pointer positive-fixnum (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 2
+                      (let ((ea (ea (* addend ,bytes-per-element) sap index ,scale)))
+                        (inst ,masked-inst result ea mask :z))))
+                  (define-vop (,sap-bc-z-c-name)
+                    (:translate ,sap-bc-z-name)
+                    (:args (mask :scs (mask-reg))
+                           (sap :scs (sap-reg)))
+                    (:info index addend)
+                    (:arg-types ,mask-primitive-type sb-alien:system-area-pointer (:constant low-index) (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 1
+                      (let ((ea (ea (* ,bytes-per-element (+ index addend)) sap)))
+                        (inst ,masked-inst result ea mask :z))))
+
+                  ;; 5. Masked Merging broadcast from array
+                  (defknown ,bc-m-name (,mask-type ,value-type ,vector-type index ,displacement)
+                      (values ,value-type &optional)
+                      (always-translatable)
+                    :overwrite-fndb-silently t)
+                  (define-vop (,bc-m-name)
+                    (:translate ,bc-m-name)
+                    (:args (mask :scs (mask-reg))
+                           (default :scs ,value-scs :target result)
+                           (vector :scs (descriptor-reg))
+                           (index :scs ,index-scs))
+                    (:info addend)
+                    (:arg-types ,mask-primitive-type ,value-primitive-type ,vector-primitive-type positive-fixnum (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 2
+                      (unless (location= result default)
+                        (inst ,move-inst result default))
+                      (let ((ea (ea (+ (* vector-data-offset n-word-bytes)
+                                       (* addend ,bytes-per-element)
+                                       (- other-pointer-lowtag))
+                                    vector index ,scale)))
+                        (inst ,masked-inst result ea mask 0))))
+                  (define-vop (,bc-m-c-name)
+                    (:translate ,bc-m-name)
+                    (:args (mask :scs (mask-reg))
+                           (default :scs ,value-scs :target result)
+                           (vector :scs (descriptor-reg)))
+                    (:info index addend)
+                    (:arg-types ,mask-primitive-type ,value-primitive-type ,vector-primitive-type (:constant low-index) (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 1
+                      (unless (location= result default)
+                        (inst ,move-inst result default))
+                      (let ((ea (ea (+ (* vector-data-offset n-word-bytes)
+                                       (* ,bytes-per-element (+ index addend))
+                                       (- other-pointer-lowtag))
+                                    vector)))
+                        (inst ,masked-inst result ea mask 0))))
+
+                  ;; 6. Masked Merging broadcast from SAP
+                  (defknown ,sap-bc-m-name (,mask-type ,value-type sb-alien:system-area-pointer index ,displacement)
+                      (values ,value-type &optional)
+                      (always-translatable)
+                    :overwrite-fndb-silently t)
+                  (define-vop (,sap-bc-m-name)
+                    (:translate ,sap-bc-m-name)
+                    (:args (mask :scs (mask-reg))
+                           (default :scs ,value-scs :target result)
+                           (sap :scs (sap-reg))
+                           (index :scs ,index-scs))
+                    (:info addend)
+                    (:arg-types ,mask-primitive-type ,value-primitive-type sb-alien:system-area-pointer positive-fixnum (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 2
+                      (unless (location= result default)
+                        (inst ,move-inst result default))
+                      (let ((ea (ea (* addend ,bytes-per-element) sap index ,scale)))
+                        (inst ,masked-inst result ea mask 0))))
+                  (define-vop (,sap-bc-m-c-name)
+                    (:translate ,sap-bc-m-name)
+                    (:args (mask :scs (mask-reg))
+                           (default :scs ,value-scs :target result)
+                           (sap :scs (sap-reg)))
+                    (:info index addend)
+                    (:arg-types ,mask-primitive-type ,value-primitive-type sb-alien:system-area-pointer (:constant low-index) (:constant ,displacement))
+                    (:results (result :scs ,value-scs))
+                    (:result-types ,value-primitive-type)
+                    (:generator 1
+                      (unless (location= result default)
+                        (inst ,move-inst result default))
+                      (let ((ea (ea (* ,bytes-per-element (+ index addend)) sap)))
+                        (inst ,masked-inst result ea mask 0)))))))))
+
+        (def-broadcast-memory-vops f32.16 single-avx512-reg m32.16 vbroadcastss vbroadcastss-masked vmovaps f32vec 4)
+        (def-broadcast-memory-vops f64.8  double-avx512-reg m64.8  vbroadcastsd vbroadcastsd-masked vmovapd f64vec 8)
+        (def-broadcast-memory-vops u32.16 int-avx512-reg    m32.16 vpbroadcastd vpbroadcastd-masked vmovdqa32 u32vec 4)
+        (def-broadcast-memory-vops s32.16 int-avx512-reg    m32.16 vpbroadcastd vpbroadcastd-masked vmovdqa32 s32vec 4)
+        (def-broadcast-memory-vops u64.8  int-avx512-reg    m64.8  vpbroadcastq vpbroadcastq-masked vmovdqa64 u64vec 8)
+        (def-broadcast-memory-vops s64.8  int-avx512-reg    m64.8  vpbroadcastq vpbroadcastq-masked vmovdqa64 s64vec 8)))
+
 
 ;; Neon
 #+arm64

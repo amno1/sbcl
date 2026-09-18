@@ -41,7 +41,8 @@
               (when (and (find #\. name)
                          (search "-SAP-REF" name)
                          (not (search "NON-TEMPORAL" name))
-                         (not (search "STRING" name)))
+                         (not (search "STRING" name))
+                         (not (search "BROADCAST" name)))
                 (is (fboundp sym))
                 (is (fboundp `(setf ,sym)))))))))))
 
