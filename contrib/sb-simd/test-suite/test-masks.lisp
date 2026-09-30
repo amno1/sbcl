@@ -1319,6 +1319,31 @@
         (is (= (sb-simd-avx512bw:m8.64-value shuf0) 0))
         (is (= (sb-simd-avx512bw:m8.64-value shuf1) #xFFFFFFFFFFFFFFFF))))))
 
+(define-test avx512vbmi-extended-intrinsics
+  (let ((open-sb-simd-avx512vbmi (find-package "SB-SIMD-AVX512VBMI")))
+    (when (and open-sb-simd-avx512vbmi
+               (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512vbmi)))
+      ;; Permute bytes (vpermb)
+      (let ((p8 (sb-simd-avx512vbmi:u8.64-permute (sb-simd-avx512bw:u8.64 0) (sb-simd-avx512bw:u8.64 42)))
+            (sp8 (sb-simd-avx512vbmi:s8.64-permute (sb-simd-avx512bw:u8.64 0) (sb-simd-avx512bw:s8.64 -42))))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values p8))) 42))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:s8.64-values sp8))) -42)))
+
+      ;; Two-source permute bytes (vpermi2b, vpermt2b)
+      (let ((pi2-1 (sb-simd-avx512vbmi:u8.64-permi2 (sb-simd-avx512bw:u8.64 0) (sb-simd-avx512bw:u8.64 10) (sb-simd-avx512bw:u8.64 20)))
+            (pi2-2 (sb-simd-avx512vbmi:u8.64-permi2 (sb-simd-avx512bw:u8.64 64) (sb-simd-avx512bw:u8.64 10) (sb-simd-avx512bw:u8.64 20)))
+            (pt2-1 (sb-simd-avx512vbmi:u8.64-permt2 (sb-simd-avx512bw:u8.64 10) (sb-simd-avx512bw:u8.64 0) (sb-simd-avx512bw:u8.64 20)))
+            (pt2-2 (sb-simd-avx512vbmi:u8.64-permt2 (sb-simd-avx512bw:u8.64 10) (sb-simd-avx512bw:u8.64 64) (sb-simd-avx512bw:u8.64 20))))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values pi2-1))) 10))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values pi2-2))) 20))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values pt2-1))) 10))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values pt2-2))) 20)))
+
+      ;; Multi-shift bytes across qwords (vpmultishiftqb)
+      (let ((ms (sb-simd-avx512vbmi:u8.64-multishiftqb (sb-simd-avx512bw:u8.64 0) (sb-simd-avx512bw:u8.64 42))))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values ms))) 42))))))
+
+
 
 
 
