@@ -1343,7 +1343,26 @@
       (let ((ms (sb-simd-avx512vbmi:u8.64-multishiftqb (sb-simd-avx512bw:u8.64 0) (sb-simd-avx512bw:u8.64 42))))
         (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values ms))) 42))))))
 
+(define-test avx512vbmi2-extended-intrinsics
+  (let ((open-sb-simd-avx512vbmi2 (find-package "SB-SIMD-AVX512VBMI2")))
+    (when (and open-sb-simd-avx512vbmi2
+               (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512vbmi2)))
+      ;; Double shift immediate (vpshldd, vpshrdd, vpshldq, vpshrdq, vpshldw, vpshrdw)
+      (let ((shld32 (sb-simd-avx512vbmi2:u32.16-shld (sb-simd-avx512f:u32.16 123) (sb-simd-avx512f:u32.16 456) 0))
+            (shrd32 (sb-simd-avx512vbmi2:u32.16-shrd (sb-simd-avx512f:u32.16 123) (sb-simd-avx512f:u32.16 456) 0))
+            (shld64 (sb-simd-avx512vbmi2:u64.8-shld (sb-simd-avx512f:u64.8 789) (sb-simd-avx512f:u64.8 101) 0))
+            (shrd64 (sb-simd-avx512vbmi2:u64.8-shrd (sb-simd-avx512f:u64.8 789) (sb-simd-avx512f:u64.8 101) 0))
+            (shld16 (sb-simd-avx512vbmi2:u16.32-shld (sb-simd-avx512bw:u16.32 11) (sb-simd-avx512bw:u16.32 22) 0))
+            (shrd16 (sb-simd-avx512vbmi2:u16.32-shrd (sb-simd-avx512bw:u16.32 11) (sb-simd-avx512bw:u16.32 22) 0)))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values shld32))) 123))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values shrd32))) 123))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u64.8-values shld64))) 789))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u64.8-values shrd64))) 789))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values shld16))) 11))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values shrd16))) 11)))
 
-
-
-
+      ;; Double shift variable (vpshldvd, vpshrdvd)
+      (let ((shldv32 (sb-simd-avx512vbmi2:u32.16-shldv (sb-simd-avx512f:u32.16 456) (sb-simd-avx512f:u32.16 123) (sb-simd-avx512f:u32.16 0)))
+            (shrdv32 (sb-simd-avx512vbmi2:u32.16-shrdv (sb-simd-avx512f:u32.16 456) (sb-simd-avx512f:u32.16 123) (sb-simd-avx512f:u32.16 0))))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values shldv32))) 456))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values shrdv32))) 456))))))
