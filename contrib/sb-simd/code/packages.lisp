@@ -280,6 +280,7 @@
    #:avx512bitalg-supported-p
    #:avx512vbmi-supported-p
    #:avx512vbmi2-supported-p
+   #:avx512vnni-supported-p
    #:avx512bw-supported-p
    #:avx512vl-supported-p
    #:avx512fp16-supported-p
@@ -3179,7 +3180,7 @@
      #:s64.8-shrdv))
 
   #+x86-64
-  (defpackage #:sb-simd-avx512fp16
+  (defpackage #:sb-simd-avx512vnni
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512vbmi2)
     #0#
     #1#
@@ -3194,6 +3195,34 @@
     #20#
     #21#
     #22#
+    #23=
+    (:export
+     #:s32.16-dpbusd
+     #:u32.16-dpbusd
+     #:s32.16-dpbusds
+     #:u32.16-dpbusds
+     #:s32.16-dpwssd
+     #:u32.16-dpwssd
+     #:s32.16-dpwssds
+     #:u32.16-dpwssds))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512fp16
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512vnni)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #18#
+    #19#
+    #20#
+    #21#
+    #22#
+    #23#
     #15=
     (:export
      #:f16
@@ -3276,6 +3305,7 @@
     #20#
     #21#
     #22#
+    #23#
     #15#
     #16=
     (:export))
@@ -3296,6 +3326,7 @@
     #20#
     #21#
     #22#
+    #23#
     #15#
     #16#
     #17=
@@ -3884,7 +3915,7 @@
              "SB-SIMD-AVX" "SB-SIMD-AVX2" "SB-SIMD-FMA"
              "SB-SIMD-AVX512F" "SB-SIMD-AVX512BW" "SB-SIMD-AVX512DQ"
              "SB-SIMD-AVX512CD" "SB-SIMD-AVX512VPOPCNTDQ"
-             "SB-SIMD-AVX512BITALG" "SB-SIMD-AVX512VBMI" "SB-SIMD-AVX512VBMI2"
+             "SB-SIMD-AVX512BITALG" "SB-SIMD-AVX512VBMI" "SB-SIMD-AVX512VBMI2" "SB-SIMD-AVX512VNNI"
              "SB-SIMD-AVX512FP16" "SB-SIMD-AVX10.1" "SB-SIMD-AVX10.2"
              "SB-SIMD-INTERNALS" "SB-SIMD-SSE" "SB-SIMD-SSE2"
              "SB-SIMD-SSE3" "SB-SIMD-SSE4.1" "SB-SIMD-SSE4.2"
