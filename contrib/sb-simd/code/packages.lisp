@@ -276,6 +276,7 @@
    #:avx512f-supported-p
    #:avx512dq-supported-p
    #:avx512cd-supported-p
+   #:avx512vpopcntdq-supported-p
    #:avx512bw-supported-p
    #:avx512vl-supported-p
    #:avx512fp16-supported-p
@@ -3067,7 +3068,7 @@
      #:s64.8-lzcnt))
 
   #+x86-64
-  (defpackage #:sb-simd-avx512fp16
+  (defpackage #:sb-simd-avx512vpopcntdq
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512cd)
     #0#
     #1#
@@ -3078,6 +3079,26 @@
     #13#
     #14#
     #18#
+    #19=
+    (:export
+     #:u32.16-popcnt
+     #:s32.16-popcnt
+     #:u64.8-popcnt
+     #:s64.8-popcnt))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512fp16
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512vpopcntdq)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #18#
+    #19#
     #15=
     (:export
      #:f16
@@ -3156,6 +3177,7 @@
     #13#
     #14#
     #18#
+    #19#
     #15#
     #16=
     (:export))
@@ -3172,6 +3194,7 @@
     #13#
     #14#
     #18#
+    #19#
     #15#
     #16#
     #17=
@@ -3759,7 +3782,7 @@
 (dolist (p '("SB-SIMD" "SB-SIMD-NEON" "SB-SIMD-ARM64"
              "SB-SIMD-AVX" "SB-SIMD-AVX2" "SB-SIMD-FMA"
              "SB-SIMD-AVX512F" "SB-SIMD-AVX512BW" "SB-SIMD-AVX512DQ"
-             "SB-SIMD-AVX512CD"
+             "SB-SIMD-AVX512CD" "SB-SIMD-AVX512VPOPCNTDQ"
              "SB-SIMD-AVX512FP16" "SB-SIMD-AVX10.1" "SB-SIMD-AVX10.2"
              "SB-SIMD-INTERNALS" "SB-SIMD-SSE" "SB-SIMD-SSE2"
              "SB-SIMD-SSE3" "SB-SIMD-SSE4.1" "SB-SIMD-SSE4.2"
