@@ -3045,7 +3045,7 @@
      #:s64.8-insert-s64.2))
 
   #+x86-64
-  (defpackage #:sb-simd-avx512fp16
+  (defpackage #:sb-simd-avx512cd
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512dq)
     #0#
     #1#
@@ -3055,6 +3055,29 @@
     #12#
     #13#
     #14#
+    #18=
+    (:export
+     #:u32.16-conflict
+     #:s32.16-conflict
+     #:u64.8-conflict
+     #:s64.8-conflict
+     #:u32.16-lzcnt
+     #:s32.16-lzcnt
+     #:u64.8-lzcnt
+     #:s64.8-lzcnt))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512fp16
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512cd)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #18#
     #15=
     (:export
      #:f16
@@ -3132,6 +3155,7 @@
     #12#
     #13#
     #14#
+    #18#
     #15#
     #16=
     (:export))
@@ -3147,6 +3171,7 @@
     #12#
     #13#
     #14#
+    #18#
     #15#
     #16#
     #17=
@@ -3734,6 +3759,7 @@
 (dolist (p '("SB-SIMD" "SB-SIMD-NEON" "SB-SIMD-ARM64"
              "SB-SIMD-AVX" "SB-SIMD-AVX2" "SB-SIMD-FMA"
              "SB-SIMD-AVX512F" "SB-SIMD-AVX512BW" "SB-SIMD-AVX512DQ"
+             "SB-SIMD-AVX512CD"
              "SB-SIMD-AVX512FP16" "SB-SIMD-AVX10.1" "SB-SIMD-AVX10.2"
              "SB-SIMD-INTERNALS" "SB-SIMD-SSE" "SB-SIMD-SSE2"
              "SB-SIMD-SSE3" "SB-SIMD-SSE4.1" "SB-SIMD-SSE4.2"
