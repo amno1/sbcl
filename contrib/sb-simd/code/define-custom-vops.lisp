@@ -578,156 +578,7 @@
     (def-not sb-simd-avx512bw::s16.32-not)
     (def-not sb-simd-avx512fp16::f16.32-not))
 
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-    (sb-ext:without-package-locks
-      (flet ((register-masked-move (name prefix opcode-from opcode-to w &optional (opcode-prefix #x0f))
-               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
-                      (sym-vm (intern (string name) "SB-VM"))
-                      (fn (lambda (segment dst src mask &optional (zeroing 0))
-                            (let ((mask-num (cond ((integerp mask) mask)
-                                                  ((sb-x86-64-asm::k-register-p mask) (sb-x86-64-asm::reg-num mask))
-                                                  (t (error "Invalid mask ~S" mask))))
-                                  (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
-                              (cond ((sb-x86-64-asm::xmm-register-p dst)
-                                     (sb-x86-64-asm::emit-avx512-inst segment src dst prefix opcode-from
-                                                       :opcode-prefix opcode-prefix
-                                                       :w w
-                                                       :aaa mask-num
-                                                       :z z-num
-                                                       :disp-n (sb-x86-64-asm::full-vector-disp-n dst)))
-                                    (t
-                                     (aver (sb-x86-64-asm::xmm-register-p src))
-                                     (sb-x86-64-asm::emit-avx512-inst segment dst src prefix opcode-to
-                                                       :opcode-prefix opcode-prefix
-                                                       :w w
-                                                       :aaa mask-num
-                                                       :z 0
-                                                       :disp-n (sb-x86-64-asm::full-vector-disp-n src))))))))
-                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
-                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
-             (register-masked-compress (name prefix opcode w)
-               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
-                      (sym-vm  (intern (string name) "SB-VM"))
-                      (fn (lambda (segment dst src mask &optional (zeroing 0))
-                            (let ((mask-num (cond ((integerp mask) mask)
-                                                  ((sb-x86-64-asm::k-register-p mask) (sb-x86-64-asm::reg-num mask))
-                                                  (t (error "Invalid mask ~S" mask))))
-                                  (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
-                              (sb-x86-64-asm::emit-avx512-inst segment dst src prefix opcode
-                                                               :opcode-prefix #x0f38
-                                                               :w w
-                                                               :aaa mask-num
-                                                               :z z-num
-                                                               :disp-n (if (zerop w) 4 8))))))
-                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
-                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
-             (register-masked-expand (name prefix opcode w)
-               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
-                      (sym-vm  (intern (string name) "SB-VM"))
-                      (fn (lambda (segment dst src mask &optional (zeroing 0))
-                            (let ((mask-num (cond ((integerp mask) mask)
-                                                  ((sb-x86-64-asm::k-register-p mask) (sb-x86-64-asm::reg-num mask))
-                                                  (t (error "Invalid mask ~S" mask))))
-                                  (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
-                              (sb-x86-64-asm::emit-avx512-inst segment src dst prefix opcode
-                                                               :opcode-prefix #x0f38
-                                                               :w w
-                                                               :aaa mask-num
-                                                               :z z-num
-                                                               :disp-n (if (zerop w) 4 8))))))
-                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
-                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
-             (register-masked-broadcast (name opcode w disp-n)
-               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
-                      (sym-vm  (intern (string name) "SB-VM"))
-                      (fn (lambda (segment dst src mask &optional (zeroing 0))
-                            (let ((mask-num (cond ((integerp mask) mask)
-                                                  ((sb-x86-64-asm::k-register-p mask) (sb-x86-64-asm::reg-num mask))
-                                                  (t (error "Invalid mask ~S" mask))))
-                                  (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
-                              (sb-x86-64-asm::emit-avx512-inst segment src dst #x66 opcode
-                                                               :opcode-prefix #x0f38
-                                                               :w w
-                                                               :aaa mask-num
-                                                               :z z-num
-                                                               :disp-n disp-n)))))
-                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
-                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
-             (register-broadcast-gpr (name opcode)
-               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
-                      (sym-vm  (intern (string name) "SB-VM"))
-                      (fn (lambda (segment dst src)
-                            (sb-x86-64-asm::emit-avx512-inst segment src dst #x66 opcode
-                                                             :opcode-prefix #x0f38
-                                                             :w 0))))
-                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
-                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
-             (register-gather (name opcode w)
-               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
-                      (sym-vm  (intern (string name) "SB-VM"))
-                      (fn (lambda (segment dst vm mask)
-                            (let* ((index (sb-x86-64-asm::ea-index vm))
-                                   (index-offset (cond ((sb-c:tn-p index) (sb-vm::tn-offset index))
-                                                       ((sb-x86-64-asm::register-p index) (sb-x86-64-asm::reg-num index))
-                                                       (t (error "Invalid VSIB index ~S" index))))
-                                   (v-prime (if (>= index-offset 16) 1 0))
-                                   (mask-num (cond ((integerp mask) mask)
-                                                   ((sb-x86-64-asm::k-register-p mask) (sb-x86-64-asm::reg-num mask))
-                                                   (t (error "Invalid mask ~S" mask)))))
-                              (multiple-value-bind (ll r x b r-prime)
-                                  (sb-x86-64-asm::determine-evex-flags vm dst nil nil)
-                                (sb-x86-64-asm::emit-evex segment r x b r-prime #x0f38 w
-                                                          0 #x66 0 (or ll #b10) 0 v-prime mask-num)
-                                (sb-assem:emit-byte segment opcode)
-                                (sb-x86-64-asm::emit-ea segment vm dst :xmm-index t :disp-n 0))))))
-                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
-                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn)))
-             (register-scatter (name opcode w)
-               (let* ((sym-asm (intern (string name) "SB-X86-64-ASM"))
-                      (sym-vm  (intern (string name) "SB-VM"))
-                      (fn (lambda (segment vm src mask)
-                            (let* ((index (sb-x86-64-asm::ea-index vm))
-                                   (index-offset (cond ((sb-c:tn-p index) (sb-vm::tn-offset index))
-                                                       ((sb-x86-64-asm::register-p index) (sb-x86-64-asm::reg-num index))
-                                                       (t (error "Invalid VSIB index ~S" index))))
-                                   (v-prime (if (>= index-offset 16) 1 0))
-                                   (mask-num (cond ((integerp mask) mask)
-                                                   ((sb-x86-64-asm::k-register-p mask) (sb-x86-64-asm::reg-num mask))
-                                                   (t (error "Invalid mask ~S" mask)))))
-                              (multiple-value-bind (ll r x b r-prime)
-                                  (sb-x86-64-asm::determine-evex-flags vm src nil nil)
-                                (sb-x86-64-asm::emit-evex segment r x b r-prime #x0f38 w
-                                                          0 #x66 0 (or ll #b10) 0 v-prime mask-num)
-                                (sb-assem:emit-byte segment opcode)
-                                (sb-x86-64-asm::emit-ea segment vm src :xmm-index t :disp-n 0))))))
-                 (setf (gethash sym-asm sb-assem::*inst-encoder*) fn)
-                 (setf (gethash sym-vm sb-assem::*inst-encoder*) fn))))
-        (register-masked-move 'vmovups-masked   nil  #x10 #x11 0)
-        (register-masked-move 'vmovupd-masked   #x66 #x10 #x11 1)
-        (register-masked-move 'vmovdqu32-masked #xf3 #x6f #x7f 0)
-        (register-masked-move 'vmovdqu64-masked #xf3 #x6f #x7f 1)
-        (register-masked-compress 'vcompressps-masked  #x66 #x8a 0)
-        (register-masked-compress 'vcompresspd-masked  #x66 #x8a 1)
-        (register-masked-compress 'vpcompressd-masked  #x66 #x8b 0)
-        (register-masked-compress 'vpcompressq-masked  #x66 #x8b 1)
-        (register-masked-expand   'vexpandps-masked    #x66 #x88 0)
-        (register-masked-expand   'vexpandpd-masked    #x66 #x88 1)
-        (register-masked-expand   'vpexpandd-masked    #x66 #x89 0)
-        (register-masked-expand   'vpexpandq-masked    #x66 #x89 1)
-        (register-masked-broadcast 'vbroadcastss-masked #x18 0 4)
-        (register-masked-broadcast 'vbroadcastsd-masked #x19 1 8)
-        (register-masked-broadcast 'vpbroadcastd-masked #x58 0 4)
-        (register-masked-broadcast 'vpbroadcastq-masked #x59 1 8)
-        (register-broadcast-gpr 'vpbroadcastb-gpr #x7a)
-        (register-broadcast-gpr 'vpbroadcastw-gpr #x7b)
-        (register-gather 'vgatherdps-z #x92 0)
-        (register-gather 'vgatherqpd-z #x93 1)
-        (register-gather 'vpgatherdd-z #x90 0)
-        (register-gather 'vpgatherqq-z #x91 1)
-        (register-scatter 'vscatterdps-z #xa2 0)
-        (register-scatter 'vscatterqpd-z #xa3 1)
-        (register-scatter 'vpscatterdd-z #xa0 0)
-        (register-scatter 'vpscatterqq-z #xa1 1))))
+
 
   (macrolet
       ((def-masked-vref-vops (type-name reg-sc stack-sc mask-name mask-sc mnemonic move-inst vec-name bytes-per-element)
@@ -1158,25 +1009,25 @@
         (:args (src))
       (:results (dst))
       (:generator
-       (inst vpbroadcastb-gpr dst src)))
+       (inst vpbroadcastb dst src)))
 
     (define-custom-vop sb-simd-avx512bw:s8.64-broadcast
         (:args (src))
       (:results (dst))
       (:generator
-       (inst vpbroadcastb-gpr dst src)))
+       (inst vpbroadcastb dst src)))
 
     (define-custom-vop sb-simd-avx512bw:u16.32-broadcast
         (:args (src))
       (:results (dst))
       (:generator
-       (inst vpbroadcastw-gpr dst src)))
+       (inst vpbroadcastw dst src)))
 
     (define-custom-vop sb-simd-avx512bw:s16.32-broadcast
         (:args (src))
       (:results (dst))
       (:generator
-       (inst vpbroadcastw-gpr dst src)))
+       (inst vpbroadcastw dst src)))
 
     ;; Memory compress and expand VOPs
 
@@ -1734,11 +1585,21 @@
                     (:args (mask :scs (mask-reg))
                            (vector :scs (descriptor-reg))
                            (index :scs ,index-scs)
-                           (indices :scs (int-avx512-reg)))
+                           ;; INDICES must stay live past the result:
+                           ;; VGATHER #UDs when the destination and the
+                           ;; VSIB index are the same register, and without
+                           ;; this the packer happily shares one (the
+                           ;; zeroing VXORPS then also wiped the indices).
+                           (indices :scs (int-avx512-reg) :to (:result 0)))
                     (:arg-types ,mask-primitive-type ,vector-primitive-type tagged-num ,index-primitive-type)
                     (:temporary (:sc sap-reg) ptr)
                     (:temporary (:sc mask-reg :from (:argument 0)) k-temp)
-                    (:results (result :scs (,reg-sc)))
+                    ;; RESULT must not share a register with INDICES:
+                    ;; VGATHER #UDs when its destination and VSIB index
+                    ;; are the same register. :TO (:RESULT 0) on the arg is
+                    ;; not enough - that lifetime ENDS exactly where the
+                    ;; result begins, so the packer may still share one.
+                    (:results (result :scs (,reg-sc) :from (:argument 3)))
                     (:result-types ,value-primitive-type)
                     (:generator 10
                       (inst ,clear-inst result result result)
@@ -1761,11 +1622,21 @@
                            (default :scs (,reg-sc) :target result)
                            (vector :scs (descriptor-reg))
                            (index :scs ,index-scs)
-                           (indices :scs (int-avx512-reg)))
+                           ;; INDICES must stay live past the result:
+                           ;; VGATHER #UDs when the destination and the
+                           ;; VSIB index are the same register, and without
+                           ;; this the packer happily shares one (the
+                           ;; zeroing VXORPS then also wiped the indices).
+                           (indices :scs (int-avx512-reg) :to (:result 0)))
                     (:arg-types ,mask-primitive-type ,value-primitive-type ,vector-primitive-type tagged-num ,index-primitive-type)
                     (:temporary (:sc sap-reg) ptr)
                     (:temporary (:sc mask-reg :from (:argument 0)) k-temp)
-                    (:results (result :scs (,reg-sc)))
+                    ;; RESULT must not share a register with INDICES:
+                    ;; VGATHER #UDs when its destination and VSIB index
+                    ;; are the same register. :TO (:RESULT 0) on the arg is
+                    ;; not enough - that lifetime ENDS exactly where the
+                    ;; result begins, so the packer may still share one.
+                    (:results (result :scs (,reg-sc) :from (:argument 4)))
                     (:result-types ,value-primitive-type)
                     (:generator 10
                       (unless (location= result default)
@@ -1788,11 +1659,21 @@
                     (:args (mask :scs (mask-reg))
                            (sap :scs (sap-reg))
                            (index :scs ,index-scs)
-                           (indices :scs (int-avx512-reg)))
+                           ;; INDICES must stay live past the result:
+                           ;; VGATHER #UDs when the destination and the
+                           ;; VSIB index are the same register, and without
+                           ;; this the packer happily shares one (the
+                           ;; zeroing VXORPS then also wiped the indices).
+                           (indices :scs (int-avx512-reg) :to (:result 0)))
                     (:arg-types ,mask-primitive-type sb-alien:system-area-pointer tagged-num ,index-primitive-type)
                     (:temporary (:sc sap-reg) ptr)
                     (:temporary (:sc mask-reg :from (:argument 0)) k-temp)
-                    (:results (result :scs (,reg-sc)))
+                    ;; RESULT must not share a register with INDICES:
+                    ;; VGATHER #UDs when its destination and VSIB index
+                    ;; are the same register. :TO (:RESULT 0) on the arg is
+                    ;; not enough - that lifetime ENDS exactly where the
+                    ;; result begins, so the packer may still share one.
+                    (:results (result :scs (,reg-sc) :from (:argument 3)))
                     (:result-types ,value-primitive-type)
                     (:generator 10
                       (inst ,clear-inst result result result)
@@ -1813,11 +1694,21 @@
                            (default :scs (,reg-sc) :target result)
                            (sap :scs (sap-reg))
                            (index :scs ,index-scs)
-                           (indices :scs (int-avx512-reg)))
+                           ;; INDICES must stay live past the result:
+                           ;; VGATHER #UDs when the destination and the
+                           ;; VSIB index are the same register, and without
+                           ;; this the packer happily shares one (the
+                           ;; zeroing VXORPS then also wiped the indices).
+                           (indices :scs (int-avx512-reg) :to (:result 0)))
                     (:arg-types ,mask-primitive-type ,value-primitive-type sb-alien:system-area-pointer tagged-num ,index-primitive-type)
                     (:temporary (:sc sap-reg) ptr)
                     (:temporary (:sc mask-reg :from (:argument 0)) k-temp)
-                    (:results (result :scs (,reg-sc)))
+                    ;; RESULT must not share a register with INDICES:
+                    ;; VGATHER #UDs when its destination and VSIB index
+                    ;; are the same register. :TO (:RESULT 0) on the arg is
+                    ;; not enough - that lifetime ENDS exactly where the
+                    ;; result begins, so the packer may still share one.
+                    (:results (result :scs (,reg-sc) :from (:argument 4)))
                     (:result-types ,value-primitive-type)
                     (:generator 10
                       (unless (location= result default)
@@ -1875,12 +1766,18 @@
                             (ea 0 ptr indices ,bytes-per-element)
                             value
                             (tn-offset k-temp)))))))))
-      (def-gather-scatter-vops f32.16 single-avx512-reg m32.16 vgatherdps-z vscatterdps-z vxorps  vmovaps   f32vec 4)
-      (def-gather-scatter-vops f64.8  double-avx512-reg m64.8  vgatherqpd-z vscatterqpd-z vxorpd  vmovapd   f64vec 8)
-      (def-gather-scatter-vops u32.16 int-avx512-reg    m32.16 vpgatherdd-z vpscatterdd-z vpxord  vmovdqa32 u32vec 4)
-      (def-gather-scatter-vops s32.16 int-avx512-reg    m32.16 vpgatherdd-z vpscatterdd-z vpxord  vmovdqa32 s32vec 4)
-      (def-gather-scatter-vops u64.8  int-avx512-reg    m64.8  vpgatherqq-z vpscatterqq-z vpxorq  vmovdqa64 u64vec 8)
-      (def-gather-scatter-vops s64.8  int-avx512-reg    m64.8  vpgatherqq-z vpscatterqq-z vpxorq  vmovdqa64 s64vec 8)))
+      ;; Use the plain (merging) VSIB mnemonics, not the -Z ones: EVEX.z
+      ;; must be 0 for gather and scatter - {z} is not encodable for them,
+      ;; since gather masks are merging-only and are cleared as elements
+      ;; are processed. The generated -Z variants set EVEX.z=1 and #UD at
+      ;; run time (they also carry no :PRINTER). Zeroing semantics still
+      ;; hold here because the generator below clears RESULT first.
+      (def-gather-scatter-vops f32.16 single-avx512-reg m32.16 vgatherdps vscatterdps vxorps  vmovaps   f32vec 4)
+      (def-gather-scatter-vops f64.8  double-avx512-reg m64.8  vgatherqpd vscatterqpd vxorpd  vmovapd   f64vec 8)
+      (def-gather-scatter-vops u32.16 int-avx512-reg    m32.16 vpgatherdd vpscatterdd vpxord  vmovdqa32 u32vec 4)
+      (def-gather-scatter-vops s32.16 int-avx512-reg    m32.16 vpgatherdd vpscatterdd vpxord  vmovdqa32 s32vec 4)
+      (def-gather-scatter-vops u64.8  int-avx512-reg    m64.8  vpgatherqq vpscatterqq vpxorq  vmovdqa64 u64vec 8)
+      (def-gather-scatter-vops s64.8  int-avx512-reg    m64.8  vpgatherqq vpscatterqq vpxorq  vmovdqa64 s64vec 8)))
 
 
 ;; Neon
