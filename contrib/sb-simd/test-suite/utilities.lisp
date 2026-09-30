@@ -1,5 +1,13 @@
 (in-package #:sb-simd-test-suite)
 
+;;; Hide a value from the compiler. Tests that expect an out-of-bounds
+;;; access to signal an error must not let the compiler see the
+;;; offending constant: it would prove the bounds check fails and emit
+;;; a full WARNING at compile time. IDENTITY is folded away, so it does
+;;; not help.
+(declaim (notinline opaque-identity))
+(defun opaque-identity (x) x)
+
 (defun shuffle (list)
   (let ((result (copy-seq list)))
     (loop for tail on result
