@@ -1290,5 +1290,35 @@
         (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values sp32))) 32))
         (is (= (first (multiple-value-list (sb-simd-avx512dq:s64.8-values sp64))) 64))))))
 
+(define-test avx512bitalg-extended-intrinsics
+  (let ((open-sb-simd-avx512bitalg (find-package "SB-SIMD-AVX512BITALG")))
+    (when (and open-sb-simd-avx512bitalg
+               (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512bitalg)))
+      (let ((p8-0 (sb-simd-avx512bitalg:u8.64-popcnt (sb-simd-avx512bw:u8.64 0)))
+            (p8-1 (sb-simd-avx512bitalg:u8.64-popcnt (sb-simd-avx512bw:u8.64 1)))
+            (p8-all (sb-simd-avx512bitalg:u8.64-popcnt (sb-simd-avx512bw:u8.64 #xFF)))
+            (p8-alt (sb-simd-avx512bitalg:u8.64-popcnt (sb-simd-avx512bw:u8.64 #x55)))
+            (sp8 (sb-simd-avx512bitalg:s8.64-popcnt (sb-simd-avx512bw:s8.64 -1)))
+            (p16-0 (sb-simd-avx512bitalg:u16.32-popcnt (sb-simd-avx512bw:u16.32 0)))
+            (p16-1 (sb-simd-avx512bitalg:u16.32-popcnt (sb-simd-avx512bw:u16.32 1)))
+            (p16-all (sb-simd-avx512bitalg:u16.32-popcnt (sb-simd-avx512bw:u16.32 #xFFFF)))
+            (p16-alt (sb-simd-avx512bitalg:u16.32-popcnt (sb-simd-avx512bw:u16.32 #x5555)))
+            (sp16 (sb-simd-avx512bitalg:s16.32-popcnt (sb-simd-avx512bw:s16.32 -1)))
+            (shuf0 (sb-simd-avx512bitalg:m8.64-shufbitqmb (sb-simd-avx512bw:u8.64 0) (sb-simd-avx512bw:u8.64 0)))
+            (shuf1 (sb-simd-avx512bitalg:m8.64-shufbitqmb (sb-simd-avx512bw:u8.64 1) (sb-simd-avx512bw:u8.64 0))))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values p8-0))) 0))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values p8-1))) 1))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values p8-all))) 8))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u8.64-values p8-alt))) 4))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:s8.64-values sp8))) 8))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values p16-0))) 0))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values p16-1))) 1))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values p16-all))) 16))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values p16-alt))) 8))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:s16.32-values sp16))) 16))
+        (is (= (sb-simd-avx512bw:m8.64-value shuf0) 0))
+        (is (= (sb-simd-avx512bw:m8.64-value shuf1) #xFFFFFFFFFFFFFFFF))))))
+
+
 
 
