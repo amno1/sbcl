@@ -2195,6 +2195,12 @@
      #:m64.8-xor
      #:m64.8-andc1
      #:m64.8-not
+     #:m64.8-xnor
+     #:two-arg-m64.8-xnor
+     #:m64.8+
+     #:two-arg-m64.8+
+     #:m64.8-shiftl
+     #:m64.8-shiftr
      #:m32.16
      #:m32.16-value
      #:m32.16-count
@@ -2205,6 +2211,13 @@
      #:m32.16-xor
      #:m32.16-andc1
      #:m32.16-not
+     #:m32.16-xnor
+     #:two-arg-m32.16-xnor
+     #:m32.16+
+     #:two-arg-m32.16+
+     #:m32.16-shiftl
+     #:m32.16-shiftr
+     #:m32.16-unpack
      ;; f32.16
      #:make-f32.16
      #:f32.16
@@ -2267,6 +2280,7 @@
      #:f32.16-sqrt
      #:f32.16-reciprocal
      #:f32.16-rsqrt
+     #:f32.16-scalef
      #:f32.16-round
      #:f32.16-floor
      #:f32.16-ceiling
@@ -2359,6 +2373,9 @@
      #:f64.8>
      #:f64.8>=
      #:f64.8-sqrt
+     #:f64.8-reciprocal
+     #:f64.8-rsqrt
+     #:f64.8-scalef
      #:f64.8-round
      #:f64.8-floor
      #:f64.8-ceiling
@@ -2442,6 +2459,12 @@
      #:u32.16-masked-xor
      #:u32.16-shiftl
      #:u32.16-shiftr
+     #:u32.16-rotatel
+     #:u32.16-rotater
+     #:u32.16-rotatelv
+     #:u32.16-rotaterv
+     #:u32.16-alignr
+     #:u32.16-from-f32.16
      #:u32.8-from-u32.16
      #:u32.16-insert-u32.8
      #:u32.16-incf
@@ -2514,6 +2537,11 @@
      #:u64.8-masked-xor
      #:u64.8-shiftl
      #:u64.8-shiftr
+     #:u64.8-rotatel
+     #:u64.8-rotater
+     #:u64.8-rotatelv
+     #:u64.8-rotaterv
+     #:u64.8-alignr
      #:u64.4-from-u64.8
      #:u64.8-insert-u64.4
      #:u64.8-incf
@@ -2587,8 +2615,15 @@
      #:s32.16-masked-andc1
      #:s32.16-masked-or
      #:s32.16-masked-xor
+     #:s32.16-abs
      #:s32.16-shiftl
      #:s32.16-shiftr
+     #:s32.16-rotatel
+     #:s32.16-rotater
+     #:s32.16-rotatelv
+     #:s32.16-rotaterv
+     #:s32.16-alignr
+     #:s32.16-from-f32.16
      #:s32.8-from-s32.16
      #:s32.16-insert-s32.8
      #:s32.16-incf
@@ -2659,8 +2694,14 @@
      #:s64.8-masked-andc1
      #:s64.8-masked-or
      #:s64.8-masked-xor
+     #:s64.8-abs
      #:s64.8-shiftl
      #:s64.8-shiftr
+     #:s64.8-rotatel
+     #:s64.8-rotater
+     #:s64.8-rotatelv
+     #:s64.8-rotaterv
+     #:s64.8-alignr
      #:s64.4-from-s64.8
      #:s64.8-insert-s64.4
      #:s64.8-incf
