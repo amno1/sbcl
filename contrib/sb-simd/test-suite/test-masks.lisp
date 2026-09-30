@@ -1366,3 +1366,27 @@
             (shrdv32 (sb-simd-avx512vbmi2:u32.16-shrdv (sb-simd-avx512f:u32.16 456) (sb-simd-avx512f:u32.16 123) (sb-simd-avx512f:u32.16 0))))
         (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values shldv32))) 456))
         (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values shrdv32))) 456))))))
+
+(define-test avx512vnni-extended-intrinsics
+  (let ((open-sb-simd-avx512vnni (find-package "SB-SIMD-AVX512VNNI")))
+    (when (and open-sb-simd-avx512vnni
+               (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512vnni)))
+      ;; Dot product bytes (vpdpbusd, vpdpbusds)
+      (let ((dpb (sb-simd-avx512vnni:s32.16-dpbusd (sb-simd-avx512f:s32.16 0)
+                                                   (sb-simd-avx512bw:u8.64 1)
+                                                   (sb-simd-avx512bw:s8.64 2)))
+            (dpbs (sb-simd-avx512vnni:s32.16-dpbusds (sb-simd-avx512f:s32.16 0)
+                                                     (sb-simd-avx512bw:u8.64 1)
+                                                     (sb-simd-avx512bw:s8.64 2))))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values dpb))) 8))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values dpbs))) 8)))
+
+      ;; Dot product words (vpdpwssd, vpdpwssds)
+      (let ((dpw (sb-simd-avx512vnni:s32.16-dpwssd (sb-simd-avx512f:s32.16 10)
+                                                   (sb-simd-avx512bw:s16.32 2)
+                                                   (sb-simd-avx512bw:s16.32 3)))
+            (dpws (sb-simd-avx512vnni:s32.16-dpwssds (sb-simd-avx512f:s32.16 10)
+                                                     (sb-simd-avx512bw:s16.32 2)
+                                                     (sb-simd-avx512bw:s16.32 3))))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values dpw))) 22))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values dpws))) 22))))))
