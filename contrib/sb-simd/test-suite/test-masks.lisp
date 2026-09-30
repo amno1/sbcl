@@ -1390,3 +1390,17 @@
                                                      (sb-simd-avx512bw:s16.32 3))))
         (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values dpw))) 22))
         (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values dpws))) 22))))))
+
+(define-test avx512ifma-extended-intrinsics
+  (let ((open-sb-simd-avx512ifma (find-package "SB-SIMD-AVX512IFMA")))
+    (when (and open-sb-simd-avx512ifma
+               (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512ifma)))
+      ;; Fused multiply-add 52-bit low/high (vpmadd52luq, vpmadd52huq)
+      (let ((mlo (sb-simd-avx512ifma:u64.8-madd52lo (sb-simd-avx512f:u64.8 10)
+                                                    (sb-simd-avx512f:u64.8 2)
+                                                    (sb-simd-avx512f:u64.8 3)))
+            (mhi (sb-simd-avx512ifma:u64.8-madd52hi (sb-simd-avx512f:u64.8 10)
+                                                    (sb-simd-avx512f:u64.8 (ash 1 50))
+                                                    (sb-simd-avx512f:u64.8 4))))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u64.8-values mlo))) 16))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u64.8-values mhi))) 11))))))
