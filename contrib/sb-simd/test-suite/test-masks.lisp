@@ -1265,4 +1265,30 @@
         (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values sc32))) 0))
         (is (= (first (multiple-value-list (sb-simd-avx512dq:s64.8-values sc64))) 0))))))
 
+(define-test avx512vpopcntdq-extended-intrinsics
+  (let ((open-sb-simd-avx512vpopcntdq (find-package "SB-SIMD-AVX512VPOPCNTDQ")))
+    (when (and open-sb-simd-avx512vpopcntdq
+               (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512vpopcntdq)))
+      (let ((p32-0 (sb-simd-avx512vpopcntdq:u32.16-popcnt (sb-simd-avx512f:u32.16 0)))
+            (p32-1 (sb-simd-avx512vpopcntdq:u32.16-popcnt (sb-simd-avx512f:u32.16 1)))
+            (p32-all (sb-simd-avx512vpopcntdq:u32.16-popcnt (sb-simd-avx512f:u32.16 #xFFFFFFFF)))
+            (p32-alt (sb-simd-avx512vpopcntdq:u32.16-popcnt (sb-simd-avx512f:u32.16 #x55555555)))
+            (p64-0 (sb-simd-avx512vpopcntdq:u64.8-popcnt (sb-simd-avx512dq:u64.8 0)))
+            (p64-1 (sb-simd-avx512vpopcntdq:u64.8-popcnt (sb-simd-avx512dq:u64.8 1)))
+            (p64-all (sb-simd-avx512vpopcntdq:u64.8-popcnt (sb-simd-avx512dq:u64.8 #xFFFFFFFFFFFFFFFF)))
+            (p64-alt (sb-simd-avx512vpopcntdq:u64.8-popcnt (sb-simd-avx512dq:u64.8 #xAAAAAAAAAAAAAAAA)))
+            (sp32 (sb-simd-avx512vpopcntdq:s32.16-popcnt (sb-simd-avx512f:s32.16 -1)))
+            (sp64 (sb-simd-avx512vpopcntdq:s64.8-popcnt (sb-simd-avx512dq:s64.8 -1))))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values p32-0))) 0))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values p32-1))) 1))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values p32-all))) 32))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:u32.16-values p32-alt))) 16))
+        (is (= (first (multiple-value-list (sb-simd-avx512dq:u64.8-values p64-0))) 0))
+        (is (= (first (multiple-value-list (sb-simd-avx512dq:u64.8-values p64-1))) 1))
+        (is (= (first (multiple-value-list (sb-simd-avx512dq:u64.8-values p64-all))) 64))
+        (is (= (first (multiple-value-list (sb-simd-avx512dq:u64.8-values p64-alt))) 32))
+        (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values sp32))) 32))
+        (is (= (first (multiple-value-list (sb-simd-avx512dq:s64.8-values sp64))) 64))))))
+
+
 
