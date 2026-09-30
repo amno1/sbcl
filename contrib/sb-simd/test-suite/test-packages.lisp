@@ -22,6 +22,7 @@
     (check-package '#:sb-simd-avx512cd :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512vpopcntdq :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512bitalg :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
+    (check-package '#:sb-simd-avx512vbmi :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512fp16 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx10.1 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx10.2 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd)))
@@ -35,7 +36,7 @@
   #+x86-64
   (let ((packages '(sb-simd-sse sb-simd-sse2 sb-simd-avx sb-simd-avx2
                     sb-simd-avx512f sb-simd-avx512bw sb-simd-avx512dq
-                    sb-simd-avx512cd sb-simd-avx512vpopcntdq sb-simd-avx512bitalg
+                    sb-simd-avx512cd sb-simd-avx512vpopcntdq sb-simd-avx512bitalg sb-simd-avx512vbmi
                     sb-simd-avx512fp16 sb-simd-avx10.1 sb-simd-avx10.2)))
     (dolist (pkg packages)
       (let ((p (find-package pkg)))
@@ -58,6 +59,7 @@
     (is (typep (sb-simd-internals:avx512f-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx512vpopcntdq-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx512bitalg-supported-p) 'boolean))
+    (is (typep (sb-simd-internals:avx512vbmi-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx512fp16-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx10-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx10.1-supported-p) 'boolean))
