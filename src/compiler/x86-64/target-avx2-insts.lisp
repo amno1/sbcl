@@ -143,3 +143,41 @@
         (write-string name stream)
         (operand name dstate))))
 
+;;; EVEX masking decoration. Unlike PRINT-OPMASK-REGISTER these print
+;;; NOTHING when the field is zero, which is what lets a single printer
+;;; serve both the masked and unmasked encodings of an instruction:
+;;; EVEX.aaa = 0 means "no mask" and must not render as {K0}, and
+;;; EVEX.z = 0 likewise renders nothing. The leading space belongs to
+;;; the decoration itself, so these are appended as trailing operands
+;;; rather than spliced into a printer's literal text.
+(defun print-opmask-decoration (value stream dstate)
+  (let ((k (logand value 7)))
+    (unless (zerop k)
+      (let ((name (format nil " {K~d}" k)))
+        (if stream
+            (write-string name stream)
+            (operand name dstate))))))
+
+(defun print-evex-zeroing (value stream dstate)
+  (unless (zerop value)
+    (if stream
+        (write-string " {z}" stream)
+        (operand " {z}" dstate))))
+
+;;; VSIB memory operand: an ordinary EA whose index is a vector register
+;;; (DECODE-MOD-R/M has already folded EVEX.V' into its number) of the
+;;; instruction's vector length.
+(defun print-vsib-index (value stream dstate)
+  (let ((name (reg-name (get-fpr (cond ((dstate-getprop dstate +evex-l1+) :zmm)
+                                       ((dstate-getprop dstate +vex-l+) :ymm)
+                                       (t :xmm))
+                                 value))))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
+
+(defun print-vsib/mem (value stream dstate)
+  (if (machine-ea-p value)
+      (print-mem-ref :ref value nil stream dstate
+                     :index-reg-printer #'print-vsib-index)
+      (print-ymmreg/mem value stream dstate)))
