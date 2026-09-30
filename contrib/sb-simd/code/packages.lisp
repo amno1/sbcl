@@ -2752,8 +2752,17 @@
      #:m16.32-and
      #:m16.32-or
      #:m16.32-xor
+     #:m16.32-xnor
+     #:two-arg-m16.32-xnor
+     #:m16.32+
+     #:two-arg-m16.32+
      #:m16.32-andc1
      #:m16.32-not
+     #:m16.32-shiftl
+     #:m16.32-shiftr
+     #:m16.32-unpack
+     #:m16.32-from-u16.32
+     #:m16.32-from-s16.32
      #:m8.64
      #:m8.64-value
      #:m8.64-count
@@ -2762,8 +2771,17 @@
      #:m8.64-and
      #:m8.64-or
      #:m8.64-xor
+     #:m8.64-xnor
+     #:two-arg-m8.64-xnor
+     #:m8.64+
+     #:two-arg-m8.64+
      #:m8.64-andc1
      #:m8.64-not
+     #:m8.64-shiftl
+     #:m8.64-shiftr
+     #:m8.64-unpack
+     #:m8.64-from-u8.64
+     #:m8.64-from-s8.64
      ;; u8.64
      #:make-u8.64
      #:u8.64
@@ -2778,6 +2796,14 @@
      #:u8.64-not
      #:u8.64-max
      #:u8.64-min
+     #:u8.64-avg
+     #:u8.64-alignr
+     #:u8.64-unpackhi
+     #:u8.64-unpacklo
+     #:u8.64-packus
+     #:u8.64-shuffle
+     #:u8.64-sad
+     #:u8.64-from-mask
      #:u8.64+
      #:u8.64-
      #:u8.64=
@@ -2800,6 +2826,8 @@
      #:two-arg-u8.64-mask<=
      #:u8.32-from-u8.64
      #:u8.64-insert-u8.32
+     #:u8.32-from-u16.32
+     #:u8.32-from-u16.32-saturating
      #:u8.64-incf
      #:u8.64-decf
      #:u8.64-aref #:u8.64-row-major-aref #:u8.64-sap-ref
@@ -2811,6 +2839,7 @@
      #:u16.32-values
      #:u16.32-broadcast
      #:u16.32-if
+     #:u16.32-from-u8.32
      #:u16.32-and
      #:u16.32-or
      #:u16.32-xor
@@ -2818,6 +2847,20 @@
      #:u16.32-not
      #:u16.32-max
      #:u16.32-min
+     #:u16.32-mullo
+     #:two-arg-u16.32-mulhi
+     #:u16.32-mulhi
+     #:u16.32-avg
+     #:u16.32-shiftl
+     #:u16.32-shiftr
+     #:u16.32-alignr
+     #:u16.32-unpackhi
+     #:u16.32-unpacklo
+     #:u16.32-packus
+     #:u16.32-shufflehi
+     #:u16.32-shufflelo
+     #:u16.32-permute
+     #:u16.32-from-mask
      #:u16.32+
      #:u16.32-
      #:u16.32=
@@ -2840,6 +2883,8 @@
      #:two-arg-u16.32-mask<=
      #:u16.16-from-u16.32
      #:u16.32-insert-u16.16
+     #:u16.16-from-u32.16
+     #:u16.16-from-u32.16-saturating
      #:u16.32-incf
      #:u16.32-decf
      #:u16.32-aref #:u16.32-row-major-aref #:u16.32-sap-ref
@@ -2856,8 +2901,15 @@
      #:s8.64-xor
      #:s8.64-andc1
      #:s8.64-not
+     #:s8.64-abs
      #:s8.64-max
      #:s8.64-min
+     #:s8.64-alignr
+     #:s8.64-unpackhi
+     #:s8.64-unpacklo
+     #:s8.64-packss
+     #:s8.64-shuffle
+     #:s8.64-from-mask
      #:s8.64+
      #:s8.64-
      #:s8.64=
@@ -2880,6 +2932,8 @@
      #:two-arg-s8.64-mask<=
      #:s8.32-from-s8.64
      #:s8.64-insert-s8.32
+     #:s8.32-from-s16.32
+     #:s8.32-from-s16.32-saturating
      #:s8.64-incf
      #:s8.64-decf
      #:s8.64-aref #:s8.64-row-major-aref #:s8.64-sap-ref
@@ -2891,6 +2945,9 @@
      #:s16.32-values
      #:s16.32-broadcast
      #:s16.32-if
+     #:s16.32-abs
+     #:s16.32-from-s8.32
+     #:s16.32-from-u8.32
      #:s16.32-and
      #:s16.32-or
      #:s16.32-xor
@@ -2898,6 +2955,23 @@
      #:s16.32-not
      #:s16.32-max
      #:s16.32-min
+     #:s16.32-mullo
+     #:two-arg-s16.32-mulhi
+     #:s16.32-mulhi
+     #:two-arg-s16.32-mulhrs
+     #:s16.32-mulhrs
+     #:s16.32-madd
+     #:s16.32-maddubs
+     #:s16.32-shiftl
+     #:s16.32-shiftr
+     #:s16.32-alignr
+     #:s16.32-unpackhi
+     #:s16.32-unpacklo
+     #:s16.32-packss
+     #:s16.32-shufflehi
+     #:s16.32-shufflelo
+     #:s16.32-permute
+     #:s16.32-from-mask
      #:s16.32+
      #:s16.32-
      #:s16.32=
@@ -2920,6 +2994,8 @@
      #:two-arg-s16.32-mask<=
      #:s16.16-from-s16.32
      #:s16.32-insert-s16.16
+     #:s16.16-from-s32.16
+     #:s16.16-from-s32.16-saturating
      #:s16.32-incf
      #:s16.32-decf
      #:s16.32-aref #:s16.32-row-major-aref #:s16.32-sap-ref
