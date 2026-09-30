@@ -366,14 +366,22 @@
                   full-reg)))))
             ((= r/m #b100) ; SIB byte - rex.b is "don't care"
              (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
-                    (index-reg (extend +rex-x+ (ldb (byte 3 3) sib)))
+                    (vsib-p (dstate-getprop dstate +vsib+))
+                    ;; A VSIB index is a vector register: EVEX.X gives
+                    ;; bit 3 as for a GPR, EVEX.V' bit 4.
+                    (index-reg (logior (extend +rex-x+ (ldb (byte 3 3) sib))
+                                       (if (and vsib-p
+                                                (dstate-getprop dstate +evex-v-prime+))
+                                           16 0)))
                     (base-reg (ldb (byte 3 0) sib)))
                ;; mod=0 and base=RBP means no base reg
                (make-machine-ea (unless (and (= mod #b00) (= base-reg #b101))
                                   (extend +rex-b+ base-reg))
                                 (cond ((/= mod #b00) (displacement))
                                       ((= base-reg #b101) (read-signed-suffix 32 dstate)))
-                                (unless (= index-reg #b100) index-reg) ; index can't be RSP
+                                ;; index can't be RSP - but a VSIB index of
+                                ;; 4 is XMM4/YMM4/ZMM4
+                                (unless (and (= index-reg #b100) (not vsib-p)) index-reg)
                                 (ash 1 (ldb (byte 2 6) sib)))))
             ((/= mod #b00) (make-machine-ea full-reg (displacement)))
             ;; rex.b is not decoded in determining RIP-relative mode
