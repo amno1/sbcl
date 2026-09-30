@@ -3014,7 +3014,35 @@
     #14=
     (:export
      #:u64.8*
-     #:s64.8*))
+     #:s64.8*
+     #:u64.8-mullo
+     #:two-arg-u64.8-mullo
+     #:s64.8-mullo
+     #:two-arg-s64.8-mullo
+     #:s64.8-mul
+     #:two-arg-s64.8-mul
+     #:m32.16-from-u32.16
+     #:m32.16-from-s32.16
+     #:m64.8-from-u64.8
+     #:m64.8-from-s64.8
+     #:s64.8-from-f64.8
+     #:u64.8-from-f64.8
+     #:s64.8-from-f32.8
+     #:u64.8-from-f32.8
+     #:f32.8-from-s64.8
+     #:f32.8-from-u64.8
+     #:f32.16-range
+     #:f64.8-range
+     #:f32.16-reduce
+     #:f64.8-reduce
+     #:f32.16-fpclass
+     #:f64.8-fpclass
+     #:f64.2-from-f64.8
+     #:f64.8-insert-f64.2
+     #:u64.2-from-u64.8
+     #:u64.8-insert-u64.2
+     #:s64.2-from-s64.8
+     #:s64.8-insert-s64.2))
 
   #+x86-64
   (defpackage #:sb-simd-avx512fp16
