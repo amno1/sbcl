@@ -100,7 +100,6 @@
    (f32.16-broadcast-f32.4 nil           (f32.16) (f32.4)                :cost 1 :encoding :custom)
    (f32.16-broadcast-f32.8 nil           (f32.16) (f32.8)                :cost 1 :encoding :custom)
    (f32.16-horizontal-and nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)
-
    (f32.16-horizontal-or  nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)
    (f32.16-horizontal-xor nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)
    (f32.16-horizontal-max nil            (f32)    (f32.16)        :cost 5 :encoding :fake-vop)

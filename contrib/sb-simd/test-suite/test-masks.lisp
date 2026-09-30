@@ -307,7 +307,7 @@
           (let ((tail (sb-simd-avx512f:f32.16-load-masked-z #b11111 short-arr 0)))
             (is (= (first (multiple-value-list (sb-simd-avx512f:f32.16-values tail))) 1.0f0)))
           ;; mask #b111111 (6 elements) on size 5 array at index 0 must signal bounds error
-          (signals error (sb-simd-avx512f:f32.16-load-masked-z (identity #b111111) short-arr 0))
+          (signals error (sb-simd-avx512f:f32.16-load-masked-z (opaque-identity #b111111) short-arr 0))
           ;; mask 0 on size 5 array at index 0 succeeds
           (let ((tail-zero (sb-simd-avx512f:f32.16-load-masked-z 0 short-arr 0)))
             (is (every #'zerop (multiple-value-list (sb-simd-avx512f:f32.16-values tail-zero)))))))
@@ -336,7 +336,7 @@
         ;; tail bounds check
         (let ((short-arr (make-array 3 :element-type 'double-float :initial-contents '(10.0d0 20.0d0 30.0d0))))
           (is (= (first (multiple-value-list (sb-simd-avx512f:f64.8-values (sb-simd-avx512f:f64.8-load-masked-z #b111 short-arr 0)))) 10.0d0))
-          (signals error (sb-simd-avx512f:f64.8-load-masked-z (identity #b1111) short-arr 0))))
+          (signals error (sb-simd-avx512f:f64.8-load-masked-z (opaque-identity #b1111) short-arr 0))))
 
       ;; 3. u32.16 masked memory operations
       (let* ((arr (make-array 16 :element-type '(unsigned-byte 32)
@@ -468,9 +468,9 @@
             (is (equal (subseq vals 4 16) '(-5f0 -6f0 -7f0 -8f0 -9f0 -10f0 -11f0 -12f0 -13f0 -14f0 -15f0 -16f0))))
           ;; Bounds checking: index 8 with 3 active elements exceeds length 10
           (signals error
-            (sb-simd-avx512f:f32.16-compress-store m v arr (identity 8)))
+            (sb-simd-avx512f:f32.16-compress-store m v arr (opaque-identity 8)))
           (signals error
-            (sb-simd-avx512f:f32.16-expand-load-z m arr (identity 8)))))
+            (sb-simd-avx512f:f32.16-expand-load-z m arr (opaque-identity 8)))))
 
       ;; 2. f64.8 Register & Memory Compress/Expand
       (let* ((v (sb-simd-avx512f:make-f64.8 10d0 20d0 30d0 40d0 50d0 60d0 70d0 80d0))
