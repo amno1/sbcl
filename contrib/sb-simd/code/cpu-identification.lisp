@@ -54,6 +54,10 @@
     (and (>= (cpuid 0) 7)
          (logbitp 28 (nth-value 1 (cpuid 7 0)))))
 
+  (defun avx512vpopcntdq-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 14 (nth-value 2 (cpuid 7 0)))))
+
   (defun avx512bw-supported-p ()
     (and (>= (cpuid 0) 7)
          (logbitp 30 (nth-value 1 (cpuid 7 0)))))
@@ -133,6 +137,9 @@
     nil)
 
   (defun avx512cd-supported-p ()
+    nil)
+
+  (defun avx512vpopcntdq-supported-p ()
     nil)
 
   (defun avx512bw-supported-p ()
