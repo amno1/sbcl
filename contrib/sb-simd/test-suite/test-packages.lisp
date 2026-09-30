@@ -19,6 +19,7 @@
     (check-package '#:sb-simd-avx512f :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512bw :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512dq :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
+    (check-package '#:sb-simd-avx512cd :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512fp16 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx10.1 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx10.2 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd)))
@@ -32,6 +33,7 @@
   #+x86-64
   (let ((packages '(sb-simd-sse sb-simd-sse2 sb-simd-avx sb-simd-avx2
                     sb-simd-avx512f sb-simd-avx512bw sb-simd-avx512dq
+                    sb-simd-avx512cd
                     sb-simd-avx512fp16 sb-simd-avx10.1 sb-simd-avx10.2)))
     (dolist (pkg packages)
       (let ((p (find-package pkg)))
