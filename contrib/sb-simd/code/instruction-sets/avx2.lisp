@@ -75,6 +75,7 @@
    (s32.4-broadcastvec    #:vpbroadcastd  (s32.4) (s32.4)         :cost 1)
    (s32.4-shiftl          #:vpsllvd       (s32.4) (s32.4 s32.4)   :cost 1)
    (s32.4-shiftr          #:vpsrlvd       (s32.4) (s32.4 s32.4)   :cost 1)
+   (s32.4-shifta          #:vpsravd       (s32.4) (s32.4 s32.4)   :cost 1)
    ;; s64.2
    (s64.2!-from-p256      #:vextracti128  (s64.2) (p256)          :cost 1 :suffix '(0) :always-translatable nil)
    (s64.2-broadcast       nil             (s64.2) (s64)           :cost 1 :encoding :fake-vop)
@@ -292,6 +293,7 @@
    (s16.16-shufflelo      #:vpshuflw     (s16.16) (s16.16 imm8)   :cost 1)
    (s16.16-shiftl         #:vpsllw       (s16.16) (s16.16 s16.8)  :cost 2)
    (s16.16-shiftr         #:vpsrlw       (s16.16) (s16.16 s16.8)  :cost 2)
+   (s16.16-shifta         #:vpsraw       (s16.16) (s16.16 s16.8)  :cost 2)
    (s16.16-sign           #:vpsignw      (s16.16) (s16.16 s16.16) :cost 2)
    (s16.8-from-s16.16     #:vextracti128 (s16.8) (s16.16 imm1)    :cost 1)
    (s16.16-insert-s16.8   #:vinserti128  (s16.16) (s16.16 s16.8 imm1) :cost 1)
@@ -327,6 +329,7 @@
    (s32.8-hsub            #:vphsubd      (s32.8) (s32.8 s32.8) :cost 1)
    (s32.8-shiftl          #:vpsllvd      (s32.8) (s32.8 s32.8) :cost 1)
    (s32.8-shiftr          #:vpsrlvd      (s32.8) (s32.8 s32.8) :cost 1)
+   (s32.8-shifta          #:vpsravd      (s32.8) (s32.8 s32.8) :cost 1)
    (s32.8-unpackhi        #:vpunpckhdq   (s32.8) (s32.8 s32.8) :cost 1)
    (s32.8-unpacklo        #:vpunpckldq   (s32.8) (s32.8 s32.8) :cost 1)
    (s32.8-movemask        #:vmovmskps    (u8)    (s32.8)       :cost 1)

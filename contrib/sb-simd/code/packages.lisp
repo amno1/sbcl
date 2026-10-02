@@ -986,6 +986,7 @@
      #:s16.8-shufflelo
      #:s16.8-shiftl
      #:s16.8-shiftr
+     #:s16.8-shifta
      #:s16.8-aref #:s16.8-row-major-aref #:s16.8-sap-ref
      #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref #:s16.8-non-temporal-sap-ref
      ;; s32.4
@@ -1015,6 +1016,7 @@
      #:s32.4-shuffle
      #:s32.4-shiftl
      #:s32.4-shiftr
+     #:s32.4-shifta
      #:s32.4-aref #:s32.4-row-major-aref #:s32.4-sap-ref
      #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref #:s32.4-non-temporal-sap-ref
      ;; s64.2
@@ -1677,6 +1679,7 @@
      #:s16.8-mullo
      #:s16.8-shiftl
      #:s16.8-shiftr
+     #:s16.8-shifta
      #:s16.8-unpackhi
      #:s16.8-unpacklo
      #:s16.8-movemask
@@ -1865,6 +1868,7 @@
      #:s8.16-sad
      #:s32.4-shiftl
      #:s32.4-shiftr
+     #:s32.4-shifta
      ;; s64.2
      #:s64.2-shiftl
      #:s64.2-shiftr
@@ -2051,6 +2055,7 @@
      #:s16.16-shufflelo
      #:s16.16-shiftl
      #:s16.16-shiftr
+     #:s16.16-shifta
      #:s16.16-sign
      #:s16.8-from-s16.16
      #:s16.16-insert-s16.8
@@ -2082,6 +2087,7 @@
      #:s32.8-hsub
      #:s32.8-shiftl
      #:s32.8-shiftr
+     #:s32.8-shifta
      #:s32.8-sign
      #:s32.8-unpacklo
      #:s32.8-unpackhi
@@ -2624,6 +2630,7 @@
      #:s32.16-abs
      #:s32.16-shiftl
      #:s32.16-shiftr
+     #:s32.16-shifta
      #:s32.16-rotatel
      #:s32.16-rotater
      #:s32.16-rotatelv
@@ -2703,6 +2710,7 @@
      #:s64.8-abs
      #:s64.8-shiftl
      #:s64.8-shiftr
+     #:s64.8-shifta
      #:s64.8-rotatel
      #:s64.8-rotater
      #:s64.8-rotatelv
@@ -2970,6 +2978,7 @@
      #:s16.32-maddubs
      #:s16.32-shiftl
      #:s16.32-shiftr
+     #:s16.32-shifta
      #:s16.32-alignr
      #:s16.32-unpackhi
      #:s16.32-unpacklo
