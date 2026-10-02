@@ -534,6 +534,7 @@
    (two-arg-s16.8<=     nil            (u16.8) (s16.8 s16.8) :cost 2 :encoding :fake-vop)
    (s16.8-shiftl        #:vpsllw       (s16.8) (s16.8 s16.8) :cost 1)
    (s16.8-shiftr        #:vpsrlw       (s16.8) (s16.8 s16.8) :cost 1)
+   (s16.8-shifta        #:vpsraw       (s16.8) (s16.8 s16.8) :cost 1)
    (s16.8-unpackhi      #:vpunpckhwd   (s16.8) (s16.8 s16.8) :cost 1)
    (s16.8-unpacklo      #:vpunpcklwd   (s16.8) (s16.8 s16.8) :cost 1)
    (s16.8-movemask      nil            (u8)    (s16.8)       :cost 1 :encoding :fake-vop)
