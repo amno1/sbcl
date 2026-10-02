@@ -261,6 +261,7 @@
    (s16.8-shufflelo   #:pshuflw    (s16.8) (s16.8 imm8)  :cost 1)
    (s16.8-shiftl      #:psllw      (s16.8) (s16.8 imm4)  :cost 1 :encoding :sse)
    (s16.8-shiftr      #:psrlw      (s16.8) (s16.8 imm4)  :cost 1 :encoding :sse)
+   (s16.8-shifta      #:psraw      (s16.8) (s16.8 imm4)  :cost 1 :encoding :sse)
    ;; s32.4
    (s32.4!-from-s32   nil          (s32.4) (s32)         :cost 1 :encoding :fake-vop)
    (s32.4!-from-p128  #:movdqu     (s32.4) (p128)        :cost 1 :encoding :move :always-translatable nil)
@@ -288,6 +289,7 @@
    (s32.4-shuffle     #:pshufd     (s32.4) (s32.4 imm8)  :cost 1)
    (s32.4-shiftl      #:pslld      (s32.4) (s32.4 imm5)  :cost 1 :encoding :sse)
    (s32.4-shiftr      #:psrld      (s32.4) (s32.4 imm5)  :cost 1 :encoding :sse)
+   (s32.4-shifta      #:psrad      (s32.4) (s32.4 imm5)  :cost 1 :encoding :sse)
    ;; s64.2
    (s64.2!-from-s64   nil          (s64.2) (s64)         :cost 1 :encoding :fake-vop)
    (s64.2!-from-p128  #:movdqu     (s64.2) (p128)        :cost 1 :encoding :move :always-translatable nil)
