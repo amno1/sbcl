@@ -1104,7 +1104,8 @@
         (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values (sb-simd-avx512bw:u16.32-shiftl u16v (sb-simd-avx512bw:u16.32 3))))) 8))
         (is (= (first (multiple-value-list (sb-simd-avx512bw:u16.32-values (sb-simd-avx512bw:u16.32-shiftr (sb-simd-avx512bw:u16.32 16) (sb-simd-avx512bw:u16.32 2))))) 4))
         (is (= (first (multiple-value-list (sb-simd-avx512bw:s16.32-values (sb-simd-avx512bw:s16.32-shiftl (sb-simd-avx512bw:s16.32 2) (sb-simd-avx512bw:u16.32 2))))) 8))
-        (is (= (first (multiple-value-list (sb-simd-avx512bw:s16.32-values (sb-simd-avx512bw:s16.32-shiftr s16v (sb-simd-avx512bw:u16.32 2))))) -4)))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:s16.32-values (sb-simd-avx512bw:s16.32-shifta s16v (sb-simd-avx512bw:u16.32 2))))) -4))
+        (is (= (first (multiple-value-list (sb-simd-avx512bw:s16.32-values (sb-simd-avx512bw:s16.32-shiftr s16v (sb-simd-avx512bw:u16.32 2))))) 16380)))
 
       ;; Alignments (vpalignr)
       (let* ((u8a (sb-simd-avx512bw:u8.64 1))
@@ -1404,3 +1405,120 @@
                                                     (sb-simd-avx512f:u64.8 4))))
         (is (= (first (multiple-value-list (sb-simd-avx512f:u64.8-values mlo))) 16))
         (is (= (first (multiple-value-list (sb-simd-avx512f:u64.8-values mhi))) 11))))))
+
+(define-test avx2-s32.8-shift-regression
+  (when (and (find-package "SB-SIMD-AVX2")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx2)))
+    ;; s32.8-shifta must perform arithmetic right shift (vpsravd) preserving sign.
+    (let* ((vals (sb-simd-avx2:make-s32.8 -4096 -1024 -64 -16 0 16 64 1024))
+           (counts (sb-simd-avx2:make-s32.8 12 10 2 2 1 2 2 2))
+           (res-a (sb-simd-avx2:s32.8-shifta vals counts))
+           (list-a (multiple-value-list (sb-simd-avx2:s32.8-values res-a)))
+           ;; s32.8-shiftr must perform logical right shift (vpsrlvd) zero-extending.
+           (res-r (sb-simd-avx2:s32.8-shiftr vals counts))
+           (list-r (multiple-value-list (sb-simd-avx2:s32.8-values res-r))))
+      (is (equal list-a '(-1 -1 -16 -4 0 4 16 256)))
+      (is (equal list-r '(1048575 4194303 1073741808 1073741820 0 4 16 256))))))
+
+(define-test shifta-support-and-negative-test
+  ;; Negative assertions: types unsupported by hardware must NOT have *-shifta defined.
+  (is (null (find-symbol "S8.16-SHIFTA" :sb-simd-sse2)))
+  (is (null (find-symbol "S8.32-SHIFTA" :sb-simd-avx2)))
+  (is (null (find-symbol "S8.64-SHIFTA" :sb-simd-avx512bw)))
+  (is (null (find-symbol "S64.2-SHIFTA" :sb-simd-sse2)))
+  (is (null (find-symbol "S64.2-SHIFTA" :sb-simd-avx)))
+  (is (null (find-symbol "S64.4-SHIFTA" :sb-simd-avx2)))
+  (is (null (find-symbol "S16.32-SHIFTA" :sb-simd-avx512f)))
+
+  ;; Positive assertions for SSE2
+  (when (and (find-package "SB-SIMD-SSE2")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :sse2)))
+    (is (= (first (multiple-value-list (sb-simd-sse2:s16.8-values (sb-simd-sse2:s16.8-shifta (sb-simd-sse2:s16.8 -16) 2)))) -4))
+    (is (= (first (multiple-value-list (sb-simd-sse2:s32.4-values (sb-simd-sse2:s32.4-shifta (sb-simd-sse2:s32.4 -16) 2)))) -4)))
+
+  ;; Positive assertions for AVX
+  (when (and (find-package "SB-SIMD-AVX")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx)))
+    (let ((c (sb-simd-sse2:make-s16.8 2 0 0 0 0 0 0 0)))
+      (is (= (first (multiple-value-list (sb-simd-avx:s16.8-values (sb-simd-avx:s16.8-shifta (sb-simd-avx:s16.8 -16) c)))) -4))))
+
+  ;; Positive assertions for AVX2
+  (when (and (find-package "SB-SIMD-AVX2")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx2)))
+    (let ((c (sb-simd-sse2:make-s16.8 2 0 0 0 0 0 0 0)))
+      (is (= (first (multiple-value-list (sb-simd-avx2:s16.16-values (sb-simd-avx2:s16.16-shifta (sb-simd-avx2:s16.16 -16) c)))) -4)))
+    (is (= (first (multiple-value-list (sb-simd-avx2:s32.4-values (sb-simd-avx2:s32.4-shifta (sb-simd-avx2:s32.4 -16) (sb-simd-avx2:s32.4 2))))) -4))
+    (is (= (first (multiple-value-list (sb-simd-avx2:s32.8-values (sb-simd-avx2:s32.8-shifta (sb-simd-avx2:s32.8 -16) (sb-simd-avx2:s32.8 2))))) -4)))
+
+  ;; Positive assertions for AVX-512F
+  (when (and (find-package "SB-SIMD-AVX512F")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512f)))
+    (is (= (first (multiple-value-list (sb-simd-avx512f:s32.16-values (sb-simd-avx512f:s32.16-shifta (sb-simd-avx512f:s32.16 -16) (sb-simd-avx512f:u32.16 2))))) -4))
+    (is (= (first (multiple-value-list (sb-simd-avx512f:s64.8-values (sb-simd-avx512f:s64.8-shifta (sb-simd-avx512f:s64.8 -16) (sb-simd-avx512f:u64.8 2))))) -4)))
+
+  ;; Positive assertions for AVX-512BW
+  (when (and (find-package "SB-SIMD-AVX512BW")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512bw)))
+    (is (= (first (multiple-value-list (sb-simd-avx512bw:s16.32-values (sb-simd-avx512bw:s16.32-shifta (sb-simd-avx512bw:s16.32 -16) (sb-simd-avx512bw:u16.32 2))))) -4))))
+
+(define-test shifta-cl-reference-and-edge-cases
+  ;; SSE2 s16.8 vs CL ash (counts 0..15)
+  (when (and (find-package "SB-SIMD-SSE2")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :sse2)))
+    (let ((vals '(-32768 -16384 -1 -2 0 1 2 16383 32767)))
+      (dolist (val vals)
+        (dotimes (c 16)
+          (let ((simd-res (first (multiple-value-list (sb-simd-sse2:s16.8-values (sb-simd-sse2:s16.8-shifta (sb-simd-sse2:s16.8 val) c)))))
+                (cl-res (ash val (- c))))
+            (is (= simd-res cl-res)))))))
+
+  ;; SSE2 s32.4 vs CL ash (counts 0..31)
+  (when (and (find-package "SB-SIMD-SSE2")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :sse2)))
+    (let ((vals '(-2147483648 -1073741824 -1 -2 0 1 2 1073741823 2147483647)))
+      (dolist (val vals)
+        (dotimes (c 32)
+          (let ((simd-res (first (multiple-value-list (sb-simd-sse2:s32.4-values (sb-simd-sse2:s32.4-shifta (sb-simd-sse2:s32.4 val) c)))))
+                (cl-res (ash val (- c))))
+            (is (= simd-res cl-res)))))))
+
+  ;; AVX2 s32.8 vs CL ash (counts 0..40, verifying hardware saturation for c >= 32)
+  (when (and (find-package "SB-SIMD-AVX2")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx2)))
+    (let ((vals '(-2147483648 -1073741824 -1 -2 0 1 2 1073741823 2147483647)))
+      (dolist (val vals)
+        (dotimes (c 40)
+          (let ((simd-res (first (multiple-value-list (sb-simd-avx2:s32.8-values (sb-simd-avx2:s32.8-shifta (sb-simd-avx2:s32.8 val) (sb-simd-avx2:s32.8 c))))))
+                (cl-res (ash val (- c))))
+            (is (= simd-res cl-res)))))))
+
+  ;; AVX-512F s64.8 vs CL ash (counts 0..70, verifying hardware saturation for c >= 64)
+  (when (and (find-package "SB-SIMD-AVX512F")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512f)))
+    (let ((vals '(-9223372036854775808 -4611686018427387904 -1 -2 0 1 2 4611686018427387903 9223372036854775807)))
+      (dolist (val vals)
+        (dotimes (c 70)
+          (let ((simd-res (first (multiple-value-list (sb-simd-avx512f:s64.8-values (sb-simd-avx512f:s64.8-shifta (sb-simd-avx512f:s64.8 val) (sb-simd-avx512f:u64.8 c))))))
+                (cl-res (ash val (- c))))
+            (is (= simd-res cl-res))))))))
+
+(define-test shifta-cross-isa-test
+  ;; Cross-ISA: s16.8-shifta SSE2 vs AVX
+  (when (and (find-package "SB-SIMD-AVX")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx)))
+    (let ((vals '(-32768 -16384 -1 -2 0 1 2 16383 32767)))
+      (dolist (val vals)
+        (dotimes (c 16)
+          (let ((res-sse (first (multiple-value-list (sb-simd-sse2:s16.8-values (sb-simd-sse2:s16.8-shifta (sb-simd-sse2:s16.8 val) c)))))
+                (res-avx (first (multiple-value-list (sb-simd-avx:s16.8-values (sb-simd-avx:s16.8-shifta (sb-simd-avx:s16.8 val) (sb-simd-sse2:make-s16.8 c 0 0 0 0 0 0 0)))))))
+            (is (= res-sse res-avx)))))))
+
+  ;; Cross-ISA: s32.4-shifta SSE2 vs AVX2
+  (when (and (find-package "SB-SIMD-AVX2")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx2)))
+    (let ((vals '(-2147483648 -1073741824 -1 -2 0 1 2 1073741823 2147483647)))
+      (dolist (val vals)
+        (dotimes (c 32)
+          (let ((res-sse (first (multiple-value-list (sb-simd-sse2:s32.4-values (sb-simd-sse2:s32.4-shifta (sb-simd-sse2:s32.4 val) c)))))
+                (res-avx2 (first (multiple-value-list (sb-simd-avx2:s32.4-values (sb-simd-avx2:s32.4-shifta (sb-simd-avx2:s32.4 val) (sb-simd-avx2:s32.4 c)))))))
+            (is (= res-sse res-avx2))))))))
