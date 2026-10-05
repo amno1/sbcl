@@ -118,14 +118,23 @@
                         sb-simd-avx512bw:m8.64)
                        `(((unsigned-byte 64) (sb-ext:%make-simd-pack-512-mask x)))))
                   (otherwise (,err x))))
-              ,@(when (and (mask-record-p (find-value-record name nil))
-                           (instruction-set-available-p instruction-set))
+              ;; Reading the mask value may compile to KMOV, so on hosts
+              ;; without the instruction set define stubs that signal
+              ;; MISSING-INSTRUCTION, like every other unavailable function.
+              ,@(when (mask-record-p (find-value-record name nil))
                   (let* ((rec (find-value-record name))
                          (width (mask-record-width rec))
                          (val-fn (mksym (symbol-package name) name "-VALUE"))
                          (cnt-fn (mksym (symbol-package name) name "-COUNT"))
                          (zero-fn (mksym (symbol-package name) name "-ZEROP"))
                          (all-fn (mksym (symbol-package name) name "-ALL-P")))
+                    (if (not (instruction-set-available-p instruction-set))
+                        (loop for fn in (list val-fn cnt-fn zero-fn all-fn)
+                              collect `(defun ,fn (mask)
+                                         (declare (ignore mask))
+                                         (missing-instruction
+                                          (load-time-value
+                                           (find-function-record ',name)))))
                     `((declaim (inline ,val-fn ,cnt-fn ,zero-fn ,all-fn))
                       (defun ,val-fn (mask)
                         (declare (type ,name mask))
@@ -141,7 +150,7 @@
                         (zerop (mask-value mask)))
                       (defun ,all-fn (mask)
                         (declare (type ,name mask))
-                        (= (logcount (mask-value mask)) ,width)))))))))
+                        (= (logcount (mask-value mask)) ,width))))))))))
      (define-scalar-casts ()
        `(progn
           ,@(loop for scalar-cast-record in (filter-function-records #'scalar-cast-record-p)
