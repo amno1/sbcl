@@ -116,13 +116,7 @@
                         sb-simd-avx512f:m32.16
                         sb-simd-avx512bw:m16.32
                         sb-simd-avx512bw:m8.64)
-                       `(((unsigned-byte 64) (sb-ext:%make-simd-pack-512-mask x))))
-                      #-x86-64
-                      ((sb-simd-avx512f:m64.8
-                        sb-simd-avx512f:m32.16
-                        sb-simd-avx512bw:m16.32
-                        sb-simd-avx512bw:m8.64)
-                       `(((unsigned-byte 64) (make-phony-simd-pack-512-mask :value x)))))
+                       `(((unsigned-byte 64) (sb-ext:%make-simd-pack-512-mask x)))))
                   (otherwise (,err x))))
               ,@(when (and (mask-record-p (find-value-record name nil))
                            (instruction-set-available-p instruction-set))
