@@ -972,7 +972,7 @@
           (sb-simd-avx512f:s32.16-scatter sval sarr idx)
           (dotimes (i 16)
             (is (= (aref uarr (+ 16 i)) 42))
-            (is (= (aref sarr (+ 16 i)) -42))))))
+            (is (= (aref sarr (+ 16 i)) -42)))))
 
       ;; 4. u64.8 & s64.8
       (let ((uarr (make-array 16 :element-type '(unsigned-byte 64) :initial-element 0))
@@ -988,7 +988,7 @@
           (is (= (nth 0 uvals) 1))
           (is (= (nth 1 uvals) 4))
           (is (= (nth 0 svals) -1))
-          (is (= (nth 1 svals) -4))))))
+          (is (= (nth 1 svals) -4)))))))
 
 (define-test sap-gather-scatter-avx512f
   (let ((open-sb-simd-avx512f (find-package "SB-SIMD-AVX512F")))
