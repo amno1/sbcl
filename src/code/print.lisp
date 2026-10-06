@@ -1876,7 +1876,18 @@ variable: an unreadable object representing the error is printed instead.")
                   (values q (cond ((< twice-r den) -1)
                                   ((= twice-r den) 0)
                                   (t 1)))))))
-      (when (or (zerop q) (zerop round))
+      (when (zerop q)
+        ;; The value is below one unit at 10^POSITION.
+        (cond ((plusp round))           ; rounds up to one unit: G = 1
+              ((< position 0)
+               ;; At most half a unit: %FLONUM-TO-DIGITS stops at the
+               ;; first digit, which is 0 because the value is below 0.1.
+               (return-from flonum-position-decimal (values 0 0 1)))
+              (t
+               ;; At POSITION >= 0 it returns unrounded digits instead.
+               (return-from flonum-position-decimal nil))))
+      (when (zerop round)
+        ;; An exact tie between two candidates.
         (return-from flonum-position-decimal nil))
       ;; G is below 2^53, since 10^POSITION >= 2^E.
       (let* ((g (if (plusp round) (1+ q) q))
@@ -2155,6 +2166,27 @@ variable: an unreadable object representing the error is printed instead.")
            (print-float-exponent float 0 stream)
            (print-float-exponent float (1- k) stream)))
      float)))
+
+;;; For a finite nonzero single or double float X, return
+;;; (values (FLONUM-EXPONENT X) (nth-value 1 (FLONUM-TO-STRING X))) from
+;;; one zmij call: K, the decimal point position of the shortest digits,
+;;; and the length FLONUM-TO-STRING gives them (digits, padding zeros and
+;;; a point). Used by ~G, which needs both but not the digits.
+#+64-bit
+(defun flonum-exponent-and-length (x)
+  (declare (type (or single-float double-float) x))
+  (multiple-value-bind (m e10) (zmij-decimal x)
+    (declare (type (unsigned-byte 62) m) (type fixnum e10))
+    (loop (multiple-value-bind (m/10 rem) (truncate m 10)
+            (unless (zerop rem) (return))
+            (setq m m/10 e10 (1+ e10))))
+    (let* ((n (do ((n 1 (1+ n))
+                   (p 10 (* p 10)))
+                  ((< m p) n)))
+           (k (+ e10 n)))
+      (values k (if (plusp k)
+                    (1+ (max n k))      ; ddd[000].ddd
+                    (+ 1 (- k) n))))))  ; .[000]ddd
 
 ;;; flonum-to-digits without producing a string
 (defun flonum-exponent (float)
