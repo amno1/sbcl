@@ -1059,3 +1059,64 @@
               array index (ash 1 (- word-shift n-fixnum-tag-bits)))
           diff)
     (move result diff)))
+
+;;; SSE2 conversion of two 8-digit numbers to 16 ASCII digits, after
+;;; zmij (https://github.com/vitaut/zmij). SSE2 is part of the x86-64
+;;; baseline, so no CPU dispatch is needed; 16 digits fit one XMM
+;;; register, so wider vectors would not help.
+(define-vop (zmij-store-digits)
+  (:translate sb-impl::%zmij-store-digits)
+  (:policy :fast-safe)
+  (:args (string :scs (descriptor-reg))
+         (index :scs (unsigned-reg))
+         (hi :scs (unsigned-reg))
+         (lo :scs (unsigned-reg)))
+  (:arg-types simple-base-string unsigned-num unsigned-num unsigned-num)
+  (:results (mask :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc int-sse-reg) x y z)
+  (:generator 30
+    (flet ((splat (width value)
+             (register-inline-constant
+              :oword (loop for i below 128 by width
+                           sum (ash value i)))))
+      ;; 64-bit lanes [LO, HI].
+      (inst movq x lo)
+      (inst movq y hi)
+      (inst punpcklqdq x y)
+      ;; Each lane v -> (v mod 10^4) | (v div 10^4) << 32, i.e. 32-bit
+      ;; lanes [mnop ijkl efgh abcd].
+      (inst movdqa y x)
+      (inst pmuludq y (splat 64 (1+ (floor (ash 1 40) 10000))))
+      (inst psrlq y 40)
+      (inst pmuludq y (splat 64 (- (ash 1 32) 10000)))
+      (inst paddq x y)
+      ;; Reverse the 32-bit lanes: [abcd efgh ijkl mnop].
+      (inst pshufd x x #b00011011)
+      ;; Each 32-bit lane v < 10^4 -> (v div 100) | (v mod 100) << 16.
+      (inst movdqa y x)
+      (inst pmulhuw y (splat 32 (1+ (floor (ash 1 19) 100))))
+      (inst psrlw y 3)
+      (inst movdqa z y)
+      (inst pmullw z (splat 32 100))
+      (inst psubw x z)
+      (inst pslld x 16)
+      (inst por x y)
+      ;; Each 16-bit lane w < 100 -> (w div 10) | (w mod 10) << 8:
+      ;;   (w << 8) - (10*256 - 1) * (w div 10)
+      (inst movdqa y x)
+      (inst pmulhuw y (splat 16 (1+ (floor (ash 1 16) 10))))
+      (inst pmullw y (splat 16 (1- (* 10 256))))
+      (inst psllw x 8)
+      (inst psubw x y)
+      ;; One digit per byte, in memory order. Store them before writing
+      ;; MASK, which may share a register with STRING or INDEX.
+      (inst pxor y y)
+      (inst pcmpeqb y x)
+      (inst por x (splat 8 (char-code #\0)))
+      (inst movdqu (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                       string index)
+            x)
+      ;; Mask of nonzero digits.
+      (inst pmovmskb mask y)
+      (inst xor :dword mask #xFFFF))))
