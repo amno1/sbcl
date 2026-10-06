@@ -1886,11 +1886,17 @@ variable: an unreadable object representing the error is printed instead.")
               (t
                ;; At POSITION >= 0 it returns unrounded digits instead.
                (return-from flonum-position-decimal nil))))
-      (when (zerop round)
-        ;; An exact tie between two candidates.
-        (return-from flonum-position-decimal nil))
       ;; G is below 2^53, since 10^POSITION >= 2^E.
-      (let* ((g (if (plusp round) (1+ q) q))
+      (let* ((g (cond ((plusp round) (1+ q))
+                      ((minusp round) q)
+                      ;; An exact tie between Q and Q+1 units. %FLONUM-TO-DIGITS
+                      ;; scans from the most significant digit and stops at the
+                      ;; first position where a candidate lies in the closed
+                      ;; interval [Q, Q+1]: Q when Q is a multiple of 10 (a
+                      ;; shorter decimal), otherwise Q+1 (a multiple of 10, or
+                      ;; its tie rule at the last digit, which rounds up).
+                      ((zerop (mod q 10)) q)
+                      (t (1+ q))))
              (n (do ((n 1 (1+ n))
                      (p 10 (* p 10)))
                     ((< g p) n)))
