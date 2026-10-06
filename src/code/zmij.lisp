@@ -207,13 +207,15 @@
   (zmij-irregular-body bin-sig raw-exp +zmij-float-exp-offset+
                        (integer 0 100000000)))
 
-(defun zmij-double-regular (bin-sig raw-exp)
+(defun zmij-double-regular (bin-sig raw-exp &optional closed)
   (declare (type (unsigned-byte 53) bin-sig)
            (type zmij-double-raw-exp raw-exp))
   (let* ((bin-exp (- raw-exp +zmij-double-exp-offset+))
          (dec-exp (zmij-dec-exp bin-exp t))
          (shift (zmij-shift raw-exp))
-         (even (- 1 (logand bin-sig 1))))
+         ;; 1 when the rounding interval includes its endpoints: for an
+         ;; even significand, or always when CLOSED.
+         (even (if closed 1 (- 1 (logand bin-sig 1)))))
     (multiple-value-bind (pow10-hi pow10-lo) (zmij-pow10 (- (1+ dec-exp)))
       (multiple-value-bind (p-hi p-lo)
           (zmij-mul192-hi128 pow10-hi pow10-lo (ash bin-sig shift))
@@ -237,7 +239,7 @@
                   digit
                   (not (or round-up round-down))))))))
 
-(defun zmij-float-regular (bin-sig raw-exp)
+(defun zmij-float-regular (bin-sig raw-exp &optional closed)
   (declare (type (unsigned-byte 24) bin-sig)
            (type zmij-float-raw-exp raw-exp))
   (let* ((bin-exp (- raw-exp +zmij-float-exp-offset+))
@@ -245,7 +247,7 @@
          ;; The double table works for floats too, with 34 bits of
          ;; fraction instead of 6.
          (shift (+ (zmij-shift (+ bin-exp +zmij-double-exp-offset+)) (- 34 6)))
-         (even (- 1 (logand bin-sig 1)))
+         (even (if closed 1 (- 1 (logand bin-sig 1))))
          (pow10-hi (values (zmij-pow10 (- (1+ dec-exp)))))
          (p (zmij-mul-hi (logand (1+ pow10-hi) #xFFFFFFFFFFFFFFFF)
                          (ash bin-sig shift)))
@@ -264,8 +266,11 @@
 (declaim (inline zmij-decimal))
 ;;; Return (values M E) such that M * 10^E is the shortest decimal that
 ;;; reads back as the absolute value of FLOAT. M may have trailing
-;;; zeros. FLOAT must be finite and nonzero.
-(defun zmij-decimal (float)
+;;; zeros. FLOAT must be finite and nonzero. With CLOSED, the rounding
+;;; interval includes its endpoints even for an odd significand, as in
+;;; %FLONUM-TO-DIGITS with a position (only meaningful when the
+;;; significand is not a power of two).
+(defun zmij-decimal (float &optional closed)
   (declare (type (or single-float double-float) float))
   (multiple-value-bind (integral dec-exp digit has-last-digit)
       (etypecase float
@@ -274,21 +279,21 @@
                 (frac (ldb (byte 52 0) bits))
                 (biased (ldb (byte 11 52) bits)))
            (cond ((zerop biased)
-                  (zmij-double-regular frac 1))
+                  (zmij-double-regular frac 1 closed))
                  ((zerop frac)
                   (zmij-double-irregular (ash 1 52) biased))
                  (t
-                  (zmij-double-regular (logior frac (ash 1 52)) biased)))))
+                  (zmij-double-regular (logior frac (ash 1 52)) biased closed)))))
         (single-float
          (let* ((bits (single-float-bits float))
                 (frac (ldb (byte 23 0) bits))
                 (biased (ldb (byte 8 23) bits)))
            (cond ((zerop biased)
-                  (zmij-float-regular frac 1))
+                  (zmij-float-regular frac 1 closed))
                  ((zerop frac)
                   (zmij-float-irregular (ash 1 23) biased))
                  (t
-                  (zmij-float-regular (logior frac (ash 1 23)) biased))))))
+                  (zmij-float-regular (logior frac (ash 1 23)) biased closed))))))
     (if has-last-digit
         (values (truly-the zmij-significand (+ (* integral 10) digit)) dec-exp)
         (values integral (1+ dec-exp)))))
