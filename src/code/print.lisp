@@ -1819,11 +1819,35 @@ variable: an unreadable object representing the error is printed instead.")
         (let ((shift (- float-digits (integer-length f))))
           (setq f (ash f shift)
                 e (- e shift)))))
-    ;; 10^POSITION >= 2^E
+    ;; Unless 10^POSITION >= 2^E, the interval is (partly) the float's own.
     (unless (if (>= position 0)
                 (or (<= e 0) (>= (expt 10 position) (ash 1 e)))
                 (and (< e 0) (>= (ash 1 (- e)) (expt 10 (- position)))))
-      (return-from flonum-position-decimal nil))
+      ;; If half a unit at 10^POSITION is at most the float's half-gaps on
+      ;; both sides, the interval is exactly the float's rounding interval,
+      ;; closed, and the result is the shortest decimal in it: zmij's
+      ;; result with CLOSED. That holds when 10^POSITION <= 2^E and the
+      ;; significand is not a power of two (whose lower half-gap is
+      ;; smaller); subnormals use a narrower interval there. Otherwise
+      ;; fall back.
+      (return-from flonum-position-decimal
+        (when (and (/= f (ash 1 (1- (float-digits float))))
+                   (= (float-precision float) (float-digits float))
+                   #+64-bit t #-64-bit nil
+                   (if (>= position 0)
+                       (and (>= e 0) (<= (expt 10 position) (ash 1 e)))
+                       (or (>= e 0)
+                           (<= (ash 1 (- e)) (expt 10 (- position))))))
+          #+64-bit
+          (multiple-value-bind (m e10) (zmij-decimal float t)
+            (declare (type (unsigned-byte 62) m) (type fixnum e10))
+            (loop (multiple-value-bind (m/10 rem) (truncate m 10)
+                    (unless (zerop rem) (return))
+                    (setq m m/10 e10 (1+ e10))))
+            (let ((n (do ((n 1 (1+ n))
+                          (p 10 (* p 10)))
+                         ((< m p) n))))
+              (values (+ e10 n) m n))))))
     ;; value / 10^POSITION = Q + R/DEN. ROUND compares R with DEN/2:
     ;; -1 below, 0 at a tie, 1 above.
     (multiple-value-bind (q round)
