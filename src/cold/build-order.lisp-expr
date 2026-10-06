@@ -547,6 +547,7 @@
  ("src/code/solist" :not-host)
  ("src/code/final" :not-host)
  ("src/code/reader" :not-host) ; needs "code/readtable"
+ #+64-bit ("src/code/zmij" :not-host)
  ("src/code/print" :not-host)
  ("src/code/pprint" :not-host)
 
