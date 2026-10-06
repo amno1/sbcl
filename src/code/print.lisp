@@ -1547,6 +1547,26 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;
 ;;; FLOAT-DIGITS actually generates the digits for positive numbers;
 ;;; see below for comments.
+;;; Layout of FLONUM-TO-STRING's result, for N digits with the decimal
+;;; point after digit E: the result is digits [0, LEFT-END), LEFT-ZEROS
+;;; zeros, a point, RIGHT-ZEROS zeros, digits [RIGHT-START, RIGHT-END) and
+;;; TRAILING-ZEROS zeros.
+(declaim (inline flonum-layout))
+(defun flonum-layout (e n fdigits fmin exponent-zero)
+  (declare (type integer e) (type index n))
+  (if (or (and (= e 0) exponent-zero)
+          (plusp e))
+      ;; ddd[000].ddd[000]
+      (let ((split (min n e)))
+        (values split (max 0 (- e n)) 0 split n
+                (if fdigits (max 0 (- fdigits (- n split))) 0)))
+      ;; .[000]ddd[000]
+      (let ((end (if fdigits
+                     (min n (max (or fmin 0) (+ fdigits e)))
+                     n)))
+        (values 0 0 (max 0 (- e)) 0 end
+                (if fdigits (max 0 (+ fdigits e (- n))) 0)))))
+
 (defun flonum-to-string (x &optional width fdigits scale fmin exponent-zero)
   (declare (type float x))
   (multiple-value-bind (e string)
@@ -1582,23 +1602,9 @@ variable: an unreadable object representing the error is printed instead.")
            (digits string)
            (n (length digits)))
       (declare (type index n))
-      ;; The result is LEFT-DIGITS, LEFT-ZEROS zeros, a point, RIGHT-ZEROS
-      ;; zeros, RIGHT-DIGITS and TRAILING-ZEROS zeros. Compute the sizes,
-      ;; then fill one string of exactly that length.
       (multiple-value-bind (left-end left-zeros right-zeros right-start
                             right-end trailing-zeros)
-          (if (or (and (= e 0) exponent-zero)
-                  (plusp e))
-              ;; ddd[000].ddd[000]
-              (let ((split (min n e)))
-                (values split (max 0 (- e n)) 0 split n
-                        (if fdigits (max 0 (- fdigits (- n split))) 0)))
-              ;; .[000]ddd[000]
-              (let ((end (if fdigits
-                             (min n (max (or fmin 0) (+ fdigits e)))
-                             n)))
-                (values 0 0 (max 0 (- e)) 0 end
-                        (if fdigits (max 0 (+ fdigits e (- n))) 0))))
+          (flonum-layout e n fdigits fmin exponent-zero)
         (let* ((point (+ left-end left-zeros))
                (length (+ point 1 right-zeros (- right-end right-start)
                           trailing-zeros))
@@ -1802,7 +1808,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; decimal in the interval is the value rounded to a multiple of
 ;;; 10^POSITION. That is computed here exactly. Exact ties (two
 ;;; candidates) and results that round to zero go to the general code.
-(defun flonum-to-digits/position (float position)
+(defun flonum-position-decimal (float position)
   (declare (type (or single-float double-float) float)
            (type fixnum position))
   (multiple-value-bind (f e) (integer-decode-float float)
@@ -1817,7 +1823,7 @@ variable: an unreadable object representing the error is printed instead.")
     (unless (if (>= position 0)
                 (or (<= e 0) (>= (expt 10 position) (ash 1 e)))
                 (and (< e 0) (>= (ash 1 (- e)) (expt 10 (- position)))))
-      (return-from flonum-to-digits/position nil))
+      (return-from flonum-position-decimal nil))
     ;; value / 10^POSITION = Q + R/DEN. ROUND compares R with DEN/2:
     ;; -1 below, 0 at a tie, 1 above.
     (multiple-value-bind (q round)
@@ -1847,7 +1853,7 @@ variable: an unreadable object representing the error is printed instead.")
                                   ((= twice-r den) 0)
                                   (t 1)))))))
       (when (or (zerop q) (zerop round))
-        (return-from flonum-to-digits/position nil))
+        (return-from flonum-position-decimal nil))
       ;; G is below 2^53, since 10^POSITION >= 2^E.
       (let* ((g (if (plusp round) (1+ q) q))
              (n (do ((n 1 (1+ n))
@@ -1859,12 +1865,78 @@ variable: an unreadable object representing the error is printed instead.")
         (loop (multiple-value-bind (g/10 rem) (truncate g 10)
                 (unless (zerop rem) (return))
                 (setq g g/10 n (1- n))))
-        (let ((string (make-string n :element-type 'base-char)))
-          (loop for i from (1- n) downto 0
-                do (multiple-value-bind (g/10 digit) (truncate g 10)
-                     (setf (schar string i) (code-char (+ (char-code #\0) digit))
-                           g g/10)))
-          (values k string))))))
+        (values k g n)))))
+
+;;; Write the N decimal digits of G into STRING starting at START.
+(declaim (inline write-decimal-digits))
+(defun write-decimal-digits (g n string start)
+  (declare (type (unsigned-byte 62) g)
+           (type (integer 1 19) n)
+           (type simple-base-string string)
+           (type index start))
+  (loop for i from (+ start n -1) downto start
+        do (multiple-value-bind (g/10 digit) (truncate g 10)
+             (setf (schar string i) (code-char (+ (char-code #\0) digit))
+                   g g/10))))
+
+;;; FLONUM-POSITION-DECIMAL as (values K DIGIT-STRING), or NIL.
+(defun flonum-to-digits/position (float position)
+  (multiple-value-bind (k g n) (flonum-position-decimal float position)
+    (when k
+      (let ((string (make-string n :element-type 'base-char)))
+        (write-decimal-digits g n string 0)
+        (values k string)))))
+
+;;; Like (FLONUM-TO-STRING X NIL FDIGITS SCALE FMIN EXPONENT-ZERO), but
+;;; write the characters into BUFFER instead of a fresh string and return
+;;; (values LENGTH LPOINT TPOINT POINT), the second to fifth values of
+;;; FLONUM-TO-STRING. Return NIL, writing nothing useful, unless X is a
+;;; nonzero single or double float on the exact fast path of
+;;; FLONUM-POSITION-DECIMAL and the result fits in BUFFER; the caller
+;;; then uses FLONUM-TO-STRING.
+(defun flonum-to-buffer (buffer x fdigits scale fmin exponent-zero)
+  (declare (type simple-base-string buffer)
+           (type float x)
+           (type (and fixnum unsigned-byte) fdigits)
+           (type (or null fixnum) scale fmin exponent-zero))
+  (unless (and (typep x '(or single-float double-float))
+               (not (zerop x)))
+    (return-from flonum-to-buffer nil))
+  (multiple-value-bind (k g n)
+      (flonum-position-decimal x (+ (min (- (+ fdigits (or scale 0)))
+                                         (- (or fmin 0)))
+                                    (or exponent-zero 0)))
+    (unless k
+      (return-from flonum-to-buffer nil))
+    (let ((e (+ (if exponent-zero (- k exponent-zero) k)
+                (or scale 0))))
+      (multiple-value-bind (left-end left-zeros right-zeros right-start
+                            right-end trailing-zeros)
+          (flonum-layout e n fdigits fmin exponent-zero)
+        (let* ((point (+ left-end left-zeros))
+               (length (+ point 1 right-zeros (- right-end right-start)
+                          trailing-zeros)))
+          (when (> (+ length 19) (length buffer))
+            (return-from flonum-to-buffer nil))
+          ;; The digits are written after the result area, at DIGITS,
+          ;; and copied into place from there.
+          (let ((digits length))
+            (write-decimal-digits g n buffer digits)
+            (flet ((copy (from to at)
+                     (loop for i of-type index from from below to
+                           for j of-type index from at
+                           do (setf (schar buffer j)
+                                    (schar buffer (+ digits i)))))
+                   (zeros (start count)
+                     (fill buffer #\0 :start start :end (+ start count))))
+              (copy 0 left-end 0)
+              (zeros left-end left-zeros)
+              (setf (schar buffer point) #\.)
+              (zeros (+ point 1) right-zeros)
+              (copy right-start right-end (+ point 1 right-zeros))
+              (zeros (+ point 1 right-zeros (- right-end right-start))
+                     trailing-zeros)))
+          (values length (= point 0) (= point (1- length)) point))))))
 
 (defun flonum-to-digits (float &optional position relativep)
   (when (and position
