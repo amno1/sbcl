@@ -8975,38 +8975,61 @@
                        (pop args)))))
    (null args)))
 
-;;; (FORMAT NIL "~w,d,k,ovf,padF" X), the control string being exactly one
-;;; ~F directive with constant parameters: build the string directly with
-;;; FORMAT-FIXED-STRING instead of through a string output stream.
+;;; (FORMAT NIL control X), the control string being exactly one ~F, ~E, ~G
+;;; or ~$ directive with constant parameters: build the string directly
+;;; (FORMAT-FIXED-STRING etc.) instead of through a string output stream.
 #-sb-xc-host
 (deftransform format ((stream control arg) (null (constant-arg string) t) * :important nil)
-  (let* ((tokenized
+  (let* (;; For each directive: the function, its parameters as (type
+         ;; default) as in the DEF-FORMAT-DIRECTIVE definitions, and whether
+         ;; it accepts the colon modifier, which is passed on as an argument.
+         (table
+           '((#\F sb-format::format-fixed-string
+              ((integer nil) (integer nil) (integer nil)
+               (character nil) (character #\Space))
+              nil)
+             (#\E sb-format::format-exponential-string
+              ((integer nil) (integer nil) (integer nil) (integer 1)
+               (character nil) (character #\Space) (character nil))
+              nil)
+             (#\G sb-format::format-general-string
+              ((integer nil) (integer nil) (integer nil) (integer nil)
+               (character nil) (character #\Space) (character nil))
+              nil)
+             (#\$ sb-format::format-dollars-string
+              ((integer 2) (integer 1) (integer 0) (character #\Space))
+              t)))
+         (tokenized
            (handler-case
                (sb-format::tokenize-control-string
                 (coerce (lvar-value control) 'simple-string))
              (sb-format:format-error ()
                (give-up-ir1-transform))))
-         (directive (first tokenized)))
-    (unless (and (= (length tokenized) 1)
-                 (sb-format::format-directive-p directive)
-                 (char-equal (sb-format::directive-character directive) #\F)
-                 (not (sb-format::directive-colonp directive))
-                 (<= (length (sb-format::directive-params directive)) 5))
+         (directive (first tokenized))
+         (entry (and (= (length tokenized) 1)
+                     (sb-format::format-directive-p directive)
+                     (assoc (char-upcase (sb-format::directive-character directive))
+                            table))))
+    (unless entry
       (give-up-ir1-transform))
-    (let* ((params (sb-format::directive-params directive))
-           (values
-             (loop for (type default) in '((integer nil) (integer nil) (integer nil)
-                                           (character nil) (character #\Space))
-                   for value = (cdr (pop params))
-                   collect (cond ((null value) default)
-                                 ((typep value type) value)
-                                 ;; V, # or a wrong type: keep the general path
-                                 (t (give-up-ir1-transform))))))
-      `(lambda (stream control arg)
-         (declare (ignore stream control))
-         (sb-format::format-fixed-string
-          arg ,@(mapcar (lambda (v) `',v) values)
-          ',(sb-format::directive-atsignp directive))))))
+    (destructuring-bind (function specs colon-allowed) (rest entry)
+      (let ((colonp (sb-format::directive-colonp directive))
+            (params (sb-format::directive-params directive)))
+        (when (or (and colonp (not colon-allowed))
+                  (> (length params) (length specs)))
+          (give-up-ir1-transform))
+        (let ((values
+                (loop for (type default) in specs
+                      for value = (cdr (pop params))
+                      collect (cond ((null value) default)
+                                    ((typep value type) value)
+                                    ;; V, # or a wrong type: keep the general path
+                                    (t (give-up-ir1-transform))))))
+          `(lambda (stream control arg)
+             (declare (ignore stream control))
+             (,function arg ,@(mapcar (lambda (v) `',v) values)
+                        ,@(and colon-allowed `(',colonp))
+                        ',(sb-format::directive-atsignp directive))))))))
 
 (deftransform format ((stream control &rest args) (null (constant-arg string) &rest t) * :important nil)
   (let ((tokenized
