@@ -56,13 +56,17 @@
                     (> (abs (- q m)) best)))
              "not closest")))))
 
+;;; A random finite float from random bits. NaN and infinity bit patterns
+;;; (all-ones exponent) are rejected before a float is made: on x86 the
+;;; x87 FPU traps on merely loading a signalling NaN.
 (defun float-print-random-float (state)
-  (loop for x = (if (zerop (random 2 state))
-                    (sb-kernel:make-double-float (- (random (ash 1 32) state) (ash 1 31))
-                                                 (random (ash 1 32) state))
-                    (sb-kernel:make-single-float (- (random (ash 1 32) state) (ash 1 31))))
-        unless (or (sb-ext:float-nan-p x) (sb-ext:float-infinity-p x))
-          return x))
+  (if (zerop (random 2 state))
+      (loop for high = (- (random (ash 1 32) state) (ash 1 31))
+            unless (= (ldb (byte 11 20) high) #x7FF)
+              return (sb-kernel:make-double-float high (random (ash 1 32) state)))
+      (loop for bits = (- (random (ash 1 32) state) (ash 1 31))
+            unless (= (ldb (byte 8 23) bits) #xFF)
+              return (sb-kernel:make-single-float bits))))
 
 (defparameter *float-print-prin1-cases*
   '(((:d 1072693248 0) "1.0d0")
