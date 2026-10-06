@@ -1,5 +1,5 @@
 ;;;; Shortest round-trip decimal conversion of SINGLE-FLOAT and
-;;;; DOUBLE-FLOAT using the Żmij algorithm.
+;;;; DOUBLE-FLOAT using the Zmij algorithm.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
