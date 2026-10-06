@@ -245,7 +245,7 @@
     ((:d 1152724226 3353430774) "1.0e23")
     ((:s 1343554297) "1.0f10")
     ((:s 964689920) "2.4414063f-4")
-    n((:s 1210557032) "171657.63f0")
+    ((:s 1210557032) "171657.63f0")
     ))
 
 (with-test (:name (:float-print :prin1 :double-float-default))
@@ -294,11 +294,19 @@
              (let ((x (abs x)))
                (multiple-value-bind (k digits) (sb-impl::flonum-to-digits x)
                  (let ((problem (float-print-digits-problem x k digits)))
+                   ;; Without zmij (32-bit platforms), subnormals still get
+                   ;; Burger-Dybvig's longer digits; they must read back.
+                   #-64-bit
+                   (when (and (equal problem "not shortest")
+                              (< x (etypecase x
+                                     (single-float least-positive-normalized-single-float)
+                                     (double-float least-positive-normalized-double-float))))
+                     (setq problem nil))
                    (when problem
                      (error "~S: ~A (~D ~S)" x problem k digits)))))))
       (dotimes (i 5000)
         (check (float-print-random-float state)))
-      ;; Subnormals: here the output is shorter than before zmij, so they
+      ;; Subnormals: with zmij the output is shorter than before, so they
       ;; are checked by the oracle rather than against recorded strings.
       (loop for i from 1 to 200
             do (check (* i least-positive-double-float))
