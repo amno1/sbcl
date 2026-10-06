@@ -8975,6 +8975,39 @@
                        (pop args)))))
    (null args)))
 
+;;; (FORMAT NIL "~w,d,k,ovf,padF" X), the control string being exactly one
+;;; ~F directive with constant parameters: build the string directly with
+;;; FORMAT-FIXED-STRING instead of through a string output stream.
+#-sb-xc-host
+(deftransform format ((stream control arg) (null (constant-arg string) t) * :important nil)
+  (let* ((tokenized
+           (handler-case
+               (sb-format::tokenize-control-string
+                (coerce (lvar-value control) 'simple-string))
+             (sb-format:format-error ()
+               (give-up-ir1-transform))))
+         (directive (first tokenized)))
+    (unless (and (= (length tokenized) 1)
+                 (sb-format::format-directive-p directive)
+                 (char-equal (sb-format::directive-character directive) #\F)
+                 (not (sb-format::directive-colonp directive))
+                 (<= (length (sb-format::directive-params directive)) 5))
+      (give-up-ir1-transform))
+    (let* ((params (sb-format::directive-params directive))
+           (values
+             (loop for (type default) in '((integer nil) (integer nil) (integer nil)
+                                           (character nil) (character #\Space))
+                   for value = (cdr (pop params))
+                   collect (cond ((null value) default)
+                                 ((typep value type) value)
+                                 ;; V, # or a wrong type: keep the general path
+                                 (t (give-up-ir1-transform))))))
+      `(lambda (stream control arg)
+         (declare (ignore stream control))
+         (sb-format::format-fixed-string
+          arg ,@(mapcar (lambda (v) `',v) values)
+          ',(sb-format::directive-atsignp directive))))))
+
 (deftransform format ((stream control &rest args) (null (constant-arg string) &rest t) * :important nil)
   (let ((tokenized
           (handler-case
