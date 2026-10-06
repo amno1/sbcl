@@ -1985,8 +1985,12 @@ variable: an unreadable object representing the error is printed instead.")
       ;; 10^K >= (2F + 1) * 2^(E-1), both sides times 2^max(0, 1-E).
       (let* ((scale (if (< e 1) (ash 1 (- 1 e)) 1))
              (u (* (1+ (* 2 f)) (if (> e 1) (ash 1 (- e 1)) 1)))
+             ;; Starting estimate, refined exactly below: log10(2) is about
+             ;; 1233/4096. (Integer arithmetic, so no float math happens
+             ;; while cross-compiling.)
              (k (max 0 (1- (floor (* (- (integer-length u) (integer-length scale))
-                                     #.(log 2d0 10d0)))))))
+                                     1233)
+                                  4096)))))
         (loop while (< (* (pow10 k) scale) u) do (incf k))
         (loop while (and (> k 0) (>= (* (pow10 (1- k)) scale) u)) do (decf k))
         ;; 2 * value + 10^(K-POSITION) < 2 * 10^K, all times
