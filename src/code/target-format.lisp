@@ -591,11 +591,21 @@
     (t
      (sb-impl::string-dispatch (single-float double-float)
          number
-       (let ((spaceleft w))
+       (let ((spaceleft w)
+             ;; With a digit count, the number is usually laid out in this
+             ;; stack buffer instead of fresh strings (SB-IMPL::FLONUM-TO-BUFFER).
+             (buffer (make-string 64 :element-type 'base-char)))
+         (declare (dynamic-extent buffer))
          (when (and w (or atsign (float-sign-bit-set-p number)))
            (decf spaceleft))
          (multiple-value-bind (str len lpoint tpoint)
-             (sb-impl::flonum-to-string (abs number) spaceleft d k)
+             (multiple-value-bind (len lpoint tpoint)
+                 (and (typep d '(and fixnum unsigned-byte))
+                      (typep k '(or null fixnum))
+                      (sb-impl::flonum-to-buffer buffer (abs number) d k nil nil))
+               (if len
+                   (values buffer len lpoint tpoint)
+                   (sb-impl::flonum-to-string (abs number) spaceleft d k)))
            ;; if caller specifically requested no fraction digits, suppress the
            ;; optional trailing zero
            (when (and d (zerop d))
@@ -627,7 +637,7 @@
                         (write-char #\+ stream)))
                   (when lpoint
                     (write-char #\0 stream))
-                  (write-string str stream)
+                  (write-string str stream :end len)
                   (when tpoint
                     (write-char #\0 stream))
                   nil))))))))
@@ -799,10 +809,19 @@
       (let* ((signstr (if (float-sign-bit-set-p number)
                           "-"
                           (if atsign "+" "")))
-             (signlen (length signstr)))
+             (signlen (length signstr))
+             ;; Usually laid out in this stack buffer instead of a fresh
+             ;; string, as in FORMAT-FIXED-AUX.
+             (buffer (make-string 64 :element-type 'base-char)))
+        (declare (dynamic-extent buffer))
         (multiple-value-bind (str strlen ig2 ig3 pointplace)
-            (sb-impl::flonum-to-string (abs number) nil d nil)
-          (declare (ignore ig2 ig3 strlen))
+            (multiple-value-bind (len lpoint tpoint point)
+                (and (typep d '(and fixnum unsigned-byte))
+                     (sb-impl::flonum-to-buffer buffer (abs number) d nil nil nil))
+              (if len
+                  (values buffer len lpoint tpoint point)
+                  (sb-impl::flonum-to-string (abs number) nil d nil)))
+          (declare (ignore ig2 ig3))
           (when colon
             (write-string signstr stream))
           (dotimes (i (- w signlen (max n pointplace) 1 d))
@@ -811,7 +830,7 @@
             (write-string signstr stream))
           (dotimes (i (- n pointplace))
             (write-char #\0 stream))
-          (write-string str stream)))
+          (write-string str stream :end strlen)))
       (let ((*print-base* 10))
         (format-write-field stream
                             (princ-to-string number)
