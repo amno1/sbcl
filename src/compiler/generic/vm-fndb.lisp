@@ -858,3 +858,10 @@
 
 (defknown sb-vm::%weakvec-ref (weak-pointer index) t (flushable))
 (defknown sb-vm::%weakvec-set (weak-pointer index t) (values) ())
+
+;;; Store the 16 decimal digits of HI * 10^8 + LO (each below 10^8) as
+;;; characters into STRING starting at INDEX, and return a mask with
+;;; bit I set when digit I is nonzero. Used by the float printer.
+(defknown sb-impl::%zmij-store-digits
+    (simple-base-string index (unsigned-byte 32) (unsigned-byte 32))
+    (unsigned-byte 16) ())

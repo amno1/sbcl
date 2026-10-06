@@ -1625,6 +1625,12 @@ variable: an unreadable object representing the error is printed instead.")
                           prologue-fun
                           epilogue-fun
                           float &optional position relativep)
+  #+64-bit
+  (when (and (not position)
+             (typep float '(or single-float double-float))
+             (not (zerop float)))
+    (return-from %flonum-to-digits
+      (zmij-digits char-fun prologue-fun epilogue-fun float)))
   (let ((print-base 10)                 ; B
         (float-radix 2)                 ; b
         (float-digits (float-digits float)) ; p
@@ -1762,6 +1768,13 @@ variable: an unreadable object representing the error is printed instead.")
                 (scale r s m+ m-))))))))
 
 (defun flonum-to-digits (float &optional position relativep)
+  #+64-bit
+  (when (and (not position)
+             (typep float '(or single-float double-float))
+             (not (zerop float)))
+    (return-from flonum-to-digits
+      (with-zmij-digit-string (buffer start end k) float
+        (values k (subseq buffer start end)))))
   (if (zerop float)
       (values 0 "0")
       (let ((digit-characters "0123456789"))
@@ -1773,7 +1786,42 @@ variable: an unreadable object representing the error is printed instead.")
            (lambda (k) (values k (get-pushed-string)))
            float position relativep)))))
 
+#+64-bit
+(defun print-float/zmij (float stream)
+  (declare (type (or single-float double-float) float))
+  (with-zmij-digit-string (buffer start end k) float
+    (let ((n (- end start)))
+      (cond ((not (< -3 k 8))
+             ;; d.ddd, then the exponent
+             (write-char (schar buffer start) stream)
+             (write-char #\. stream)
+             (if (> n 1)
+                 (write-string buffer stream :start (1+ start) :end end)
+                 (write-char #\0 stream))
+             (print-float-exponent float (1- k) stream))
+            ((plusp k)
+             (cond ((< k n)
+                    ;; ddd.ddd
+                    (write-string buffer stream :start start :end (+ start k))
+                    (write-char #\. stream)
+                    (write-string buffer stream :start (+ start k) :end end))
+                   (t
+                    ;; ddd000.0
+                    (write-string buffer stream :start start :end end)
+                    (loop repeat (- k n) do (write-char #\0 stream))
+                    (write-string ".0" stream)))
+             (print-float-exponent float 0 stream))
+            (t
+             ;; 0.000ddd
+             (write-string "0." stream)
+             (loop repeat (- k) do (write-char #\0 stream))
+             (write-string buffer stream :start start :end end)
+             (print-float-exponent float 0 stream))))))
+
 (defun print-float (float stream)
+  #+64-bit
+  (when (typep float '(or single-float double-float))
+    (return-from print-float (print-float/zmij float stream)))
   (let ((position 0)
         (dot-position 0)
         (digit-characters "0123456789")
