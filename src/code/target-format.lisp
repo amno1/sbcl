@@ -696,9 +696,23 @@
       (let* ((num (abs number))
              (num-expt (sb-impl::flonum-exponent num))
              (expt (- num-expt k))
-             (estr (decimal-string (abs expt)))
-             (elen (if e (max (length estr) e) (length estr)))
+             ;; The exponent's digits, usually in a small stack buffer
+             ;; instead of a string from DECIMAL-STRING.
+             (ebuffer (make-string 20 :element-type 'base-char))
+             (estr ebuffer)
+             (estr-len (let ((a (abs expt)))
+                         (if (typep a '(unsigned-byte 62))
+                             (let ((n (do ((n 1 (1+ n))
+                                           (p 10 (* p 10)))
+                                          ((< a p) n))))
+                               (sb-impl::write-decimal-digits a n ebuffer 0)
+                               n)
+                             (length (setq estr (decimal-string a))))))
+             (elen (if e (max estr-len e) estr-len))
+             ;; The significand, usually laid out here (see FORMAT-FIXED-AUX).
+             (buffer (make-string 64 :element-type 'base-char))
              spaceleft)
+        (declare (dynamic-extent ebuffer buffer))
         (when w
           (setf spaceleft (- w 2 elen))
           (when (or atsign (float-sign-bit-set-p number))
@@ -708,7 +722,15 @@
             (let* ((fdig (if d (if (plusp k) (1+ (- d k)) d) nil))
                    (fmin (if (minusp k) 1 fdig)))
               (multiple-value-bind (fstr flen lpoint tpoint)
-                  (sb-impl::flonum-to-string num spaceleft fdig k fmin num-expt)
+                  (multiple-value-bind (len lpoint tpoint)
+                      (and (typep fdig '(and fixnum unsigned-byte))
+                           (typep k 'fixnum)
+                           (typep fmin '(or null fixnum))
+                           (typep num-expt 'fixnum)
+                           (sb-impl::flonum-to-buffer buffer num fdig k fmin num-expt))
+                    (if len
+                        (values buffer len lpoint tpoint)
+                        (sb-impl::flonum-to-string num spaceleft fdig k fmin num-expt)))
                 (when (eql fdig 0) (setq tpoint nil))
                 (when w
                   (decf spaceleft flen)
@@ -729,7 +751,7 @@
                              (write-char #\- stream)
                              (if atsign (write-char #\+ stream)))
                          (when lpoint (write-char #\0 stream))
-                         (write-string fstr stream)
+                         (write-string fstr stream :end flen)
                          (when tpoint (write-char #\0 stream))
                          (write-char (if marker
                                          marker
@@ -738,9 +760,9 @@
                          (write-char (if (minusp expt) #\- #\+) stream)
                          (when e
                            ;;zero-fill before exponent if necessary
-                           (dotimes (i (- e (length estr)))
+                           (dotimes (i (- e estr-len))
                              (write-char #\0 stream)))
-                         (write-string estr stream)))))))))
+                         (write-string estr stream :end estr-len)))))))))
 
 (def-format-interpreter #\G (colonp atsignp params)
   (check-modifier "colon" colonp)
