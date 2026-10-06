@@ -212,6 +212,20 @@ variable: an unreadable object representing the error is printed instead.")
                (setf (%array-fill-pointer string)
                      (finite-base-string-output-stream-pointer stream))
                string)))))
+    ;; Finite nonzero floats, unless a pprint dispatch entry applies:
+    ;; build the string directly, without a string output stream.
+    ;; (PRINT-OBJECT methods on floats are not allowed, CLHS 11.1.2.1.2.)
+    #+64-bit
+    ((or single-float double-float)
+     (if (or (float-infinity-or-nan-p object)
+             (zerop object)
+             (and *print-pretty* (nth-value 1 (pprint-dispatch object))))
+         (%with-output-to-string (stream)
+           (output-object object stream))
+         (let ((out (make-string +zmij-float-chars-length+
+                                 :element-type 'base-char)))
+           (declare (dynamic-extent out))
+           (subseq out 0 (zmij-float-chars object out t)))))
     ;; Could do something for other numeric types, symbols, ...
     (t
      (%with-output-to-string (stream)
@@ -1786,20 +1800,20 @@ variable: an unreadable object representing the error is printed instead.")
            (lambda (k) (values k (get-pushed-string)))
            float position relativep)))))
 
-;;; Print FLOAT (finite, nonzero, sign already written) like PRINT-FLOAT,
-;;; but assemble the digits, decimal point, padding zeros and exponent
-;;; in one stack buffer and output it with a single WRITE-STRING.
-;;; The longest output is 0.00 plus 17 digits, or d. plus 16 digits,
-;;; a marker, a sign and three exponent digits: 24 characters.
+;;; Write the printed representation of FLOAT (finite and nonzero) into
+;;; OUT, as PRINT-FLOAT would print it, preceded by a minus sign when
+;;; SIGN is true and FLOAT is negative. Return the number of characters.
+;;; The longest output is -0.00 plus 17 digits, or -d. plus 16 digits, a
+;;; marker, a sign and three exponent digits: 24 characters.
 #+64-bit
-(defun print-float/zmij (float stream)
-  (declare (type (or single-float double-float) float))
+(progn
+(defun zmij-float-chars (float out sign)
+  (declare (type (or single-float double-float) float)
+           (type (simple-base-string 24) out))
   (with-zmij-digit-string (digits start end k) float
-    (let ((out (make-string 24 :element-type 'base-char))
-          (p 0)
+    (let ((p 0)
           (n (- end start)))
-      (declare (dynamic-extent out)
-               (type (integer 0 24) p))
+      (declare (type (integer 0 24) p))
       (macrolet ((put (char)
                    `(progn (setf (schar out p) ,char) (incf p)))
                  ;; At most 17 characters: an inline loop beats REPLACE's
@@ -1811,6 +1825,8 @@ variable: an unreadable object representing the error is printed instead.")
                    `(loop repeat ,count do (put #\0)))
                  (put-digit (d)
                    `(put (code-char (+ (char-code #\0) ,d)))))
+        (when (and sign (minusp (float-sign float)))
+          (put #\-))
         (let ((exponent
                 (cond ((not (< -3 k 8))
                        ;; d.ddd, then the exponent
@@ -1861,7 +1877,14 @@ variable: an unreadable object representing the error is printed instead.")
                   (when (or (plusp hundreds) (plusp tens))
                     (put-digit tens))
                   (put-digit ones)))))
-          (write-string out stream :end p))))))
+          p)))))
+
+;;; PRINT-FLOAT for a finite, nonzero FLOAT whose sign is already written.
+(defun print-float/zmij (float stream)
+  (declare (type (or single-float double-float) float))
+  (let ((out (make-string +zmij-float-chars-length+ :element-type 'base-char)))
+    (declare (dynamic-extent out))
+    (write-string out stream :end (zmij-float-chars float out nil)))))
 
 (defun print-float (float stream)
   #+64-bit

@@ -333,6 +333,10 @@
         (store (zmij-bcd8 lo) 8))
       mask)))
 
+;;; Length of a ZMIJ-FLOAT-CHARS buffer (see print.lisp): the longest
+;;; printed float, e.g. -1.2345678901234567d-308.
+(defconstant +zmij-float-chars-length+ 24)
+
 ;;; Length of a ZMIJ-DIGIT-STRING buffer.
 (defconstant +zmij-buffer-length+ 18)
 
