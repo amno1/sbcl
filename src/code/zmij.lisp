@@ -181,8 +181,10 @@
                 (half-ulp (ash pow10-hi (- shift 7)))
                 (round-up (> half-ulp (logxor #xFFFFFFFFFFFFFFFF fractional)))
                 (round-down (> (ash half-ulp -1) fractional))
+                ;; Bias 2^63 rounds an exact tie up, as SBCL always has;
+                ;; upstream zmij uses 2^63 - 1, rounding it down.
                 (digit (truly-the zmij-digit
-                                  (zmij-mul-add-hi fractional 10 (1- (ash 1 63)))))
+                                  (zmij-mul-add-hi fractional 10 (ash 1 63))))
                 (lo (truly-the zmij-digit
                                (zmij-mul-add-hi
                                 (logand (- fractional (ash half-ulp -1))
@@ -229,7 +231,10 @@
           (values (truly-the (integer 0 10000000000000000)
                              (+ integral (if round-up 1 0)))
                   (truly-the zmij-dec-exp dec-exp)
-                  (if (= fractional (ash 1 62)) 2 digit) ; round 2.5 to 2
+                  ;; An exact tie (fractional = 1/4, digit 2.5) rounds up
+                  ;; to 3, as SBCL always has; upstream zmij rounds it to
+                  ;; even (2) instead.
+                  digit
                   (not (or round-up round-down))))))))
 
 (defun zmij-float-regular (bin-sig raw-exp)
@@ -252,7 +257,8 @@
          (digit (ash (+ (* fractional 10) (ash 1 33)) -34)))
     (values (truly-the (integer 0 100000000) (+ integral (if round-up 1 0)))
             (truly-the zmij-dec-exp dec-exp)
-            (if (= fractional (ash 1 32)) 2 (truly-the zmij-digit digit))
+            ;; Ties round up, as in ZMIJ-DOUBLE-REGULAR.
+            (truly-the zmij-digit digit)
             (not (or round-up round-down)))))
 
 (declaim (inline zmij-decimal))
