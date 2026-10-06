@@ -579,6 +579,44 @@
      (let ((*print-base* 10))
       (format-princ stream number nil nil w 1 0 pad)))))
 
+;;; The pieces of ~F output for a finite single or double float: return
+;;; (values SPACELEFT STR LEN LPOINT TPOINT). The output is SPACELEFT pad
+;;; characters (none if W is NIL), the sign, "0" if LPOINT, the first LEN
+;;; characters of STR, and "0" if TPOINT; it overflows if W is given and
+;;; SPACELEFT is negative. STR is often BUFFER, a 64-character base
+;;; string that the caller provides (usually on the stack).
+(declaim (inline format-fixed-pieces))
+(defun format-fixed-pieces (number w d k atsign buffer)
+  (declare (type (or single-float double-float) number))
+  (let ((spaceleft w))
+    (when (and w (or atsign (float-sign-bit-set-p number)))
+      (decf spaceleft))
+    (multiple-value-bind (str len lpoint tpoint)
+        (multiple-value-bind (len lpoint tpoint)
+            (and (typep d '(and fixnum unsigned-byte))
+                 (typep k '(or null fixnum))
+                 (sb-impl::flonum-to-buffer buffer (abs number) d k nil nil))
+          (if len
+              (values buffer len lpoint tpoint)
+              (sb-impl::flonum-to-string (abs number) spaceleft d k)))
+      ;; if caller specifically requested no fraction digits, suppress the
+      ;; optional trailing zero
+      (when (and d (zerop d))
+        (setq tpoint nil))
+      (when w
+        (decf spaceleft len)
+        ;; optional leading zero
+        (when lpoint
+          (if (or (> spaceleft 0) tpoint) ;force at least one digit
+              (decf spaceleft)
+              (setq lpoint nil)))
+        ;; optional trailing zero
+        (when tpoint
+          (if (> spaceleft 0)
+              (decf spaceleft)
+              (setq tpoint nil))))
+      (values spaceleft str len lpoint tpoint))))
+
 ;;; We return true if we overflowed, so that ~G can output the overflow char
 ;;; instead of spaces.
 (defun format-fixed-aux (stream number w d k ovf pad atsign)
@@ -591,37 +629,10 @@
     (t
      (sb-impl::string-dispatch (single-float double-float)
          number
-       (let ((spaceleft w)
-             ;; With a digit count, the number is usually laid out in this
-             ;; stack buffer instead of fresh strings (SB-IMPL::FLONUM-TO-BUFFER).
-             (buffer (make-string 64 :element-type 'base-char)))
+       (let ((buffer (make-string 64 :element-type 'base-char)))
          (declare (dynamic-extent buffer))
-         (when (and w (or atsign (float-sign-bit-set-p number)))
-           (decf spaceleft))
-         (multiple-value-bind (str len lpoint tpoint)
-             (multiple-value-bind (len lpoint tpoint)
-                 (and (typep d '(and fixnum unsigned-byte))
-                      (typep k '(or null fixnum))
-                      (sb-impl::flonum-to-buffer buffer (abs number) d k nil nil))
-               (if len
-                   (values buffer len lpoint tpoint)
-                   (sb-impl::flonum-to-string (abs number) spaceleft d k)))
-           ;; if caller specifically requested no fraction digits, suppress the
-           ;; optional trailing zero
-           (when (and d (zerop d))
-             (setq tpoint nil))
-           (when w
-             (decf spaceleft len)
-             ;; optional leading zero
-             (when lpoint
-               (if (or (> spaceleft 0) tpoint) ;force at least one digit
-                   (decf spaceleft)
-                   (setq lpoint nil)))
-             ;; optional trailing zero
-             (when tpoint
-               (if (> spaceleft 0)
-                   (decf spaceleft)
-                   (setq tpoint nil))))
+         (multiple-value-bind (spaceleft str len lpoint tpoint)
+             (format-fixed-pieces number w d k atsign buffer)
            (cond ((and w (< spaceleft 0) ovf)
                   ;; field width overflow
                   (dotimes (i w)
@@ -641,6 +652,53 @@
                   (when tpoint
                     (write-char #\0 stream))
                   nil))))))))
+
+;;; (FORMAT NIL "~w,d,k,ovf,padF" NUMBER) without a string output stream,
+;;; for control strings that are just one ~F directive (see the FORMAT
+;;; transform in srctran.lisp). Finite single and double floats are built
+;;; directly from FORMAT-FIXED-PIECES; anything else goes through
+;;; FORMAT-FIXED.
+(defun format-fixed-string (number w d k ovf pad atsign)
+  (typecase number
+    ((or single-float double-float)
+     (if (or (float-infinity-p number) (float-nan-p number))
+         (%with-output-to-string (stream)
+           (format-fixed stream number w d k ovf pad atsign))
+         (let ((buffer (make-string 64 :element-type 'base-char)))
+           (declare (dynamic-extent buffer))
+           (multiple-value-bind (spaceleft str len lpoint tpoint)
+               (format-fixed-pieces number w d k atsign buffer)
+             (if (and w (< spaceleft 0) ovf)
+                 (make-string w :initial-element ovf)
+                 (let* ((pads (if w (max spaceleft 0) 0))
+                        (sign (cond ((float-sign-bit-set-p number) #\-)
+                                    (atsign #\+)))
+                        (result (make-string (+ pads (if sign 1 0) (if lpoint 1 0)
+                                                len (if tpoint 1 0))
+                                             :initial-element pad))
+                        (i pads))
+                   (declare (type index i))
+                   (when sign
+                     (setf (char result i) sign)
+                     (incf i))
+                   (when lpoint
+                     (setf (char result i) #\0)
+                     (incf i))
+                   (sb-impl::string-dispatch (simple-base-string
+                                              (simple-array character (*))
+                                              string)
+                       str
+                     (dotimes (j len)
+                       (setf (char result i) (char str j))
+                       (incf i)))
+                   (when tpoint
+                     (setf (char result i) #\0))
+                   result))))))
+    (rational
+     (format-fixed-string (coerce number 'single-float) w d k ovf pad atsign))
+    (t
+     (%with-output-to-string (stream)
+       (format-fixed stream number w d k ovf pad atsign)))))
 
 (def-format-interpreter #\E (colonp atsignp params)
   (check-modifier "colon" colonp)
