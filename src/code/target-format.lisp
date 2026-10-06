@@ -791,18 +791,26 @@
   (if (or (float-infinity-p number)
           (float-nan-p number))
       (prin1 number stream)
-      (let* ((abs (abs number))
-             (n (sb-impl::flonum-exponent abs)))
-        ;; KLUDGE: Default d if omitted. The procedure is taken directly from
-        ;; the definition given in the manual, and is not very efficient, since
-        ;; we generate the digits twice. Future maintainers are encouraged to
-        ;; improve on this. -- rtoy?? 1998??
+      (let ((abs (abs number))
+            n shortest-length)
+        ;; N is the shortest digits' exponent. Without D, ~G also needs
+        ;; their printed length; zmij gives both at once for nonzero
+        ;; single and double floats.
+        #+64-bit
+        (when (and (null d)
+                   (typep abs '(or single-float double-float))
+                   (not (zerop abs)))
+          (setf (values n shortest-length)
+                (sb-impl::flonum-exponent-and-length abs)))
+        (unless n
+          (setq n (sb-impl::flonum-exponent abs)))
+        ;; Default d if omitted. The procedure is taken directly from the
+        ;; definition given in the manual.
         (unless d
-          (multiple-value-bind (str len)
-              (sb-impl::flonum-to-string abs)
-            (declare (ignore str))
-            (let ((q (if (= len 1) 1 (1- len))))
-              (setq d (max q (min n 7))))))
+          (let* ((len (or shortest-length
+                          (nth-value 1 (sb-impl::flonum-to-string abs))))
+                 (q (if (= len 1) 1 (1- len))))
+            (setq d (max q (min n 7)))))
         (let* ((ee (if e (+ e 2) 4))
                (ww (if w (- w ee) nil))
                (dd (- d n)))
