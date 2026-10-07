@@ -398,6 +398,10 @@
    "PARSE-NATIVE-NAMESTRING"
    "NATIVE-NAMESTRING"
 
+   ;; reading numbers
+
+   "PARSE-FLOAT"
+
    ;; external-format support
 
    "OCTETS-TO-STRING" "STRING-TO-OCTETS"
