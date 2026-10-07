@@ -2140,7 +2140,9 @@ float format."
         (declare (type index index digits-start digits-end)
                  (type (unsigned-byte 64) w)
                  (type (integer 0 19) significant)
-                 (type fixnum fraction-digits))
+                 (type fixnum fraction-digits)
+                 ;; Only the fast path, which is 64-bit only, uses these.
+                 (ignorable w long))
         (flet ((digit-at (i)
                  (and (< i end) (digit-char-p (char string i) 10))))
           (declare (inline digit-at))
@@ -2234,6 +2236,7 @@ float format."
                                (error 'simple-parse-error
                                       :format-control "can't represent the number in ~S as a ~S"
                                       :format-arguments (list string format)))))))))
+            (declare (ignorable double q)) ; used by the 64-bit fast path
             (values (if negative (- value) value)
                     (- index offset))))))))
 
