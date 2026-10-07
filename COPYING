@@ -17,9 +17,13 @@ the FreeBSD licence where not.
 
 The CityHash mix function as adapted in hopscotch.c has an MIT license.
 
+The Eisel-Lemire float parsing code in src/code/reader.lisp is adapted
+from fast_float (https://github.com/fastfloat/fast_float), which is
+available under an MIT license; its notice is included below.
+
 Thus, there are no known obstacles to copying, using, and modifying
-SBCL freely, as long as copyright notices of MIT, Symbolics, Xerox and
-Gerd Moellmann are retained.
+SBCL freely, as long as copyright notices of MIT, Symbolics, Xerox,
+Gerd Moellmann and the fast_float authors are retained.
 
 ================================================================================
 
@@ -121,3 +125,31 @@ Gerd Moellmann are retained.
 ;;; software is freely granted, provided that this notice
 ;;; is preserved.
 ;;; ====================================================
+
+================================================================================
+
+;;;; The Eisel-Lemire float parsing code in src/code/reader.lisp is adapted
+;;;; from fast_float:
+;;;;
+;;;; MIT License
+;;;;
+;;;; Copyright (c) 2021 The fast_float authors
+;;;;
+;;;; Permission is hereby granted, free of charge, to any person obtaining a
+;;;; copy of this software and associated documentation files (the
+;;;; "Software"), to deal in the Software without restriction, including
+;;;; without limitation the rights to use, copy, modify, merge, publish,
+;;;; distribute, sublicense, and/or sell copies of the Software, and to
+;;;; permit persons to whom the Software is furnished to do so, subject to
+;;;; the following conditions:
+;;;;
+;;;; The above copyright notice and this permission notice shall be included
+;;;; in all copies or substantial portions of the Software.
+;;;;
+;;;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;; OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+;;;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;; IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+;;;; CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+;;;; TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+;;;; SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
