@@ -1762,76 +1762,87 @@ extended <package-name>::<form-in-package> syntax."
 (declaim (type (simple-array (unsigned-byte 64) (1302)) *eisel-lemire-powers-of-five*))
 
 ;;; The bits of the float nearest to W * 10^Q (W a nonzero integer below
-;;; 10^19, Q in [-342, 308]), as an unsigned integer: a DOUBLE-FLOAT if
-;;; DOUBLE, else a SINGLE-FLOAT. NIL if the result overflows or underflows
-;;; to zero; the caller then uses the exact code, which handles those
-;;; cases. This is fast_float's compute_float.
-(declaim (inline decimal-to-float-bits))
-(defun decimal-to-float-bits (w q double)
-  (declare (type (unsigned-byte 64) w)
-           (type (integer -342 308) q))
-  (let* ((mantissa-bits (if double 52 23))
-         (minimum-exponent (if double -1023 -127))
-         (infinite-power (if double #x7FF #xFF))
-         (lz (- 64 (integer-length w)))
-         (w (logand (ash w lz) #xFFFFFFFFFFFFFFFF))
-         (index (* 2 (+ q 342)))
-         (table *eisel-lemire-powers-of-five*))
-    (declare (type (integer 0 63) lz))
-    (multiple-value-bind (hi lo) (sb-bignum:%multiply w (aref table index))
-      (declare (type (unsigned-byte 64) hi lo))
-      ;; Only when the low bits that decide the result are all ones can
-      ;; the second half of the 128-bit power change them.
-      (let ((precision-mask (ash #xFFFFFFFFFFFFFFFF (- (+ mantissa-bits 3)))))
-        (when (= (logand hi precision-mask) precision-mask)
-          (let ((hi2 (values (sb-bignum:%multiply w (aref table (1+ index))))))
-            (declare (type (unsigned-byte 64) hi2))
-            (setq lo (logand (+ lo hi2) #xFFFFFFFFFFFFFFFF))
-            (when (> hi2 lo)
-              (setq hi (logand (1+ hi) #xFFFFFFFFFFFFFFFF))))))
-      (let* ((upperbit (ash hi -63))
-             (shift (+ upperbit 64 (- mantissa-bits) -3))
-             (mantissa (ash hi (- shift)))
-             (power2 (+ (ash (* (+ 152170 65536) q) -16) 63 upperbit (- lz)
-                        (- minimum-exponent))))
-        (declare (type (unsigned-byte 64) mantissa)
-                 (type fixnum power2))
-        (when (<= power2 0)
-          ;; Subnormal, or zero.
-          (let ((subnormal-shift (1+ (- power2))))
-            (when (>= subnormal-shift 64)
-              (return-from decimal-to-float-bits nil))
-            (setq mantissa (ash mantissa (- subnormal-shift)))
-            (setq mantissa (ash (+ mantissa (logand mantissa 1)) -1))
-            (when (zerop mantissa)
-              (return-from decimal-to-float-bits nil))
-            ;; Rounding may have carried into the smallest normal.
-            (return-from decimal-to-float-bits
-              (logior (ash (if (< mantissa (ash 1 mantissa-bits)) 0 1)
-                           mantissa-bits)
-                      mantissa))))
-        ;; Exactly halfway between two floats, with an even lower one:
-        ;; round down. Only possible where 5^Q fits in 64 bits.
-        (and (<= lo 1)
-             (if double
-                 (<= -4 q 23)
-                 (<= -17 q 10))
-             (= (logand mantissa 3) 1)
-             (= (logand (ash mantissa shift) #xFFFFFFFFFFFFFFFF) hi)
-             (setq mantissa (logandc2 mantissa 1)))
-        (setq mantissa (ash (+ mantissa (logand mantissa 1)) -1))
-        (when (>= mantissa (ash 2 mantissa-bits))
-          (setq mantissa (ash 1 mantissa-bits))
-          (incf power2))
-        (setq mantissa (logandc2 mantissa (ash 1 mantissa-bits)))
-        (when (>= power2 infinite-power)
-          (return-from decimal-to-float-bits nil))
-        (logior (ash power2 mantissa-bits) mantissa)))))
+;;; 10^19, Q in [-342, 308]), as an unsigned integer: a DOUBLE-FLOAT for
+;;; DECIMAL-TO-DOUBLE-BITS, a SINGLE-FLOAT for DECIMAL-TO-SINGLE-BITS. NIL
+;;; if the result overflows or underflows to zero; the caller then uses
+;;; the exact code, which handles those cases. This is fast_float's
+;;; compute_float. The two functions are made from one template with the
+;;; format's constants written in, rather than one function taking the
+;;; format as an argument, so that the generated code does not depend on
+;;; how far the compiler propagates that argument (which differs between
+;;; cross-compilation hosts).
+(macrolet ((def (name mantissa-bits minimum-exponent infinite-power
+                 round-to-even-min round-to-even-max)
+             `(progn
+                (declaim (inline ,name))
+                (defun ,name (w q)
+                  (declare (type (unsigned-byte 64) w)
+                           (type (integer -342 308) q))
+                  (let* ((lz (- 64 (integer-length w)))
+                         (w (logand (ash w lz) #xFFFFFFFFFFFFFFFF))
+                         (index (* 2 (+ q 342)))
+                         (table *eisel-lemire-powers-of-five*))
+                    (declare (type (integer 0 63) lz))
+                    (multiple-value-bind (hi lo) (sb-bignum:%multiply w (aref table index))
+                      (declare (type (unsigned-byte 64) hi lo))
+                      ;; Only when the low bits that decide the result are all
+                      ;; ones can the second half of the 128-bit power change
+                      ;; them.
+                      (let ((precision-mask ,(ash #xFFFFFFFFFFFFFFFF
+                                                  (- (+ mantissa-bits 3)))))
+                        (when (= (logand hi precision-mask) precision-mask)
+                          (let ((hi2 (values (sb-bignum:%multiply
+                                              w (aref table (1+ index))))))
+                            (declare (type (unsigned-byte 64) hi2))
+                            (setq lo (logand (+ lo hi2) #xFFFFFFFFFFFFFFFF))
+                            (when (> hi2 lo)
+                              (setq hi (logand (1+ hi) #xFFFFFFFFFFFFFFFF))))))
+                      (let* ((upperbit (ash hi -63))
+                             (shift (+ upperbit ,(- 64 mantissa-bits 3)))
+                             (mantissa (ash hi (- shift)))
+                             (power2 (+ (ash (* (+ 152170 65536) q) -16) 63 upperbit
+                                        (- lz) ,(- minimum-exponent))))
+                        (declare (type (unsigned-byte 64) mantissa)
+                                 (type fixnum power2))
+                        (when (<= power2 0)
+                          ;; Subnormal, or zero.
+                          (let ((subnormal-shift (1+ (- power2))))
+                            (when (>= subnormal-shift 64)
+                              (return-from ,name nil))
+                            (setq mantissa (ash mantissa (- subnormal-shift)))
+                            (setq mantissa (ash (+ mantissa (logand mantissa 1)) -1))
+                            (when (zerop mantissa)
+                              (return-from ,name nil))
+                            ;; Rounding may have carried into the smallest
+                            ;; normal.
+                            (return-from ,name
+                              (logior (ash (if (< mantissa ,(ash 1 mantissa-bits)) 0 1)
+                                           ,mantissa-bits)
+                                      mantissa))))
+                        ;; Exactly halfway between two floats, with an even
+                        ;; lower one: round down. Only possible where 5^Q fits
+                        ;; in 64 bits.
+                        (and (<= lo 1)
+                             (<= ,round-to-even-min q ,round-to-even-max)
+                             (= (logand mantissa 3) 1)
+                             (= (logand (ash mantissa shift) #xFFFFFFFFFFFFFFFF) hi)
+                             (setq mantissa (logandc2 mantissa 1)))
+                        (setq mantissa (ash (+ mantissa (logand mantissa 1)) -1))
+                        (when (>= mantissa ,(ash 2 mantissa-bits))
+                          (setq mantissa ,(ash 1 mantissa-bits))
+                          (incf power2))
+                        (setq mantissa (logandc2 mantissa ,(ash 1 mantissa-bits)))
+                        (when (>= power2 ,infinite-power)
+                          (return-from ,name nil))
+                        (logior (ash power2 ,mantissa-bits) mantissa))))))))
+  (def decimal-to-double-bits 52 -1023 #x7FF -4 23)
+  (def decimal-to-single-bits 23 -127 #xFF -17 10))
 
 ;;; The float nearest to W * 10^Q (W below 10^19), a DOUBLE-FLOAT if DOUBLE
 ;;; else a SINGLE-FLOAT, or NIL if Q is out of range or the result
-;;; overflows or underflows to zero (cases for the exact code).
-(declaim (inline decimal-to-float))
+;;; overflows or underflows to zero (cases for the exact code). Not inline:
+;;; compiled once, the code does not depend on whether callers' constant
+;;; DOUBLE arguments get folded.
 (defun decimal-to-float (w q double)
   (declare (type (unsigned-byte 64) w)
            (type fixnum q))
@@ -1839,17 +1850,15 @@ extended <package-name>::<form-in-package> syntax."
          (if double 0d0 0f0))
         ((not (<= -342 q 308))
          nil)
-        ;; Two calls with a constant DOUBLE, so that each inlined copy of
-        ;; DECIMAL-TO-FLOAT-BITS is compiled for one format.
         (double
-         (let ((bits (decimal-to-float-bits w q t)))
+         (let ((bits (decimal-to-double-bits w q)))
            ;; The sign bit is clear, so the high word fits
            ;; MAKE-DOUBLE-FLOAT's signed argument.
            (and bits
                 (sb-kernel:make-double-float (ash bits -32)
                                              (ldb (byte 32 0) bits)))))
         (t
-         (let ((bits (decimal-to-float-bits w q nil)))
+         (let ((bits (decimal-to-single-bits w q)))
            (and bits (sb-kernel:make-single-float bits))))))
 
 ;;; The float in the token buffer BUF, or NIL if the fast path does not
