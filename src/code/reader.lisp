@@ -1900,16 +1900,20 @@ extended <package-name>::<form-in-package> syntax."
                        (if double 0d0 0f0))
                       ((not (<= -342 q 308))
                        (return-from make-float/fast nil))
-                      (t
-                       (let ((bits (decimal-to-float-bits w q double)))
-                         (unless bits
-                           (return-from make-float/fast nil))
+                      ;; Two calls with a constant DOUBLE, so that each
+                      ;; inlined copy of DECIMAL-TO-FLOAT-BITS is compiled
+                      ;; for one format.
+                      (double
+                       (let ((bits (or (decimal-to-float-bits w q t)
+                                       (return-from make-float/fast nil))))
                          ;; The sign bit is clear, so the high word fits
                          ;; MAKE-DOUBLE-FLOAT's signed argument.
-                         (if double
-                             (sb-kernel:make-double-float (ash bits -32)
-                                                          (ldb (byte 32 0) bits))
-                             (sb-kernel:make-single-float bits)))))))
+                         (sb-kernel:make-double-float (ash bits -32)
+                                                      (ldb (byte 32 0) bits))))
+                      (t
+                       (sb-kernel:make-single-float
+                        (or (decimal-to-float-bits w q nil)
+                            (return-from make-float/fast nil)))))))
           (if negative (- value) value))))))
 )
 
