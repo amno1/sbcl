@@ -1060,10 +1060,10 @@
           diff)
     (move result diff)))
 
-;;; SSE2 conversion of two 8-digit numbers to 16 ASCII digits, after
-;;; zmij (https://github.com/vitaut/zmij). SSE2 is part of the x86-64
-;;; baseline, so no CPU dispatch is needed; 16 digits fit one XMM
-;;; register, so wider vectors would not help.
+;;; SSE2 conversion of two 8-digit numbers to 16 ASCII digits, adapted
+;;; from zmij (https://github.com/vitaut/zmij, MIT license, see COPYING).
+;;; SSE2 is part of the x86-64 baseline, so no CPU dispatch is needed; 16
+;;; digits fit one XMM register, so wider vectors would not help.
 (define-vop (zmij-store-digits)
   (:translate sb-impl::%zmij-store-digits)
   (:policy :fast-safe)

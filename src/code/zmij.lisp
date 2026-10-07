@@ -5,7 +5,8 @@
 ;;;; more information.
 ;;;;
 ;;;; A port of Victor Zverovich's C implementation from
-;;;; https://github.com/vitaut/zmij, MIT license
+;;;; https://github.com/vitaut/zmij, Copyright (c) 2025 Victor Zverovich,
+;;;; used under its MIT license (see COPYING).
 ;;;;
 ;;;; For details on the algorithm see
 ;;;; https://vitaut.net/posts/2025/faster-dtoa/
