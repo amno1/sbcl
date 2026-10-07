@@ -1726,9 +1726,10 @@ extended <package-name>::<form-in-package> syntax."
         (min exponent (floor (- max-exponent magnitude)
                              #.(cl:floor (cl:log 10 2)))))))
 
-;;;; Fast path for MAKE-FLOAT: the Eisel-Lemire algorithm, after Daniel
-;;;; Lemire's fast_float (https://github.com/fastfloat/fast_float, MIT,
-;;;; Apache-2.0 or BSL-1.0). With at most 19 significant decimal digits it
+;;;; Fast path for MAKE-FLOAT: the Eisel-Lemire algorithm, adapted from
+;;;; Daniel Lemire's fast_float (https://github.com/fastfloat/fast_float),
+;;;; Copyright (c) 2021 The fast_float authors, used under its MIT license
+;;;; (see COPYING). With at most 19 significant decimal digits it
 ;;;; gives the correctly rounded single or double float from one 64x128-bit
 ;;;; multiplication (Mushtak and Lemire, "Fast Number Parsing Without
 ;;;; Fallback"). Everything else uses the exact rational code below.
@@ -1809,12 +1810,11 @@ extended <package-name>::<form-in-package> syntax."
                             (setq mantissa (ash (+ mantissa (logand mantissa 1)) -1))
                             (when (zerop mantissa)
                               (return-from ,name nil))
-                            ;; Rounding may have carried into the smallest
-                            ;; normal.
-                            (return-from ,name
-                              (logior (ash (if (< mantissa ,(ash 1 mantissa-bits)) 0 1)
-                                           ,mantissa-bits)
-                                      mantissa))))
+                            ;; MANTISSA is the result's bits: below 2^MANTISSA-BITS
+                            ;; a subnormal, or, if rounding carried into the
+                            ;; smallest normal, exactly 2^MANTISSA-BITS, whose
+                            ;; set bit is that normal's exponent of 1.
+                            (return-from ,name mantissa)))
                         ;; Exactly halfway between two floats, with an even
                         ;; lower one: round down. Only possible where 5^Q fits
                         ;; in 64 bits.
