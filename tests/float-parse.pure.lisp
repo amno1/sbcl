@@ -16,7 +16,23 @@
 ;;; the fast path (exact rational arithmetic), so it checks that results
 ;;; are unchanged. Floats are given as bit patterns: (:D high-bits
 ;;; low-bits) for a double, (:S bits) for a single; :ERROR means the
-;;; number does not fit the float format.
+;;; number does not fit the float format. Such a number signals an error
+;;; where the floating-point overflow trap is enabled, and gives an
+;;; infinity where it is not (e.g. on ARM), with or without the fast path;
+;;; FLOAT-PARSE-OVERFLOW-OK accepts both.
+
+(defun float-parse-overflow-ok (got)
+  (or (eq got :error)
+      (and (consp got)
+           (sb-ext:float-infinity-p
+            (if (eq (car got) :d)
+                (sb-kernel:make-double-float (second got) (third got))
+                (sb-kernel:make-single-float (second got)))))))
+
+(defun float-parse-matches (got expected)
+  (if (eq expected :error)
+      (float-parse-overflow-ok got)
+      (equal got expected)))
 
 (defun float-parse-test-value (spec)
   (ecase (car spec)
@@ -539,7 +555,7 @@
         do (let* ((*read-default-float-format* format)
                   (got (handler-case (float-parse-bits (read-from-string string))
                          (reader-error () :error))))
-             (assert (equal got expected)))))
+             (assert (float-parse-matches got expected)))))
 
 (with-test (:name (:float-parse sb-ext:parse-float :known-values))
   ;; The same values as the reader, a PARSE-ERROR where the reader
@@ -548,7 +564,7 @@
         do (let* ((*read-default-float-format* format)
                   (got (handler-case (float-parse-bits (sb-ext:parse-float string))
                          (parse-error () :error))))
-             (assert (equal got expected)))))
+             (assert (float-parse-matches got expected)))))
 
 (with-test (:name (:float-parse :round-trip))
   (let ((state (sb-ext:seed-random-state 11)))
@@ -579,11 +595,12 @@
                        (reader-error () :error)))
                (parsed (handler-case (float-parse-bits (sb-ext:parse-float string))
                          (parse-error () :error))))
-          (assert (equal read expected))
-          (assert (equal parsed expected)))))))
+          (assert (float-parse-matches read expected))
+          (assert (float-parse-matches parsed expected)))))))
 
 (with-test (:name (:float-parse sb-ext:parse-float :interface))
-  ;; (string arguments value index), or (string arguments :error).
+  ;; (string arguments value index), (string arguments :error), or
+  ;; (string arguments :overflow): an error or an infinity (see above).
   (let ((*read-default-float-format* 'single-float))
     (loop for (string args . expected)
             in '(("1.5" () 1.5 3) ("  1.5  " () 1.5 7) ("+1.5" () 1.5 4)
@@ -600,17 +617,20 @@
                  ("x" () :error) ("x" (:junk-allowed t) nil 0)
                  ("-" () :error) ("-" (:junk-allowed t) nil 1)
                  ("." () :error) ("1.2.3" () :error) ("1.2.3" (:junk-allowed t) 1.2 3)
-                 ("1d309" () :error) ("1e39" () :error)
+                 ("1d309" () :overflow) ("1e39" () :overflow)
                  ("x1.5y" (:start 1 :end 4) 1.5 4) ("x1.5y" (:start 1) :error)
                  ("x1.5y" (:start 1 :junk-allowed t) 1.5 4) ("1.5" (:end 1) 1.0 1)
                  ("  2.5" (:start 0 :end 5) 2.5 5))
           do (multiple-value-bind (value index)
                  (handler-case (apply #'sb-ext:parse-float string args)
                    (parse-error () (values :error nil)))
-               (if (eq (first expected) :error)
-                   (assert (eq value :error))
-                   (assert (and (eql value (first expected))
-                                (eql index (second expected)))))))))
+               (case (first expected)
+                 (:error (assert (eq value :error)))
+                 (:overflow (assert (or (eq value :error)
+                                        (and (floatp value)
+                                             (sb-ext:float-infinity-p value)))))
+                 (t (assert (and (eql value (first expected))
+                                 (eql index (second expected))))))))))
 
 (with-test (:name (:float-parse sb-ext:parse-float :non-simple-strings))
   (let ((*read-default-float-format* 'single-float)
