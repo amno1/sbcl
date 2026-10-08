@@ -362,7 +362,9 @@
 ;;; where tramps only get the assembly routine.
 (define-assembly-routine (update-object-layout
                           (:translate update-object-layout)
-                          (:return-style :raw))
+                          (:return-style :raw)
+                          ;; The routine's FPR save covers only xmm/ymm0-15
+                          #+sb-simd-pack-512 (:save-p :avx512))
     ((:arg x (descriptor-reg) (:lisp-reg 0))
      (:res r (descriptor-reg) (:lisp-reg 0)))
   (progn x r)
@@ -371,7 +373,9 @@
 
 (define-assembly-routine (sb-impl:install-hash-table-lock
                           (:translate sb-impl:install-hash-table-lock)
-                          (:return-style :raw))
+                          (:return-style :raw)
+                          ;; The routine's FPR save covers only xmm/ymm0-15
+                          #+sb-simd-pack-512 (:save-p :avx512))
     ((:arg x (descriptor-reg) (:lisp-reg 0))
      (:res r (descriptor-reg) (:lisp-reg 0)))
   (progn x r)
