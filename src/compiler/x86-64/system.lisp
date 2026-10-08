@@ -487,6 +487,8 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:temporary (:sc unsigned-reg :offset rsi-offset) rsi)
   (:vop-var vop)
   (:ignore rsi)
+  ;; The asm routine's FPR save covers only xmm/ymm0-15
+  #+sb-simd-pack-512 (:save-p :avx512)
   (:generator 1
     (inst mov rdi (if (sc-is x immediate) (tn-value x) x))
     ;; We could have the vop declare that all C volatile regs are clobbered,
