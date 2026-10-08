@@ -802,6 +802,21 @@
                        (setf (sbit saves num) 1)))))
                (setq restores-list nil)
                (clear-bit-vector restores))
+              #+sb-simd-pack-512
+              (:avx512
+               ;; As for T, but only AVX-512 TNs are clobbered
+               (setq restores-list
+                     (delete-if (lambda (tn)
+                                  (when (sb-vm::avx512-tn-p tn)
+                                    (when (tn-offset tn)
+                                      (restore-tn tn (vop-next vop) vop)
+                                      (let ((num (tn-number tn)))
+                                        (when (zerop (sbit saves num))
+                                          (push tn saves-list)
+                                          (setf (sbit saves num) 1))))
+                                    (setf (sbit restores (tn-number tn)) 0)
+                                    t))
+                                restores-list)))
               (:compute-only
                (cond ((policy (vop-node vop) (= speed 3))
                       (do-live-tns (tn (vop-save-set vop) block)
@@ -834,7 +849,8 @@
       (when (eq block head) (return))
       (when (do ((vop (ir2-block-start-vop block) (vop-next vop)))
                 ((null vop) nil)
-              (when (eq (vop-info-save-p (vop-info vop)) t)
+              (when (member (vop-info-save-p (vop-info vop))
+                            '(t #+sb-simd-pack-512 :avx512))
                 (return t)))
         (setq block (optimized-emit-saves-block block saves restores)))
       (setq block (ir2-block-prev block)))))
