@@ -1366,6 +1366,38 @@ variable: an unreadable object representing the error is printed instead.")
   `(with-lisp-string-on-alien-stack (,buffer ,size)
      ,@body))
 
+;;; Write the decimal digits of the word N to STREAM, without division
+;;; per digit: N is split into TOP * 10^16 + HI * 10^8 + LO (the divisions
+;;; by constants compile to multiplications), HI and LO are written as 16
+;;; digits at once by %ZMIJ-STORE-DIGITS, and its mask of nonzero digits
+;;; gives the leading zeros to skip. TOP, below 1845, takes at most four
+;;; digits in front.
+#+64-bit
+(defun %output-word-in-base-10 (n stream)
+  (declare (type word n))
+  (with-string-buffer (sb-vm:n-word-bits buffer)
+    (multiple-value-bind (top rest) (truncate n (expt 10 16))
+      (multiple-value-bind (hi lo) (truncate rest (expt 10 8))
+        (let* ((nonzero (%zmij-store-digits buffer 4 hi lo))
+               (start
+                 (cond ((plusp top)
+                        ;; TOP's digits go in front of the 16.
+                        (let ((start 4))
+                          (declare (type (integer 0 4) start))
+                          (loop (multiple-value-bind (q r) (truncate top 10)
+                                  (decf start)
+                                  (setf (schar buffer start)
+                                        (code-char (+ (char-code #\0) r)))
+                                  (when (zerop (setq top q)) (return start))))))
+                       ((zerop nonzero)
+                        ;; N is 0: just the last digit.
+                        19)
+                       (t
+                        ;; Skip the leading zeros: bit J of NONZERO is set
+                        ;; when digit J of the 16 is not 0.
+                        (+ 4 (1- (integer-length (logand nonzero (- nonzero)))))))))
+          (%write-string buffer stream start 20))))))
+
 ;;; Using specialized routines for the various cases seems to work nicely.
 ;;;
 ;;; Testing with 100,000 random integers, output to a sink stream, x86-64:
@@ -1394,7 +1426,10 @@ variable: an unreadable object representing the error is printed instead.")
                             (decf ptr)
                             (setf (aref buffer ptr) (schar chars r))
                             (when (zerop (setq integer q)) (return)))))))
-      (cond ((typep integer 'word) ; Division vops can handle this all inline.
+      (cond #+64-bit
+            ((and (= base 10) (typep integer 'word))
+             (%output-word-in-base-10 integer stream))
+            ((typep integer 'word) ; Division vops can handle this all inline.
              (with-string-buffer (sb-vm:n-word-bits buffer)
                (let ((ptr sb-vm:n-word-bits))
                  (iterative-algorithm integer)
