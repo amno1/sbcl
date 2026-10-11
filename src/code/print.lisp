@@ -1604,20 +1604,26 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; zeros, a point, RIGHT-ZEROS zeros, digits [RIGHT-START, RIGHT-END) and
 ;;; TRAILING-ZEROS zeros.
 (declaim (inline flonum-layout))
+;; more verbose than it could be, but doesn't do unnecessary computations
 (defun flonum-layout (e n fdigits fmin exponent-zero)
   (declare (type integer e) (type index n))
-  (if (or (and (= e 0) exponent-zero)
-          (plusp e))
-      ;; ddd[000].ddd[000]
-      (let ((split (min n e)))
-        (values split (max 0 (- e n)) 0 split n
-                (if fdigits (max 0 (- fdigits (- n split))) 0)))
-      ;; .[000]ddd[000]
-      (let ((end (if fdigits
-                     (min n (max (or fmin 0) (+ fdigits e)))
-                     n)))
-        (values 0 0 (max 0 (- e)) 0 end
-                (if fdigits (max 0 (+ fdigits e (- n))) 0)))))
+  (let ((integer-part (or (and (= e 0) exponent-zero) (plusp e))))
+    (cond ((null fdigits)
+           ;; All N digits, no padding.
+           (if integer-part
+               (let ((split (min n e)))
+                 (values split (max 0 (- e n)) 0 split n 0))
+               (values 0 0 (max 0 (- e)) 0 n 0)))
+          (integer-part
+           ;; ddd[000].ddd[000]
+           (let ((split (min n e)))
+             (values split (max 0 (- e n)) 0 split n
+                     (max 0 (- fdigits (- n split))))))
+          (t
+           ;; .[000]ddd[000]
+           (values 0 0 (max 0 (- e)) 0
+                   (min n (max (or fmin 0) (+ fdigits e)))
+                   (max 0 (+ fdigits e (- n))))))))
 
 (defun flonum-to-string (x &optional width fdigits scale fmin exponent-zero)
   (declare (type float x))
@@ -1633,7 +1639,8 @@ variable: an unreadable object representing the error is printed instead.")
                                           (max 1
                                                (+ (1- width)
                                                   (if (and scale (minusp scale))
-                                                      scale 0)))
+                                                      scale
+                                                      0)))
                                           t)))
                     (f (multiple-value-list
                         (flonum-to-digits x (- (+ (or fmin 0)
@@ -1847,6 +1854,7 @@ variable: an unreadable object representing the error is printed instead.")
                 (scale-p r s m+ m-)
                 (scale r s m+ m-))))))))
 
+;; Powers of ten that fit in 64 bits, indexed by exponent (explicit in zmij.c).
 (define-load-time-global +powers-of-ten-to-18+
   #.(coerce (loop for i from 0 to 18 collect (expt 10 i)) 'simple-vector))
 
@@ -2081,7 +2089,9 @@ variable: an unreadable object representing the error is printed instead.")
                  (typep position '(integer 1 #.most-positive-fixnum))))
     (multiple-value-bind (k string)
         (flonum-to-digits/position
-         float (if relativep (flonum-relative-position float position) position))
+         float (if relativep
+                   (flonum-relative-position float position)
+                   position))
       (when k
         (return-from flonum-to-digits (values k string)))))
   #+64-bit
