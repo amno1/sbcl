@@ -718,8 +718,11 @@
                  (let* ((pads (if w (max spaceleft 0) 0))
                         (sign (cond ((float-sign-bit-set-p number) #\-)
                                     (atsign #\+)))
-                        (result (make-string (+ pads (if sign 1 0) (if lpoint 1 0)
-                                                len (if tpoint 1 0))
+                        (result (make-string (+ pads
+                                                (if sign 1 0)
+                                                (if lpoint 1 0)
+                                                len
+                                                (if tpoint 1 0))
                                              :initial-element pad))
                         (i pads))
                    (declare (type index i))
@@ -829,7 +832,10 @@
         (decf spaceleft)))
     (if (and w ovf e (> elen e))  ;exponent overflow
         (emit-chars ovf w)
-        (let* ((fdig (if d (if (plusp k) (1+ (- d k)) d) nil))
+        (let* ((fdig (when d
+                       (if (plusp k)
+                           (1+ (- d k))
+                           d)))
                (fmin (if (minusp k) 1 fdig)))
           (multiple-value-bind (fstr flen lpoint tpoint)
               (multiple-value-bind (len lpoint tpoint)
