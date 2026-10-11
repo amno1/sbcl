@@ -1604,8 +1604,7 @@ variable: an unreadable object representing the error is printed instead.")
                                           (max 1
                                                (+ (1- width)
                                                   (if (and scale (minusp scale))
-                                                      scale
-                                                      0)))
+                                                      scale 0)))
                                           t)))
                     (f (multiple-value-list
                         (flonum-to-digits x (- (+ (or fmin 0)
