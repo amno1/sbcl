@@ -2151,102 +2151,105 @@ float format."
                  (type fixnum fraction-digits)
                  ;; Only the fast path, which is 64-bit only, uses these.
                  (ignorable w long))
-        (flet ((digit-at (i)
-                 (and (< i end) (digit-char-p (char string i) 10))))
-          (declare (inline digit-at))
-          (case (char string index)
-            (#\- (setq negative t) (incf index))
-            (#\+ (incf index)))
-          ;; The significand: digits with at most one point. W collects up
-          ;; to 19 significant digits; beyond that LONG is set, and the
-          ;; exact code reparses DIGITS-START to DIGITS-END.
-          (setq digits-start index)
-          (loop while (< index end)
-                do (let* ((char (char string index))
-                          (digit (digit-char-p char 10)))
-                     (cond (digit
-                            (setq found-digit t)
-                            (unless (and (zerop w) (zerop digit))
-                              (if (= significant 19)
-                                  (setq long t)
-                                  (setq w (+ (* w 10) digit)
-                                        significant (1+ significant))))
-                            (when dot
-                              (incf fraction-digits)))
-                           ((and (char= char #\.) (not dot))
-                            (setq dot t))
-                           (t (return))))
-                   (incf index))
-          (setq digits-end index)
-          (unless found-digit
-            (return-from parse-float
-              (if junk-allowed
-                  (values nil (- index offset))
-                  (parse-error "no digits in string ~S"))))
-          ;; The exponent: a marker, an optional sign and at least one
-          ;; digit. Without digits the marker is not part of the number.
-          (when (< index end)
-            (let ((marker-format (case (char-upcase (char string index))
-                                   (#\E *read-default-float-format*)
-                                   (#\S 'short-float)
-                                   (#\F 'single-float)
-                                   (#\D 'double-float)
-                                   (#\L 'long-float)))
-                  (i (1+ index))
-                  (exponent-negative nil))
-              (declare (type index i))
-              (when marker-format
-                (when (< i end)
-                  (case (char string i)
-                    (#\- (setq exponent-negative t) (incf i))
-                    (#\+ (incf i))))
-                (when (digit-at i)
-                  (loop for digit = (digit-at i)
-                        while digit
-                        do (setq exponent (+ (* exponent 10) digit))
-                           (incf i))
-                  (when exponent-negative
-                    (setq exponent (- exponent)))
-                  (setq format marker-format
-                        index i)))))
-          ;; Anything else must be trailing whitespace.
-          (when (and (< index end) (not junk-allowed))
-            (loop for i from index below end
-                  unless (whitespace[1]p (char string i))
-                    do (parse-error "junk in string ~S"))
-            (setq index end))
-          (let* ((double (ecase format
-                           ((double-float #-long-float long-float) t)
-                           ((single-float short-float) nil)
-                           #+long-float (long-float :long)))
-                 (q (- exponent fraction-digits))
-                 (value
-                   (or #+64-bit
-                       (and (not long)
-                            (typep q 'fixnum)
-                            (case double
-                              ((t) (decimal-to-float w q t))
-                              ((nil) (decimal-to-float w q nil))))
-                       ;; Exact: the digits as an integer, scaled by a power
-                       ;; of ten, as MAKE-FLOAT does.
-                       (let ((number 0))
-                         (loop for i from digits-start below digits-end
-                               for digit = (digit-char-p (char string i) 10)
-                               when digit do (setq number (+ (* number 10) digit)))
-                         (let* ((divisor (expt 10 fraction-digits))
-                                (exponent (truncate-exponent exponent number divisor)))
-                           ;; Too large for FORMAT: a parse error, as the
-                           ;; reader reports it.
-                           (handler-case
-                               (coerce (/ (* (expt 10 exponent) number) divisor)
-                                       format)
-                             (arithmetic-error ()
-                               (error 'simple-parse-error
-                                      :format-control "can't represent the number in ~S as a ~S"
-                                      :format-arguments (list string format)))))))))
-            (declare (ignorable double q)) ; used by the 64-bit fast path
-            (values (if negative (- value) value)
-                    (- index offset))))))))
+        ;; One copy of the rest for each kind of simple string, so that
+        ;; CHAR is a plain load instead of a type test on every character.
+        (string-dispatch ((simple-array character (*)) simple-base-string) string
+          (flet ((digit-at (i)
+                   (and (< i end) (digit-char-p (char string i) 10))))
+            (declare (inline digit-at))
+            (case (char string index)
+              (#\- (setq negative t) (incf index))
+              (#\+ (incf index)))
+            ;; The significand: digits with at most one point. W collects up
+            ;; to 19 significant digits; beyond that LONG is set, and the
+            ;; exact code reparses DIGITS-START to DIGITS-END.
+            (setq digits-start index)
+            (loop while (< index end)
+                  do (let* ((char (char string index))
+                            (digit (digit-char-p char 10)))
+                       (cond (digit
+                              (setq found-digit t)
+                              (unless (and (zerop w) (zerop digit))
+                                (if (= significant 19)
+                                    (setq long t)
+                                    (setq w (+ (* w 10) digit)
+                                          significant (1+ significant))))
+                              (when dot
+                                (incf fraction-digits)))
+                             ((and (char= char #\.) (not dot))
+                              (setq dot t))
+                             (t (return))))
+                     (incf index))
+            (setq digits-end index)
+            (unless found-digit
+              (return-from parse-float
+                (if junk-allowed
+                    (values nil (- index offset))
+                    (parse-error "no digits in string ~S"))))
+            ;; The exponent: a marker, an optional sign and at least one
+            ;; digit. Without digits the marker is not part of the number.
+            (when (< index end)
+              (let ((marker-format (case (char-upcase (char string index))
+                                     (#\E *read-default-float-format*)
+                                     (#\S 'short-float)
+                                     (#\F 'single-float)
+                                     (#\D 'double-float)
+                                     (#\L 'long-float)))
+                    (i (1+ index))
+                    (exponent-negative nil))
+                (declare (type index i))
+                (when marker-format
+                  (when (< i end)
+                    (case (char string i)
+                      (#\- (setq exponent-negative t) (incf i))
+                      (#\+ (incf i))))
+                  (when (digit-at i)
+                    (loop for digit = (digit-at i)
+                          while digit
+                          do (setq exponent (+ (* exponent 10) digit))
+                             (incf i))
+                    (when exponent-negative
+                      (setq exponent (- exponent)))
+                    (setq format marker-format
+                          index i)))))
+            ;; Anything else must be trailing whitespace.
+            (when (and (< index end) (not junk-allowed))
+              (loop for i from index below end
+                    unless (whitespace[1]p (char string i))
+                      do (parse-error "junk in string ~S"))
+              (setq index end))
+            (let* ((double (ecase format
+                             ((double-float #-long-float long-float) t)
+                             ((single-float short-float) nil)
+                             #+long-float (long-float :long)))
+                   (q (- exponent fraction-digits))
+                   (value
+                     (or #+64-bit
+                         (and (not long)
+                              (typep q 'fixnum)
+                              (case double
+                                ((t) (decimal-to-float w q t))
+                                ((nil) (decimal-to-float w q nil))))
+                         ;; Exact: the digits as an integer, scaled by a power
+                         ;; of ten, as MAKE-FLOAT does.
+                         (let ((number 0))
+                           (loop for i from digits-start below digits-end
+                                 for digit = (digit-char-p (char string i) 10)
+                                 when digit do (setq number (+ (* number 10) digit)))
+                           (let* ((divisor (expt 10 fraction-digits))
+                                  (exponent (truncate-exponent exponent number divisor)))
+                             ;; Too large for FORMAT: a parse error, as the
+                             ;; reader reports it.
+                             (handler-case
+                                 (coerce (/ (* (expt 10 exponent) number) divisor)
+                                         format)
+                               (arithmetic-error ()
+                                 (error 'simple-parse-error
+                                        :format-control "can't represent the number in ~S as a ~S"
+                                        :format-arguments (list string format)))))))))
+              (declare (ignorable double q)) ; used by the 64-bit fast path
+              (values (if negative (- value) value)
+                      (- index offset)))))))))
 
 ;;;; PARSE-INTEGER
 
