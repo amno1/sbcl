@@ -22600,60 +22600,6 @@
         (EMIT-EA SEGMENT SRC2 DST :REMAINING-BYTES 1)))
    (EMIT-BYTE SEGMENT SRC3))))
 
-(DEFINE-INSTRUCTION VPBROADCASTW (SEGMENT DST SRC)
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 121) (W 0) (L 0))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 123) (W 0) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 123) (W 0) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 123) (W 0) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 121) (W 0) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 121) (W 0) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 121) (W 0) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 121) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 123 :VVVV NIL :W 0 :MAP 2
-                           :EVEX-B 0 :DISP-N 2)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 123)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 121 :VVVV NIL :W 0 :MAP 2
-                           :EVEX-B 0 :DISP-N 2)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 121)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 121 :VVVV NIL :W 0 :MAP 2
-                           :EVEX-B 0 :DISP-N 2)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 121)
-          (EMIT-EA SEGMENT SRC DST))))))))
-
 (DEFINE-INSTRUCTION VPBROADCASTW-MASKED (SEGMENT DST SRC K &OPTIONAL (Z 0))
  (:EMITTER
   (PROGN
@@ -22701,60 +22647,6 @@
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))))))))
-
-(DEFINE-INSTRUCTION VPBROADCASTQ (SEGMENT DST SRC)
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 89) (W 0) (L 0))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 124) (W 1) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 124) (W 1) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 124) (W 1) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 89) (W 1) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 89) (W 1) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 89) (W 1) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 89) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 124 :VVVV NIL :W 1 :MAP 2
-                           :EVEX-B 0 :DISP-N 8)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 124)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 89 :VVVV NIL :W 1 :MAP 2 :EVEX-B
-                           0 :DISP-N 8)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 89)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 89 :VVVV NIL :W 1 :MAP 2 :EVEX-B
-                           0 :DISP-N 8)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 89)
-          (EMIT-EA SEGMENT SRC DST))))))))
 
 (DEFINE-INSTRUCTION VPBROADCASTQ-MASKED (SEGMENT DST SRC K &OPTIONAL (Z 0))
  (:EMITTER
@@ -22850,60 +22742,6 @@
      (EMIT-AVX512-INST SEGMENT SRC DST 243 42 :VVVV NIL :W 1 :MAP 2 :EVEX-B 0
                        :DISP-N (WIDEST-VECTOR-DISP-N SRC DST)))))))
 
-(DEFINE-INSTRUCTION VPBROADCASTD (SEGMENT DST SRC)
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 88) (W 0) (L 0))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 124) (W 0) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 124) (W 0) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 124) (W 0) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 88) (W 0) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 88) (W 0) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 88) (W 0) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 88) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 124 :VVVV NIL :W 0 :MAP 2
-                           :EVEX-B 0 :DISP-N 4)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 124)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 88 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 4)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 88)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 88 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 4)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 88)
-          (EMIT-EA SEGMENT SRC DST))))))))
-
 (DEFINE-INSTRUCTION VPBROADCASTD-MASKED (SEGMENT DST SRC K &OPTIONAL (Z 0))
  (:EMITTER
   (PROGN
@@ -22951,60 +22789,6 @@
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))))))))
-
-(DEFINE-INSTRUCTION VPBROADCASTB (SEGMENT DST SRC)
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 120) (W 0) (L 0))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 122) (W 0) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP1)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 122) (W 0) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP1)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 122) (W 0) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP1)))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 120) (W 0) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP1))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 120) (W 0) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP1))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 120) (W 0) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP1))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 120) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 122 :VVVV NIL :W 0 :MAP 2
-                           :EVEX-B 0 :DISP-N 1)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 122)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 120 :VVVV NIL :W 0 :MAP 2
-                           :EVEX-B 0 :DISP-N 1)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 120)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 120 :VVVV NIL :W 0 :MAP 2
-                           :EVEX-B 0 :DISP-N 1)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 120)
-          (EMIT-EA SEGMENT SRC DST))))))))
 
 (DEFINE-INSTRUCTION VPBROADCASTB-MASKED (SEGMENT DST SRC K &OPTIONAL (Z 0))
  (:EMITTER
@@ -26043,6 +25827,109 @@
                              1
                              0))))))))
 
+(DEFINE-INSTRUCTION VMOVSS (SEGMENT DST SRC2 &OPTIONAL SRC3)
+ (:PRINTER VEX2-YMM-YMM/MEM ((PP 2) (OP 17) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER VEX3-YMM-YMM/MEM ((PP 2) (M-MMMM 1) (OP 17) (W 0) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER VEX2-YMM-YMM/MEM ((PP 2) (OP 16) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER VEX3-YMM-YMM/MEM ((PP 2) (M-MMMM 1) (OP 16) (W 0) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER EVEX-YMM-YMM/MEM
+  ((PP 2) (MM 1) (OP 17) (W 0) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM
+  ((PP 2) (MM 1) (OP 16) (W 0) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM AAA Z-BIT))
+ (:EMITTER
+  (IF SRC3
+      (LET ((SRC1 SRC2) (SRC2 SRC3))
+        (PROGN
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
+             (EMIT-AVX512-INST SEGMENT SRC2 DST 243 16 :VVVV SRC1 :W 0 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 4)
+             (PROGN
+              (EMIT-VEX SEGMENT SRC1 SRC2 DST 243 15 0 0)
+              (EMIT-BYTE SEGMENT 16)
+              (EMIT-EA SEGMENT SRC2 DST)))))
+      (PROGN
+       (COND
+        ((EA-P DST)
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC2)
+             (EMIT-AVX512-INST SEGMENT DST SRC2 243 17 :VVVV NIL :W 0 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 4)
+             (PROGN
+              (EMIT-VEX SEGMENT NIL DST SRC2 243 15 0 0)
+              (EMIT-BYTE SEGMENT 17)
+              (EMIT-EA SEGMENT DST SRC2))))
+        ((EA-P SRC2)
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC2)
+             (EMIT-AVX512-INST SEGMENT SRC2 DST 243 16 :VVVV NIL :W 0 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 4)
+             (PROGN
+              (EMIT-VEX SEGMENT NIL SRC2 DST 243 15 0 0)
+              (EMIT-BYTE SEGMENT 16)
+              (EMIT-EA SEGMENT SRC2 DST))))
+        (T
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC2)
+             (EMIT-AVX512-INST SEGMENT SRC2 DST 243 16 :VVVV DST :W 0 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 4)
+             (PROGN
+              (EMIT-VEX SEGMENT NIL SRC2 DST 243 15 0 0)
+              (EMIT-BYTE SEGMENT 16)
+              (EMIT-EA SEGMENT SRC2 DST)))))))))
+
+(DEFINE-INSTRUCTION VMOVSS-MASKED (SEGMENT DST SRC2 K &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (COND
+    ((EA-P DST)
+     (EMIT-AVX512-INST SEGMENT DST SRC2 243 17 :VVVV NIL :W 0 :MAP 1 :LL 0
+                       :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)))
+    ((EA-P SRC2)
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 243 16 :VVVV DST :W 0 :MAP 1 :LL 0
+                       :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)))
+    (T
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 243 16 :VVVV DST :W 0 :MAP 1 :LL 0
+                       :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)))))))
+
+(DEFINE-INSTRUCTION VMOVSS-MASKED-Z (SEGMENT DST SRC2 K)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (COND
+      ((EA-P DST)
+       (EMIT-AVX512-INST SEGMENT DST SRC2 243 17 :VVVV NIL :W 0 :MAP 1 :LL 0
+                         :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0)))
+      ((EA-P SRC2)
+       (EMIT-AVX512-INST SEGMENT SRC2 DST 243 16 :VVVV DST :W 0 :MAP 1 :LL 0
+                         :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0)))
+      (T
+       (EMIT-AVX512-INST SEGMENT SRC2 DST 243 16 :VVVV DST :W 0 :MAP 1 :LL 0
+                         :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0))))))))
+
 (DEFINE-INSTRUCTION VMOVSLDUP (SEGMENT DST SRC)
  (:PRINTER VEX2-YMM-YMM/MEM ((PP 2) (OP 18) (L 0))
   '(:NAME :TAB REG ", " REG/MEM))
@@ -26320,6 +26207,109 @@
        (EMIT-AVX512-INST SEGMENT SRC1 DST 243 22 :VVVV NIL :W 0 :MAP 1 :EVEX-B
                          0 :DISP-N (WIDEST-VECTOR-DISP-N SRC1 DST) :AAA
                          (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0))))))))
+
+(DEFINE-INSTRUCTION VMOVSD (SEGMENT DST SRC2 &OPTIONAL SRC3)
+ (:PRINTER VEX2-YMM-YMM/MEM ((PP 3) (OP 17) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER VEX3-YMM-YMM/MEM ((PP 3) (M-MMMM 1) (OP 17) (W 0) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER VEX2-YMM-YMM/MEM ((PP 3) (OP 16) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER VEX3-YMM-YMM/MEM ((PP 3) (M-MMMM 1) (OP 16) (W 0) (L 0))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM))
+ (:PRINTER EVEX-YMM-YMM/MEM
+  ((PP 3) (MM 1) (OP 17) (W 1) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM
+  ((PP 3) (MM 1) (OP 16) (W 1) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM AAA Z-BIT))
+ (:EMITTER
+  (IF SRC3
+      (LET ((SRC1 SRC2) (SRC2 SRC3))
+        (PROGN
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC1 SRC2)
+             (EMIT-AVX512-INST SEGMENT SRC2 DST 242 16 :VVVV SRC1 :W 1 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 8)
+             (PROGN
+              (EMIT-VEX SEGMENT SRC1 SRC2 DST 242 15 0 0)
+              (EMIT-BYTE SEGMENT 16)
+              (EMIT-EA SEGMENT SRC2 DST)))))
+      (PROGN
+       (COND
+        ((EA-P DST)
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC2)
+             (EMIT-AVX512-INST SEGMENT DST SRC2 242 17 :VVVV NIL :W 1 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 8)
+             (PROGN
+              (EMIT-VEX SEGMENT NIL DST SRC2 242 15 0 0)
+              (EMIT-BYTE SEGMENT 17)
+              (EMIT-EA SEGMENT DST SRC2))))
+        ((EA-P SRC2)
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC2)
+             (EMIT-AVX512-INST SEGMENT SRC2 DST 242 16 :VVVV NIL :W 1 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 8)
+             (PROGN
+              (EMIT-VEX SEGMENT NIL SRC2 DST 242 15 0 0)
+              (EMIT-BYTE SEGMENT 16)
+              (EMIT-EA SEGMENT SRC2 DST))))
+        (T
+         (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC2)
+             (EMIT-AVX512-INST SEGMENT SRC2 DST 242 16 :VVVV DST :W 1 :MAP 1
+                               :LL 0 :EVEX-B 0 :DISP-N 8)
+             (PROGN
+              (EMIT-VEX SEGMENT NIL SRC2 DST 242 15 0 0)
+              (EMIT-BYTE SEGMENT 16)
+              (EMIT-EA SEGMENT SRC2 DST)))))))))
+
+(DEFINE-INSTRUCTION VMOVSD-MASKED (SEGMENT DST SRC2 K &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (COND
+    ((EA-P DST)
+     (EMIT-AVX512-INST SEGMENT DST SRC2 242 17 :VVVV NIL :W 1 :MAP 1 :LL 0
+                       :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)))
+    ((EA-P SRC2)
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 242 16 :VVVV DST :W 1 :MAP 1 :LL 0
+                       :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)))
+    (T
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 242 16 :VVVV DST :W 1 :MAP 1 :LL 0
+                       :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)))))))
+
+(DEFINE-INSTRUCTION VMOVSD-MASKED-Z (SEGMENT DST SRC2 K)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (COND
+      ((EA-P DST)
+       (EMIT-AVX512-INST SEGMENT DST SRC2 242 17 :VVVV NIL :W 1 :MAP 1 :LL 0
+                         :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0)))
+      ((EA-P SRC2)
+       (EMIT-AVX512-INST SEGMENT SRC2 DST 242 16 :VVVV DST :W 1 :MAP 1 :LL 0
+                         :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                         (IF (OR (EQ Z :Z) (EQL Z 1))
+                             1
+                             0)))
+      (T
+       (EMIT-AVX512-INST SEGMENT SRC2 DST 242 16 :VVVV DST :W 1 :MAP 1 :LL 0
+                         :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
                          (IF (OR (EQ Z :Z) (EQL Z 1))
                              1
                              0))))))))
@@ -27880,6 +27870,426 @@
   (PROGN
    (EMIT-AVX512-INST SEGMENT SRC2 DST 102 93 :VVVV SRC1 :W 1 :MAP 1 :EVEX-B 1
                      :DISP-N 8))))
+
+(DEFINE-INSTRUCTION VMINMAXSS-MASKED
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 83 :VVVV SRC1 :W 0 :MAP 3 :LL 0
+                     :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXSS-MASKED-Z (SEGMENT DST SRC1 SRC2 K SRC3)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 102 83 :VVVV SRC1 :W 0 :MAP 3 :LL 0
+                       :EVEX-B 0 :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)
+                       :REMAINING-BYTES 1)
+     (EMIT-BYTE SEGMENT SRC3)))))
+
+(DEFINE-INSTRUCTION VMINMAXSS (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 83) (W 0) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 83 :VVVV SRC1 :W 0 :MAP 3 :LL 0
+                     :EVEX-B 0 :DISP-N 4 :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXSH-MASKED
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 83 :VVVV SRC1 :W 0 :MAP 3 :LL 0
+                     :EVEX-B 0 :DISP-N 2 :AAA (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXSH-MASKED-Z (SEGMENT DST SRC1 SRC2 K SRC3)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 83 :VVVV SRC1 :W 0 :MAP 3 :LL 0
+                       :EVEX-B 0 :DISP-N 2 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)
+                       :REMAINING-BYTES 1)
+     (EMIT-BYTE SEGMENT SRC3)))))
+
+(DEFINE-INSTRUCTION VMINMAXSH (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 0) (MM 3) (OP 83) (W 0) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 83 :VVVV SRC1 :W 0 :MAP 3 :LL 0
+                     :EVEX-B 0 :DISP-N 2 :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXSD-MASKED
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 83 :VVVV SRC1 :W 1 :MAP 3 :LL 0
+                     :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXSD-MASKED-Z (SEGMENT DST SRC1 SRC2 K SRC3)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 102 83 :VVVV SRC1 :W 1 :MAP 3 :LL 0
+                       :EVEX-B 0 :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)
+                       :REMAINING-BYTES 1)
+     (EMIT-BYTE SEGMENT SRC3)))))
+
+(DEFINE-INSTRUCTION VMINMAXSD (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 83) (W 1) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 83 :VVVV SRC1 :W 1 :MAP 3 :LL 0
+                     :EVEX-B 0 :DISP-N 8 :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPS-MASKED
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                     (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPS-MASKED-Z (SEGMENT DST SRC1 SRC2 K SRC3)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                       :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                       (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)
+                       :REMAINING-BYTES 1)
+     (EMIT-BYTE SEGMENT SRC3)))))
+
+(DEFINE-INSTRUCTION VMINMAXPS (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 0) (LL 2) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP64))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 0) (LL 1) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP32))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 0) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP16))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPS-MASKED-BCAST
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 1
+                     :DISP-N 4 :AAA (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPS-BCAST (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 0) (LL 2) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to16}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 0) (LL 1) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to8}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 0) (LL 0) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to4}" AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 1
+                     :DISP-N 4 :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPH-MASKED
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                     (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPH-MASKED-Z (SEGMENT DST SRC1 SRC2 K SRC3)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                       :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                       (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)
+                       :REMAINING-BYTES 1)
+     (EMIT-BYTE SEGMENT SRC3)))))
+
+(DEFINE-INSTRUCTION VMINMAXPH (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 0) (MM 3) (OP 82) (W 0) (LL 2) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP64))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 0) (MM 3) (OP 82) (W 0) (LL 1) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP32))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 0) (MM 3) (OP 82) (W 0) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP16))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPH-MASKED-BCAST
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 1
+                     :DISP-N 2 :AAA (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPH-BCAST (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 0) (MM 3) (OP 82) (W 0) (LL 2) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to32}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 0) (MM 3) (OP 82) (W 0) (LL 1) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to16}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 0) (MM 3) (OP 82) (W 0) (LL 0) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to8}" AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST NIL 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 1
+                     :DISP-N 2 :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPD-MASKED
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 1 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                     (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPD-MASKED-Z (SEGMENT DST SRC1 SRC2 K SRC3)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 1 :MAP 3 :EVEX-B 0
+                       :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                       (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)
+                       :REMAINING-BYTES 1)
+     (EMIT-BYTE SEGMENT SRC3)))))
+
+(DEFINE-INSTRUCTION VMINMAXPD (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 1) (LL 2) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP64))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 1) (LL 1) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP32))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 1) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP16))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 1 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPD-MASKED-BCAST
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 1 :MAP 3 :EVEX-B 1
+                     :DISP-N 8 :AAA (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXPD-BCAST (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 1) (LL 2) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to8}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 1) (LL 1) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to4}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 1) (MM 3) (OP 82) (W 1) (LL 0) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to2}" AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 102 82 :VVVV SRC1 :W 1 :MAP 3 :EVEX-B 1
+                     :DISP-N 8 :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXBF16-MASKED
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 242 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                     (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXBF16-MASKED-Z (SEGMENT DST SRC1 SRC2 K SRC3)
+ (:EMITTER
+  (LET ((Z 1))
+    (DECLARE (IGNORABLE Z))
+    (PROGN
+     (EMIT-AVX512-INST SEGMENT SRC2 DST 242 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                       :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1) :AAA
+                       (MASK-ARG-NUMBER K) :Z
+                       (IF (OR (EQ Z :Z) (EQL Z 1))
+                           1
+                           0)
+                       :REMAINING-BYTES 1)
+     (EMIT-BYTE SEGMENT SRC3)))))
+
+(DEFINE-INSTRUCTION VMINMAXBF16 (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 3) (MM 3) (OP 82) (W 0) (LL 2) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP64))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 3) (MM 3) (OP 82) (W 0) (LL 1) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP32))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 3) (MM 3) (OP 82) (W 0) (LL 0) (EVEX-B 0)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP16))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 242 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 0
+                     :DISP-N (WIDEST-VECTOR-DISP-N SRC2 DST SRC1)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXBF16-MASKED-BCAST
+ (SEGMENT DST SRC1 SRC2 K SRC3 &OPTIONAL (Z 0))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 242 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 1
+                     :DISP-N 2 :AAA (MASK-ARG-NUMBER K) :Z
+                     (IF (OR (EQ Z :Z) (EQL Z 1))
+                         1
+                         0)
+                     :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
+
+(DEFINE-INSTRUCTION VMINMAXBF16-BCAST (SEGMENT DST SRC1 SRC2 SRC3)
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 3) (MM 3) (OP 82) (W 0) (LL 2) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to32}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 3) (MM 3) (OP 82) (W 0) (LL 1) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to16}" AAA Z-BIT))
+ (:PRINTER EVEX-YMM-YMM/MEM-IMM
+  ((PP 3) (MM 3) (OP 82) (W 0) (LL 0) (EVEX-B 1)
+   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP2))
+  '(:NAME :TAB REG ", " VVVV ", " REG/MEM ", " IMM " {1to8}" AAA Z-BIT))
+ (:EMITTER
+  (PROGN
+   (EMIT-AVX512-INST SEGMENT SRC2 DST 242 82 :VVVV SRC1 :W 0 :MAP 3 :EVEX-B 1
+                     :DISP-N 2 :REMAINING-BYTES 1)
+   (EMIT-BYTE SEGMENT SRC3))))
 
 (DEFINE-INSTRUCTION VMINBF16-MASKED (SEGMENT DST SRC1 SRC2 K &OPTIONAL (Z 0))
  (:EMITTER
@@ -51403,51 +51813,6 @@
                      :DISP-N 2 :REMAINING-BYTES 1)
    (EMIT-BYTE SEGMENT CC))))
 
-(DEFINE-INSTRUCTION VBROADCASTSS (SEGMENT DST SRC)
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 24) (W 0) (L 0))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 24) (W 0) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 24) (W 0) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 24) (W 0) (LL 0) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP4))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 24) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 24 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 4)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 24)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 24 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 4)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 24)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 24 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 4)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 NIL 0)
-          (EMIT-BYTE SEGMENT 24)
-          (EMIT-EA SEGMENT SRC DST))))))))
-
 (DEFINE-INSTRUCTION VBROADCASTSS-MASKED (SEGMENT DST SRC K &OPTIONAL (Z 0))
  (:EMITTER
   (PROGN
@@ -51547,45 +51912,6 @@
                           (IF (OR (EQ Z :Z) (EQL Z 1))
                               1
                               0)))))))))
-
-(DEFINE-INSTRUCTION VBROADCASTSD (SEGMENT DST SRC)
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 25) (W 1) (LL 2) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER EVEX-YMM-YMM/MEM
-  ((PP 1) (MM 2) (OP 25) (W 1) (LL 1) (EVEX-B 0)
-   (REG/MEM NIL :TYPE 'EVEX-YMMREG/MEM-DISP8))
-  '(:NAME :TAB REG ", " REG/MEM AAA Z-BIT))
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 25) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 25 :VVVV NIL :W 1 :MAP 2 :EVEX-B
-                           0 :DISP-N 8)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 25)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 25 :VVVV NIL :W 1 :MAP 2 :EVEX-B
-                           0 :DISP-N 8)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 25)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 25 :VVVV NIL :W 1 :MAP 2 :EVEX-B
-                           0 :DISP-N 8)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 25)
-          (EMIT-EA SEGMENT SRC DST))))))))
 
 (DEFINE-INSTRUCTION VBROADCASTI64X4-MASKED (SEGMENT DST SRC K &OPTIONAL (Z 0))
  (:EMITTER
@@ -51956,37 +52282,6 @@
     (T
      (EMIT-AVX512-INST SEGMENT SRC DST 102 89 :VVVV NIL :W 0 :MAP 2 :EVEX-B 0
                        :DISP-N 8))))))
-
-(DEFINE-INSTRUCTION VBROADCASTI128 (SEGMENT DST SRC)
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 90) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 90 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 16)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 90)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 90 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 16)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 90)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 90 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 16)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 90)
-          (EMIT-EA SEGMENT SRC DST))))))))
 
 (DEFINE-INSTRUCTION VBROADCASTF64X4-MASKED (SEGMENT DST SRC K &OPTIONAL (Z 0))
  (:EMITTER
@@ -52359,37 +52654,6 @@
      (T
       (EMIT-AVX512-INST SEGMENT SRC DST 102 25 :VVVV NIL :W 0 :MAP 2 :EVEX-B 0
                         :DISP-N 8)))))))
-
-(DEFINE-INSTRUCTION VBROADCASTF128 (SEGMENT DST SRC)
- (:PRINTER VEX3-YMM-YMM/MEM ((PP 1) (M-MMMM 2) (OP 26) (W 0) (L 1))
-  '(:NAME :TAB REG ", " REG/MEM))
- (:EMITTER
-  (PROGN
-   (COND
-    ((EA-P DST)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT DST SRC 102 26 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 16)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL DST SRC 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 26)
-          (EMIT-EA SEGMENT DST SRC))))
-    ((EA-P SRC)
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 26 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 16)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 26)
-          (EMIT-EA SEGMENT SRC DST))))
-    (T
-     (IF (NEEDS-EVEX-P NIL NIL NIL DST SRC)
-         (EMIT-AVX512-INST SEGMENT SRC DST 102 26 :VVVV NIL :W 0 :MAP 2 :EVEX-B
-                           0 :DISP-N 16)
-         (PROGN
-          (EMIT-VEX SEGMENT NIL SRC DST 102 3896 1 0)
-          (EMIT-BYTE SEGMENT 26)
-          (EMIT-EA SEGMENT SRC DST))))))))
 
 (DEFINE-INSTRUCTION VBLENDVPS (SEGMENT DST SRC1 SRC2 SRC3)
  (:PRINTER VEX3-YMM-YMM/MEM-YMM ((PP 1) (M-MMMM 3) (OP 74) (W 0) (L 0))
@@ -54228,4 +54492,644 @@
    (EMIT-VEX SEGMENT SRC1 SRC2 DST 102 15 1 0)
    (EMIT-BYTE SEGMENT 74)
    (EMIT-EA SEGMENT SRC2 DST))))
+
+
+;;;; special-insts.lisp --- Vector instructions requiring custom calling conventions or emitters
+;;;;
+;;;; Emitted by x86-insts.lisp into avx512-insts.lisp.
+
+(in-package "SB-X86-64-ASM")
+
+;;;; VCMP with keyword condition codes
+
+(macrolet ((def (name prefix opcode
+                 name-suffix &key (evex-w 0) scalar)
+             `(define-instruction ,name (segment condition dst src src2 &optional mask)
+                ,@(avx2-inst-printer-list 'ymm-ymm/mem-imm prefix opcode
+                                          :more-fields `((imm nil :type 'avx-condition-code))
+                                          :printer `("VCMP" imm ,name-suffix
+                                                            :tab reg ", " vvvv ", " reg/mem))
+                ,@(loop for k from 0 to 7
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem-imm prefix opcode
+                         :opcode-prefix #x0F
+                         :w evex-w
+                         :more-fields `((reg nil :type 'opmask-reg)
+                                        (imm nil :type 'avx-condition-code)
+                                        ,@(when (plusp k) `((aaa ,k))))
+                         :printer (if (plusp k)
+                                      `("VCMP" imm ,name-suffix
+                                               :tab reg aaa ", " vvvv ", " reg/mem)
+                                      `("VCMP" imm ,name-suffix
+                                               :tab reg ", " vvvv ", " reg/mem))))
+                (:emitter
+                 (multiple-value-bind (cond-arg dst-reg src1 src2-arg mask-val)
+                     (if (register-p condition)
+                         ;; (inst vcmp dst src1 src2 condition &optional mask)
+                         (values src2 condition dst src (or mask 0))
+                         ;; (inst vcmp condition dst src1 src2 &optional mask)
+                         (values condition dst src src2 (or mask 0)))
+                   (let ((imm (or (position cond-arg +avx-conditions+)
+                                  (and (integerp cond-arg) (<= 0 cond-arg 31) cond-arg)
+                                  (error "~s not one of ~s or 0..31"
+                                         cond-arg
+                                         +avx-conditions+)))
+                         (mask-num (cond ((null mask-val) 0)
+                                         ((integerp mask-val) mask-val)
+                                         ((k-register-p mask-val) (reg-id-num (reg-id mask-val)))
+                                         (t 0))))
+                     (cond
+                       ((or (k-register-p dst-reg)
+                            (zmm-register-p src1)
+                            (and (register-p src2-arg) (zmm-register-p src2-arg))
+                            (plusp mask-num))
+                        (aver (k-register-p dst-reg))
+                        (let ((disp-n ,(if scalar
+                                           `(if (zerop ,evex-w) 4 8)
+                                           `(cond ((zmm-register-p src1) 64)
+                                                  ((ymm-register-p src1) 32)
+                                                  (t 16)))))
+                          (emit-avx512-inst segment src2-arg dst-reg ,prefix ,opcode
+                                            :opcode-prefix #x0F
+                                            :vvvv src1
+                                            :w ,evex-w
+                                            :aaa mask-num
+                                            :disp-n disp-n
+                                            :remaining-bytes 1)
+                          (emit-byte segment imm)))
+                       (t
+                        (emit-avx2-inst segment src2-arg dst-reg ,prefix ,opcode
+                                        :evex-w ,evex-w
+                                        :vvvv src1
+                                        :remaining-bytes 1)
+                        (emit-byte segment imm)))))))))
+  (def vcmppd #x66 #xc2 "PD" :evex-w 1)
+  (def vcmpps nil  #xc2 "PS" :evex-w 0)
+  (def vcmpsd #xf2 #xc2 "SD" :evex-w 1 :scalar t)
+  (def vcmpss #xf3 #xc2 "SS" :evex-w 0 :scalar t))
+
+;;; AVX512-FP16 compares. Same calling conventions as VCMPPS above -
+;;; (VCMPPH :EQ K DST SRC [MASK]) or (VCMPPH K SRC1 SRC2 :EQ [MASK]) -
+;;; but EVEX-only, in map 0F3A.
+(macrolet ((def (name prefix name-suffix &key scalar)
+             `(define-instruction ,name (segment condition dst src src2 &optional mask)
+                ,@(avx512-inst-printer-list
+                   'ymm-ymm/mem-imm prefix #xc2
+                   :opcode-prefix #x0f3a
+                   :w 0
+                   :ll (if scalar 0 nil)
+                   :disp-n (if scalar 2 nil)
+                   :more-fields `((reg nil :type 'opmask-reg)
+                                  (imm nil :type 'avx-condition-code))
+                   :printer `("VCMP" imm ,name-suffix
+                                     :tab reg aaa ", " vvvv ", " reg/mem))
+                (:emitter
+                 (multiple-value-bind (cond-arg dst-reg src1 src2-arg mask-val)
+                     (if (register-p condition)
+                         (values src2 condition dst src (or mask 0))
+                         (values condition dst src src2 (or mask 0)))
+                   (let ((imm (or (position cond-arg +avx-conditions+)
+                                  (and (integerp cond-arg) (<= 0 cond-arg 31) cond-arg)
+                                  (error "~s not one of ~s or 0..31"
+                                         cond-arg
+                                         +avx-conditions+)))
+                         (mask-num (cond ((integerp mask-val) mask-val)
+                                         ((k-register-p mask-val) (reg-id-num (reg-id mask-val)))
+                                         (t 0))))
+                     (aver (k-register-p dst-reg))
+                     (emit-avx512-inst segment src2-arg dst-reg ,prefix #xc2
+                                       :opcode-prefix #x0f3a
+                                       :vvvv src1
+                                       :w 0
+                                       ,@(when scalar '(:ll 0))
+                                       :aaa mask-num
+                                       :disp-n ,(if scalar
+                                                    2
+                                                    '(cond ((zmm-register-p src1) 64)
+                                                           ((ymm-register-p src1) 32)
+                                                           (t 16)))
+                                       :remaining-bytes 1)
+                     (emit-byte segment imm)))))))
+  (def vcmpph nil  "PH")
+  (def vcmpsh #xf3 "SH" :scalar t))
+
+;;;; VMOVD / VMOVQ (vector <-> GPR moves)
+
+(flet ((move-ymm<->gpr (segment dst src w)
+         (cond ((xmm-register-p dst)
+                (emit-avx2-inst segment src dst #x66 #x6e :l 0 :w w))
+               (t
+                (aver (xmm-register-p src))
+                (emit-avx2-inst segment dst src #x66 #x7e :l 0 :w w)))))
+  (define-instruction vmovd (segment dst src)
+    (:emitter (move-ymm<->gpr segment dst src 0))
+    . #.(append (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x6e
+                                        :w 0
+                                        :l 0
+                                        :evex t
+                                        :more-fields '((reg/mem nil :type 'sized-reg/mem)))
+                (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x7e
+                                        :w 0
+                                        :l 0
+                                        :evex t
+                                        :more-fields '((reg/mem nil :type 'sized-reg/mem))
+                                        :printer '(:name :tab reg/mem ", " reg))))
+  (define-instruction vmovq (segment dst src)
+    (:emitter
+     (cond ((or (gpr-p src) (gpr-p dst))
+            (move-ymm<->gpr segment dst src 1))
+           ((xmm-register-p dst)
+            (emit-avx2-inst segment src dst #xf3 #x7e :l 0))
+           (t
+            (aver (xmm-register-p src))
+            (emit-avx2-inst segment dst src #x66 #xd6 :l 0))))
+    . #.(append (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x6e
+                                        :w 1
+                                        :l 0
+                                        :evex t
+                                        :more-fields '((reg/mem nil :type 'sized-reg/mem-default-qword)))
+                (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x7e
+                                        :w 1
+                                        :l 0
+                                        :evex t
+                                        :more-fields '((reg/mem nil :type 'sized-reg/mem-default-qword))
+                                        :printer '(:name :tab reg/mem ", " reg))
+                (avx2-inst-printer-list 'ymm-ymm/mem #xf3 #x7e :l 0 :evex t)
+                (avx2-inst-printer-list 'ymm-ymm/mem #x66 #xd6 :l 0 :evex t
+                                        :printer '(:name :tab reg/mem ", " reg)))))
+
+;;;; VPINSR* / VPEXTR* / VINSERTPS / VEXTRACTPS
+
+(macrolet ((def-insert (name prefix op size &key (op-prefix #x0f3a)
+                                                 (w 0))
+             `(define-instruction ,name (segment dst src src2 imm)
+                ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix op
+                                          :w w
+                                          :l 0
+                                          :opcode-prefix op-prefix
+                                          :reg-mem-size size
+                                          :more-fields `((imm nil :type 'imm-byte))
+                                          :printer `(:name :tab reg ", " vvvv ", " reg/mem ", " imm)
+                                          :evex t)
+                (:emitter
+                 (emit-avx2-inst segment src2 dst ,prefix ,op
+                                 :opcode-prefix ,op-prefix
+                                 :vvvv src
+                                 :w ,w
+                                 :l 0
+                                 :remaining-bytes 1)
+                 (emit-byte segment imm))))
+           (def-extract (name prefix op size &key (w 0))
+             `(define-instruction ,name (segment dst src imm)
+                ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix op
+                                           :w w
+                                           :l 0
+                                           :opcode-prefix #x0f3a
+                                           :reg-mem-size size
+                                           :more-fields `((imm nil :type 'imm-byte))
+                                           :printer `(:name :tab reg/mem ", " reg ", " imm)
+                                           :evex t)
+                (:emitter
+                 (aver (and (xmm-register-p src) (not (xmm-register-p dst))))
+                 (emit-avx2-inst segment dst src ,prefix ,op
+                                 :w ,w
+                                 :l 0
+                                 :opcode-prefix #x0f3a
+                                 :remaining-bytes 1)
+                 (emit-byte segment imm)))))
+
+  (def-insert vpinsrb #x66 #x20 :byte)
+  (def-insert vpinsrq #x66 #x22 :qword :w 1)
+  (def-insert vpinsrw #x66 #xc4 :word :op-prefix #x0f)
+  (def-insert vpinsrd #x66 #x22 :dword)
+  (def-insert vinsertps #x66 #x21 nil)
+
+  (def-extract vpextrb #x66 #x14 :byte)
+  (def-extract vpextrd #x66 #x16 :dword)
+  (def-extract vpextrq #x66 #x16 :qword :w 1)
+  (def-extract vextractps #x66 #x17 nil))
+
+(define-instruction vpextrw (segment dst src imm)
+  (:emitter
+   (aver (xmm-register-p src))
+   (if (gpr-p dst)
+       (emit-avx2-inst segment dst src #x66 #xc5 :l 0 :remaining-bytes 1)
+       (emit-avx2-inst segment dst src #x66 #x15 :opcode-prefix #x0f3a :l 0 :remaining-bytes 1))
+   (emit-byte segment imm))
+  . #.(append
+       (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x15
+                               :w 0
+                               :l 0
+                               :opcode-prefix #x0f3a
+                               :more-fields `((imm nil :type 'imm-byte))
+                               :printer '(:name :tab reg/mem ", " reg ", " imm)
+                               :evex t)
+       (avx2-inst-printer-list 'ymm-ymm/mem #x66 #xc5
+                               :w 0
+                               :l 0
+                               :more-fields `((imm nil :type 'imm-byte))
+                               :printer '(:name :tab reg/mem ", " reg ", " imm)
+                               :evex t)))
+
+;;;; VCVTSI2S* / VCVTS*2SI / VMOVMSK*
+
+(macrolet ((def (name prefix opcode)
+             `(define-instruction ,name (segment dst src src2)
+                ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix opcode
+                                          :reg-mem-size :sized
+                                          :nds t)
+                (:emitter
+                 (aver (xmm-register-p dst))
+                 (let ((src-size (operand-size src2)))
+                   (emit-avx2-inst segment src2 dst ,prefix ,opcode
+                                   :l 0
+                                   :vvvv src
+                                   :w (case src-size
+                                        (:qword 1)
+                                        (:dword 0)
+                                        (t 1))))))))
+  (def vcvtsi2sd #xf2 #x2a)
+  (def vcvtsi2ss #xf3 #x2a))
+
+(macrolet ((def (name prefix opcode &key reg-only)
+             `(define-instruction ,name (segment dst src)
+                ,@(avx2-inst-printer-list 'reg-ymm/mem prefix opcode)
+                (:emitter
+                 (aver (gpr-p dst))
+                 ,(when reg-only
+                    `(aver (xmm-register-p src)))
+                 (let ((dst-size (operand-size dst)))
+                   (aver (or (eq dst-size :qword) (eq dst-size :dword)))
+                   (emit-avx2-inst segment src dst ,prefix ,opcode
+                                   :w (ecase dst-size
+                                        (:qword 1)
+                                        (:dword 0))
+                                   ,@(unless reg-only
+                                       '(:l 0))))))))
+  (def vcvtsd2si  #xf2 #x2d)
+  (def vcvtss2si  #xf3 #x2d)
+  (def vcvttsd2si #xf2 #x2c)
+  (def vcvttss2si #xf3 #x2c)
+  (def vmovmskpd  #x66 #x50 :reg-only t)
+  (def vmovmskps  nil  #x50 :reg-only t)
+  (def vpmovmskb  #x66 #xd7 :reg-only t))
+
+;;;; VMOVHPD / VMOVHPS / VMOVLPD / VMOVLPS / VMOVHLPS / VMOVLHPS
+
+(macrolet ((def (name prefix opcode-from opcode-to
+                                 &key force-to-mem
+                                      reg-reg-name
+                                      l
+                                      (opcode-prefix #x0F)
+                                      (evex-w 0)
+                                      nds)
+             `(progn
+                ,(when reg-reg-name
+                   `(define-instruction ,reg-reg-name (segment dst src ,@(if nds '(src2)))
+                      (:emitter
+                       (aver (xmm-register-p dst))
+                       (aver (xmm-register-p src))
+                       (emit-avx2-inst segment dst
+                                       ,(if nds
+                                            'src2
+                                            'src)
+                                       ,prefix ,opcode-from
+                                       :opcode-prefix ,opcode-prefix
+                                       :evex-w ,evex-w
+                                       :l ,l
+                                       ,@(and nds
+                                              `(:vvvv src))))))
+                (define-instruction ,name (segment dst src ,@(if nds '(&optional src2)))
+                  ,@(when opcode-from
+                      (avx2-inst-printer-list 'ymm-ymm/mem prefix opcode-from
+                                              :opcode-prefix opcode-prefix
+                                              :nds nds))
+                  ,@(when opcode-to
+                      (avx2-inst-printer-list
+                       'ymm-ymm/mem prefix opcode-to
+                       :printer '(:name :tab reg/mem ", " reg)
+                       :opcode-prefix opcode-prefix))
+                  (:emitter
+                   ,@(when nds
+                       `((aver (register-p src))))
+                   (cond ,@(when opcode-from
+                             `(((xmm-register-p dst)
+                                ,(when force-to-mem
+                                   `(aver (not (register-p ,(if nds
+                                                                'src2
+                                                                'src)))))
+                                (emit-avx2-inst segment ,(if nds
+                                                             'src2
+                                                             'src)
+                                                dst
+                                                ,prefix ,opcode-from
+                                                :opcode-prefix ,opcode-prefix
+                                                :evex-w ,evex-w
+                                                ,@(and nds
+                                                       `(:vvvv src))
+                                                :l ,l))))
+                         (t
+                          (aver (xmm-register-p src))
+                          ,(when force-to-mem
+                             `(aver (not (register-p dst))))
+                          (emit-avx2-inst segment
+                                          dst src
+                                          ,prefix ,opcode-to
+                                          :opcode-prefix ,opcode-prefix
+                                          :evex-w ,evex-w
+                                          :l ,l))))))))
+  ;; use vmovhps for vmovlhps and vmovlps for vmovhlps
+  (def vmovhpd #x66 #x16 #x17 :force-to-mem t :l 0 :nds t)
+  (def vmovhps nil  #x16 #x17 :reg-reg-name vmovlhps :l 0 :nds t)
+  (def vmovlpd #x66 #x12 #x13 :force-to-mem t :l 0 :nds t)
+  (def vmovlps nil  #x12 #x13 :reg-reg-name vmovhlps :l 0 :nds t))
+
+;;;; VZEROUPPER / VZEROALL
+
+(define-instruction vzeroupper (segment)
+  (:printer vex2-op ((op #x77) (l 0) (r 1) (pp 0)))
+  (:emitter
+   (emit-two-byte-vex segment 0 0 0 nil)
+   (emit-byte segment #x77)))
+
+(define-instruction vzeroall (segment)
+  (:printer vex2-op ((op #x77) (l 1) (r 1) (pp 0)))
+  (:emitter
+   (emit-two-byte-vex segment 0 0 1 nil)
+   (emit-byte segment #x77)))
+
+;;;; KMOVW / KMOVB / KMOVD / KMOVQ (opmask register moves via VEX)
+
+(macrolet ((def (name kk-prefix gr-prefix store-mem-prefix load-mem-prefix
+                     op-k-k op-k-r op-r-k op-m-k op-k-m w &optional (gr-w w))
+             `(define-instruction ,name (segment dst src)
+                (:emitter
+                 (cond
+                   ((and (k-register-p dst) (k-register-p src))
+                    ;; VEX: k1 <- k2
+                    (emit-vex segment nil src dst ,kk-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-k-k)
+                    (emit-ea segment src dst))
+
+                   ((and (k-register-p dst) (gpr-p src))
+                    ;; VEX: k1 <- r32/r64
+                    (emit-vex segment nil src dst ,gr-prefix #x0F 0 ,gr-w)
+                    (emit-bytes segment ,op-k-r)
+                    (emit-ea segment src dst))
+
+                   ((and (gpr-p dst) (k-register-p src))
+                    ;; VEX: r32/r64 <- k1
+                    (emit-vex segment nil src dst ,gr-prefix #x0F 0 ,gr-w)
+                    (emit-bytes segment ,op-r-k)
+                    (emit-ea segment src dst))
+
+                   ((and (k-register-p dst) (or (ea-p src) (tn-p src)))
+                    ;; VEX: k1 <- m8/m16/m32/m64
+                    (emit-vex segment nil src dst ,load-mem-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-k-m)
+                    (emit-ea segment src dst))
+
+                   ((and (or (ea-p dst) (tn-p dst)) (k-register-p src))
+                    ;; VEX: m8/m16/m32/m64 <- k1
+                    (emit-vex segment nil dst src ,store-mem-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-m-k)
+                    (emit-ea segment dst src))
+
+                   (t
+                    (error "invalid operands for ~A: ~S, ~S" ',name dst src))))
+
+                ;; printers:
+                ;; K <- K and K <- memory share the same opcode
+                ;; and are both decoded by kreg-kreg/mem.
+                ,@(kmov-printer-list 'kreg-kreg/mem kk-prefix op-k-k w)
+
+                ;; K <- GPR
+                ,@(kmov-printer-list 'kreg-reg/mem gr-prefix op-k-r gr-w)
+
+                ;; GPR <- K
+                ,@(kmov-printer-list 'reg-kreg/mem gr-prefix op-r-k gr-w)
+
+                ;; memory <- K
+                ;; ModRM.reg = K, ModRM.r/m = memory.
+                ;; kreg-kreg/mem can decode r/m as memory.
+                ,@(kmov-printer-list 'kreg-kreg/mem store-mem-prefix op-m-k w
+                                     :printer '(:name :tab reg/mem ", " reg)))))
+
+  ;;         kk    gr    store load  k<-k k<-r r<-k m<-k k<-m  w  gr-w
+  (def kmovw nil   nil   nil   nil   #x90 #x92 #x93 #x91 #x90  0  0)
+  (def kmovb #x66  #x66  #x66  #x66  #x90 #x92 #x93 #x91 #x90  0  0)
+  (def kmovd #x66  #xf2  #x66  #x66  #x90 #x92 #x93 #x91 #x90  1  0)
+  (def kmovq nil   #xf2  nil   nil   #x90 #x92 #x93 #x91 #x90  1  1))
+
+;;;; VMOVW (AVX512-FP16 16-bit GPR/memory <-> XMM move)
+
+(define-instruction vmovw (segment dst src)
+  #.(first (avx512-inst-printer-list 'ymm-ymm/mem #x66 #x6e :opcode-prefix :map5
+                                     :w 0 :ll 0 :reg-mem-size :dword))
+  #.(first (avx512-inst-printer-list 'ymm-ymm/mem #x66 #x7e :opcode-prefix :map5
+                                     :w 0 :ll 0 :reg-mem-size :dword
+                                     :printer '(:name :tab reg/mem ", " reg)))
+  (:emitter
+   (cond ((gpr-p dst)
+          (aver (xmm-register-p src))
+          (emit-avx512-inst segment dst src #x66 #x7e
+                            :opcode-prefix :map5 :w 0 :ll 0))
+         ((gpr-p src)
+          (aver (xmm-register-p dst))
+          (emit-avx512-inst segment src dst #x66 #x6e
+                            :opcode-prefix :map5 :w 0 :ll 0))
+         ((ea-p dst)
+          (aver (xmm-register-p src))
+          (emit-avx512-inst segment dst src #x66 #x7e
+                            :opcode-prefix :map5 :w 0 :ll 0 :disp-n 2))
+         ((ea-p src)
+          (aver (xmm-register-p dst))
+          (emit-avx512-inst segment src dst #x66 #x6e
+                            :opcode-prefix :map5 :w 0 :ll 0 :disp-n 2))
+         (t
+          (error "Unsupported operands for VMOVW: ~S, ~S" dst src)))))
+
+;;;; Broadcast instructions with custom register printers and GPR support
+
+(macrolet ((def-vbroadcast ()
+             `(progn
+                (define-instruction vbroadcastss (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x18
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :dword
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x18
+                                              :opcode-prefix #x0f38
+                                              :w 0 :disp-n 4)
+                  (:emitter
+                   (cond
+                     ((or (needs-evex-p nil nil nil dst src))
+                      (emit-avx512-inst segment src dst #x66 #x18
+                                        :opcode-prefix #x0f38
+                                        :w 0
+                                        :disp-n 4))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x18
+                                      :opcode-prefix #x0f38
+                                      :evex-w 0 :w 0 :l nil)))))
+
+                (define-instruction vbroadcastsd (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x19
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :qword
+                                            :w 0 :l 1)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x19
+                                              :opcode-prefix #x0f38
+                                              :w 1 :disp-n 8)
+                  (:emitter
+                   (cond
+                     ((or (needs-evex-p nil nil nil dst src))
+                      (emit-avx512-inst segment src dst #x66 #x19
+                                        :opcode-prefix #x0f38
+                                        :w 1
+                                        :disp-n 8))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x19
+                                      :opcode-prefix #x0f38
+                                      :evex-w 1 :w 0 :l 1)))))
+
+                (define-instruction vpbroadcastd (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x58
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :dword
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x58
+                                              :opcode-prefix #x0f38
+                                              :w 0 :disp-n 4)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x7c
+                                              :opcode-prefix #x0f38
+                                              :w 0
+                                              :reg-mem-size :dword
+                                              :printer '(:name :tab reg ", " reg/mem))
+                  (:emitter
+                   (cond
+                     ((gpr-p src)
+                      (emit-avx512-inst segment src dst #x66 #x7c
+                                        :opcode-prefix #x0f38
+                                        :w 0))
+                     ((or (needs-evex-p nil nil nil dst src))
+                      (emit-avx512-inst segment src dst #x66 #x58
+                                        :opcode-prefix #x0f38
+                                        :w 0
+                                        :disp-n 4))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x58
+                                      :opcode-prefix #x0f38
+                                      :evex-w 0 :w 0 :l nil)))))
+
+                (define-instruction vpbroadcastq (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x59
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :qword
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x59
+                                              :opcode-prefix #x0f38
+                                              :w 1 :disp-n 8)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x7c
+                                              :opcode-prefix #x0f38
+                                              :w 1
+                                              :reg-mem-size :qword
+                                              :printer '(:name :tab reg ", " reg/mem))
+                  (:emitter
+                   (cond
+                     ((gpr-p src)
+                      (emit-avx512-inst segment src dst #x66 #x7c
+                                        :opcode-prefix #x0f38
+                                        :w 1))
+                     ((or (needs-evex-p nil nil nil dst src))
+                      (emit-avx512-inst segment src dst #x66 #x59
+                                        :opcode-prefix #x0f38
+                                        :w 1
+                                        :disp-n 8))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x59
+                                      :opcode-prefix #x0f38
+                                      :evex-w 1 :w 0 :l nil)))))
+                (define-instruction vpbroadcastb (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x78
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :byte
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x78
+                                              :opcode-prefix #x0f38
+                                              :w 0 :disp-n 1)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x7a
+                                              :opcode-prefix #x0f38
+                                              :w 0
+                                              :reg-mem-size :byte
+                                              :printer '(:name :tab reg ", " reg/mem))
+                  (:emitter
+                   (cond
+                     ((gpr-p src)
+                      (emit-avx512-inst segment src dst #x66 #x7a
+                                        :opcode-prefix #x0f38
+                                        :w 0))
+                     ((or (needs-evex-p nil nil nil dst src))
+                      (emit-avx512-inst segment src dst #x66 #x78
+                                        :opcode-prefix #x0f38
+                                        :w 0
+                                        :disp-n 1))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x78
+                                      :opcode-prefix #x0f38
+                                      :evex-w 0 :w 0 :l nil)))))
+
+                (define-instruction vpbroadcastw (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x79
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :word
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x79
+                                              :opcode-prefix #x0f38
+                                              :w 0 :disp-n 2)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x7b
+                                              :opcode-prefix #x0f38
+                                              :w 0
+                                              :reg-mem-size :word
+                                              :printer '(:name :tab reg ", " reg/mem))
+                  (:emitter
+                   (cond
+                     ((gpr-p src)
+                      (emit-avx512-inst segment src dst #x66 #x7b
+                                        :opcode-prefix #x0f38
+                                        :w 0))
+                     ((or (needs-evex-p nil nil nil dst src))
+                      (emit-avx512-inst segment src dst #x66 #x79
+                                        :opcode-prefix #x0f38
+                                        :w 0
+                                        :disp-n 2))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x79
+                                      :opcode-prefix #x0f38
+                                      :evex-w 0 :w 0 :l nil))))))))
+  (def-vbroadcast))
+
+(macrolet ((def (name opcode &optional l (mem-size :qword) (evex-w 0) (disp-n 8))
+             `(define-instruction ,name (segment dst src)
+                ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 opcode
+                                          :opcode-prefix #x0f38
+                                          :xmmreg-mem-size mem-size
+                                          :w 0 :l l)
+                ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 opcode
+                                            :opcode-prefix #x0f38
+                                            :w evex-w :disp-n disp-n)
+                (:emitter
+                 (cond
+                   ((or (needs-evex-p nil nil nil dst src))
+                    (emit-avx512-inst segment src dst #x66 ,opcode
+                                      :opcode-prefix #x0f38
+                                      :w ,evex-w
+                                      :disp-n ,disp-n))
+                   (t
+                    (emit-avx2-inst segment src dst #x66 ,opcode
+                                    :opcode-prefix #x0f38
+                                    :evex-w ,evex-w :l ,l)))))))
+  (def vbroadcastf128 #x1a 1 :qword 0 16)
+  (def vbroadcasti128 #x5a 1 :qword 0 16))
 
