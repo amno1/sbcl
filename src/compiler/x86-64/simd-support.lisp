@@ -1,4 +1,55 @@
+;;;; Encoding and decoding support for VEX- and EVEX-encoded instructions.
+;;;;
+;;;; This file contains the vector runtime infrastructure:
+;;;; - Disassembler argument types (define-arg-type) and operand decoders
+;;;; - VEX and EVEX instruction format definitions (VEX2, VEX3, EVEX)
+;;;; - Instruction emitters for VEX (emit-avx2-inst) and EVEX (emit-avx512-inst)
+;;;; - Register printing utilities
+;;;; - VEX-encoded general-purpose register instructions (BMI1, BMI2, ADX)
+;;;;
+;;;; All vector computational and data movement instruction definitions
+;;;; are located in simd-insts.lisp (generated from LLVM TableGen).
+
 (in-package "SB-X86-64-ASM")
+
+
+;;; Declarations
+
+;;; General indicator that we are decoding an EVEX instruction.
+;;; EVEX has 128-, 256-, and 512-bit forms; L'L=00 is 128-bit and sets
+;;; neither +vex-l+ nor +evex-l1+, so this separate bit is required for
+;;; code that needs to know "EVEX vs VEX/legacy".
+;;; (Bit 14 is currently unused by other dstate properties.)
+(defconstant +evex+ #x4000)
+(defconstant +vex-l+ #x400)
+;; EVEX L'L=10 (512-bit) sets bit 11; L'L=01 (256-bit) sets bit 10 (=+vex-l+)
+(defconstant +evex-l1+ #x800)
+;; EVEX R' bit (reg bit 4, for registers 16-31 in ModR/M.reg)
+(defconstant +evex-r-prime+ #x1000)
+;; EVEX X bit as B' (r/m bit 4, for registers 16-31 in ModR/M.r/m, reg-direct only)
+(defconstant +evex-b-prime+ #x2000)
+;;; EVEX V' bit (vvvv bit 4, for registers 16-31 in the vvvv field).
+;;; The 4-bit vvvv field in the EVEX prefix is extended with this bit.
+;;; (Bit 15 is currently unused by other dstate properties.)
+(defconstant +evex-v-prime+ #x8000)
+
+(defconstant-eqx +avx-conditions+
+    #(:eq :lt :le :unord :neq :nlt :nle :ord :eq_uq
+      :nge :ngt :false :neq_oq :ge :gt :true :eq_os :lt_oq
+      :le_oq :unord_s :neq_us :nlt_uq :nle_uq :ord_s :eq_us
+      :nge_uq :ngt_uq :false_os :neq_os :ge_oq :gt_oq :true_us)
+  #'equalp)
+
+;;; VSIB support
+
+;;; Mark that the instruction uses vector-index SIB addressing.
+(defconstant +vsib+ #x10000)   ; choose an unused dstate property bit
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (declaim (ftype (function (t t t) *) print-vsib/mem)))
+
+
+;; disassembler argument types
 
 (define-arg-type k-vvvv-reg
   :prefilter #'invert-4
@@ -31,39 +82,32 @@
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-half-ymmreg/mem)
 
-(macrolet ((define-disp-arg-type (name n)
+(macrolet ((define-disp-arg-type (name n &optional (printer '#'print-ymmreg/mem))
              `(define-arg-type ,name
                 :prefilter (lambda (dstate mod r/m)
                              (decode-mod-r/m dstate mod r/m 'fpr :disp-n ,n))
-                :printer #'print-ymmreg/mem)))
+                :printer ,printer)))
   (define-disp-arg-type evex-ymmreg/mem-disp1  1)
   (define-disp-arg-type evex-ymmreg/mem-disp2  2)
   (define-disp-arg-type evex-ymmreg/mem-disp4  4)
   (define-disp-arg-type evex-ymmreg/mem-disp8  8)
   (define-disp-arg-type evex-ymmreg/mem-disp16 16)
   (define-disp-arg-type evex-ymmreg/mem-disp32 32)
-  (define-disp-arg-type evex-ymmreg/mem-disp64 64))
+  (define-disp-arg-type evex-ymmreg/mem-disp64 64)
 
-;;; The same, for the narrower source operand of the widening moves
-;;; (VPMOVSX/ZX): half-width (BW/WD/DQ) and XMM-only (BD/BQ/WQ).
-(macrolet ((define-disp-arg-types (printer &rest name-n-pairs)
-             `(progn
-                ,@(loop for (name n) on name-n-pairs by #'cddr
-                        collect `(define-arg-type ,name
-                                   :prefilter (lambda (dstate mod r/m)
-                                                (decode-mod-r/m dstate mod r/m 'fpr :disp-n ,n))
-                                   :printer ,printer)))))
-  (define-disp-arg-types #'print-half-ymmreg/mem
-    evex-half-ymmreg/mem-disp8 8 evex-half-ymmreg/mem-disp16 16
-    evex-half-ymmreg/mem-disp32 32)
-  (define-disp-arg-types #'print-xmmreg/mem
-    evex-xmmreg/mem-disp2 2 evex-xmmreg/mem-disp4 4 evex-xmmreg/mem-disp8 8
-    evex-xmmreg/mem-disp16 16))
+  ;; Narrower source operand of widening moves (VPMOVSX/ZX)
+  (define-disp-arg-type evex-half-ymmreg/mem-disp8  8  #'print-half-ymmreg/mem)
+  (define-disp-arg-type evex-half-ymmreg/mem-disp16 16 #'print-half-ymmreg/mem)
+  (define-disp-arg-type evex-half-ymmreg/mem-disp32 32 #'print-half-ymmreg/mem)
+
+  (define-disp-arg-type evex-xmmreg/mem-disp2  2  #'print-xmmreg/mem)
+  (define-disp-arg-type evex-xmmreg/mem-disp4  4  #'print-xmmreg/mem)
+  (define-disp-arg-type evex-xmmreg/mem-disp8  8  #'print-xmmreg/mem)
+  (define-disp-arg-type evex-xmmreg/mem-disp16 16 #'print-xmmreg/mem))
 
 (define-arg-type vm
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-ymmreg/mem)
-
 
 (define-arg-type vmx/y
   :prefilter #'prefilter-reg/mem
@@ -72,47 +116,26 @@
 (define-arg-type vmx
   :prefilter #'prefilter-reg/mem
   :printer #'print-vmx)
+
 (define-arg-type sized-xmmreg/mem
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-sized-xmmreg/mem)
+
 (define-arg-type sized-byte-xmmreg/mem
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-sized-byte-xmmreg/mem)
+
 (define-arg-type sized-word-xmmreg/mem
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-sized-word-xmmreg/mem)
+
 (define-arg-type sized-dword-xmmreg/mem
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-sized-dword-xmmreg/mem)
+
 (define-arg-type sized-xmmreg/mem-default-qword
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-sized-xmmreg/mem-default-qword)
-
-;;; General indicator that we are decoding an EVEX instruction.
-;;; EVEX has 128-, 256-, and 512-bit forms; L'L=00 is 128-bit and sets
-;;; neither +vex-l+ nor +evex-l1+, so this separate bit is required for
-;;; code that needs to know "EVEX vs VEX/legacy".
-;;; (Bit 14 is currently unused by other dstate properties.)
-(defconstant +evex+ #b100000000000000)
-(defconstant +vex-l+ #b10000000000)
-;; EVEX L'L=10 (512-bit) sets bit 11; L'L=01 (256-bit) sets bit 10 (=+vex-l+)
-(defconstant +evex-l1+ #b100000000000)
-;; EVEX R' bit (reg bit 4, for registers 16-31 in ModR/M.reg)
-(defconstant +evex-r-prime+ #b1000000000000)
-;; EVEX X bit as B' (r/m bit 4, for registers 16-31 in ModR/M.r/m, reg-direct only)
-(defconstant +evex-b-prime+ #b10000000000000)
-;;; EVEX V' bit (vvvv bit 4, for registers 16-31 in the vvvv field).
-;;; The 4-bit vvvv field in the EVEX prefix is extended with this bit.
-;;; (Bit 15 is currently unused by other dstate properties.)
-(defconstant +evex-v-prime+ #b1000000000000000)
-
-;;; VSIB support
-
-;;; Mark that the instruction uses vector-index SIB addressing.
-(defconstant +vsib+ #x10000)   ; choose an unused dstate property bit
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (declaim (ftype (function (t t t) *) print-vsib/mem)))
 
 (define-arg-type evex-vsib-disp4
   :prefilter (lambda (dstate mod r/m)
@@ -156,18 +179,10 @@
                               full-reg))))
   :printer #'print-ymmreg-rm)
 
-(defconstant-eqx +avx-conditions+
-    #(:eq :lt :le :unord :neq :nlt :nle :ord :eq_uq
-      :nge :ngt :false :neq_oq :ge :gt :true :eq_os :lt_oq
-      :le_oq :unord_s :neq_us :nlt_uq :nle_uq :ord_s :eq_us
-      :nge_uq :ngt_uq :false_os :neq_os :ge_oq :gt_oq :true_us)
-  #'equalp)
-
 (define-arg-type avx-condition-code
   :type 'imm-byte
   :printer +avx-conditions+)
-
-
+
 ;;; EVEX arg-types
 
 ;; EVEX R' extends ModR/M.reg bit 4 (inverted in prefix)
@@ -245,6 +260,8 @@
                    (decode-mod-r/m dstate mod r/m 'gpr)))
   :printer #'print-kreg/mem)
 
+;;; Instruction formats
+
 (define-instruction-format (vex2 16)
                            (vex :field (byte 8 0) :value #xC5)
                            (r :field (byte 1 (+ 8 7)) :type 'vex-r)
@@ -317,14 +334,15 @@
 ;;; Same as ymm-ymm/mem etc., but with a direction bit.
 (define-vex-instruction-format (ymm-ymm/mem-dir 16
                                 :include ymm-ymm/mem
-                                :default-printer `(:name
-                                                   :tab
-                                                   (:if (reg/mem :test machine-ea-p)
-                                                        (:if (dir :constant 0)
-                                                             (reg ", " reg/mem)
-                                                             (reg/mem ", " reg))
-                                                        (reg ", " vvvv ", " reg/mem))))
-  (op  :field (byte 7 (+ start 1)))
+                                :default-printer
+                                `(:name
+                                  :tab
+                                  (:if (reg/mem :test machine-ea-p)
+                                       (:if (dir :constant 0)
+                                            (reg ", " reg/mem)
+                                            (reg/mem ", " reg))
+                                       (reg ", " vvvv ", " reg/mem))))
+    (op  :field (byte 7 (+ start 1)))
   (dir :field (byte 1 (+ start 0))))
 
 (define-vex-instruction-format (ymm-ymm-imm 16
@@ -536,14 +554,15 @@
 
 (define-evex-instruction-format (ymm-ymm/mem-dir 16
                                  :include ymm-ymm/mem
-                                 :default-printer `(:name
-                                                    :tab
-                                                    (:if (reg/mem :test machine-ea-p)
-                                                         (:if (dir :constant 0)
-                                                              (reg ", " reg/mem)
-                                                              (reg/mem ", " reg))
-                                                         (reg ", " vvvv ", " reg/mem))))
-  (op  :field (byte 7 (+ start 1)))
+                                 :default-printer
+                                 `(:name
+                                   :tab
+                                   (:if (reg/mem :test machine-ea-p)
+                                        (:if (dir :constant 0)
+                                             (reg ", " reg/mem)
+                                             (reg/mem ", " reg))
+                                        (reg ", " vvvv ", " reg/mem))))
+    (op  :field (byte 7 (+ start 1)))
   (dir :field (byte 1 (+ start 0))))
 
 (define-evex-instruction-format (ymm-ymm-imm 16
@@ -712,10 +731,10 @@
                       (ash (logxor 1 v-prime) 3)
                       aaa)))
 
+;; Extract EVEX prefix flags from operands.
+;; Returns: ll, r, x, b, r-prime, v-prime.
+;; EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding.
 (defun determine-evex-flags (thing reg ll vvvv)
-  "Extract EVEX prefix flags from operands.
-Returns: ll, r, x, b, r-prime, v-prime.
-EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
   (flet ((reg-bit3 (reg-id)
            ;; Extract bit 3 of 5-bit register number (for R, B in EVEX)
            (if (logbitp 3 (reg-id-num reg-id)) 1 0))
@@ -875,15 +894,15 @@ produces silently wrong addresses."
   (when is4
     (emit-byte segment (ash (reg-id-num (reg-id is4)) 4))))
 
+;; Emit EVEX-encoded instruction with /i field and immediate byte.
+;; THING is the destination (NDD, encoded in vvvv).
+;; REG is the source (encoded in ModR/M.r/m).
+;; /I is encoded in ModR/M.reg bits 5:3.
 (defun emit-avx512-inst-imm (segment thing reg imm prefix opcode /i
                              &key ll
                                   (w 0)
                                   (opcode-prefix #x0F)
                                   (aaa 0) (z 0) (evex-b 0))
-  "Emit EVEX-encoded instruction with /i field and immediate byte.
-THING is the destination (NDD, encoded in vvvv).
-REG is the source (encoded in ModR/M.r/m).
-/I is encoded in ModR/M.reg bits 5:3."
   (aver (<= 0 /i 7))
   ;; thing = destination -> goes in vvvv (NDD encoding)
   ;; reg = source -> goes in r/m
@@ -1071,7 +1090,7 @@ REG is the source (encoded in ModR/M.r/m).
                 (op ,opcode)))))))))
 
 
-;;; ------------------------------------------------------------------
+
 ;;; Runtime support for vector instruction emitters.
 
 (defun avx512-register-p (reg)
@@ -1108,23 +1127,6 @@ REG is the source (encoded in ModR/M.r/m).
         ((sb-c:tn-p mask) (sb-c:tn-offset mask))
         (t (error "Invalid mask ~S" mask))))
 
-(define-instruction xsave (segment dst)
-  (:printer ext-reg/mem-no-width ((op '(#xae 4))))
-  (:emitter
-   (aver (not (register-p dst)))
-   (emit-prefixes segment dst nil :do-not-set)
-   (emit-byte segment #x0F)
-   (emit-byte segment #xAE)
-   (emit-ea segment dst 4)))
-
-(define-instruction xrstor (segment dst)
-  (:printer ext-reg/mem-no-width ((op '(#xae 5))))
-  (:emitter
-   (aver (not (register-p dst)))
-   (emit-prefixes segment dst nil :do-not-set)
-   (emit-byte segment #x0F)
-   (emit-byte segment #xAE)
-   (emit-ea segment dst 5)))
 
 (define-instruction-format (vex3-vex-gpr (+ 24 16) :include vex3
                                                    :default-printer '(:name :tab reg ", " vvvv ", " reg/mem))
