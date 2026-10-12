@@ -3282,7 +3282,23 @@
 
   (define-instruction stmxcsr (segment dst)
     (:printer ext-reg/mem-no-width ((op '(#xae 3))))
-    (:emitter (emit* segment dst 3))))
+    (:emitter (emit* segment dst 3)))
+
+  (define-instruction xsave (segment dst)
+    (:printer ext-reg/mem-no-width ((op '(#xae 4))))
+    (:emitter
+     (aver (not (register-p dst)))
+     (emit-prefixes segment dst nil :do-not-set)
+     (emit-bytes segment #x0f #xae)
+     (emit-ea segment dst 4)))
+
+  (define-instruction xrstor (segment dst)
+    (:printer ext-reg/mem-no-width ((op '(#xae 5))))
+    (:emitter
+     (aver (not (register-p dst)))
+     (emit-prefixes segment dst nil :do-not-set)
+     (emit-bytes segment #x0f #xae)
+     (emit-ea segment dst 5))))
 
 (define-instruction popcnt (segment &prefix prefix dst src)
   (:printer ext-xmm-reg/mem ((prefix #xF3) (op #xB8) (reg nil :type 'reg)))

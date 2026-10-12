@@ -1,4 +1,12 @@
-;;; Generated instruction definitions
+;;;; Unified SIMD Instruction Database (AVX, AVX2, AVX-512, AVX10).
+;;;;
+;;;; Automatically generated from LLVM TableGen (x86-insts.sexp) via
+;;;; x86-insts.lisp and special-insts.lisp.
+;;;;
+;;;; This file defines all vector computational, data movement, conversion,
+;;;; masking, broadcast, blend, and gather/scatter instructions using the
+;;;; formats and emitters provided by simd-support.lisp.
+
 (in-package "SB-X86-64-ASM")
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf (symbol-value (find-symbol "*BACKEND-INSTRUCTION-SET-PACKAGE*" "SB-ASSEM"))

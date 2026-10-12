@@ -1,4 +1,4 @@
-;;;; target-only stuff for avx2-insts.lisp
+;;;; target-only stuff for simd-support.lisp
 ;;;;
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
