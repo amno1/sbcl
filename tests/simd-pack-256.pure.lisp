@@ -245,3 +245,30 @@
                                (simd-pack-256 single-float)
                                (simd-pack-256 double-float)))
                    'simd-pack-256))))
+
+(with-test (:name :simd-pack-256-constant-loop-hoist)
+  (let* ((fun (checked-compile
+               'sb-vm::(lambda (n)
+                         (declare (type fixnum n)
+                                  (optimize (speed 3) (safety 0)))
+                         (let ((c (sb-ext:%make-simd-pack-256-ub64 10 10 10 10))
+                               (acc (sb-ext:%make-simd-pack-256-ub64 0 0 0 0)))
+                           (declare (type (sb-ext:simd-pack-256 (unsigned-byte 64)) c acc))
+                           (dotimes (i n)
+                             (setf acc (inline-vop
+                                        (((a int-avx2-reg simd-pack-256-ub64) acc)
+                                         ((b int-avx2-reg simd-pack-256-ub64) c))
+                                        ((res int-avx2-reg simd-pack-256-ub64))
+                                        (inst vpaddq res a b)
+                                        (inst vpaddq res res b))))
+                           acc))))
+         (lines (ctu:disassembly-lines fun))
+         (head (position-if (lambda (line) (search "L0:" line)) lines))
+         (tail (position-if (lambda (line) (search "L0" line)) lines :from-end t)))
+    (assert (find-if (lambda (line) (search "VPADDQ" line)) lines))
+    (assert head)
+    ;; The vector constant is materialized once before the loop ...
+    (assert (find-if (lambda (line) (search "[RIP" line)) (subseq lines 0 head)))
+    ;; ... and never re-read from memory inside the loop body.
+    (assert (notany (lambda (line) (search "[RIP" line))
+                    (subseq lines head (1+ tail))))))

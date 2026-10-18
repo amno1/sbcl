@@ -16,6 +16,16 @@
 
 (in-package "SB-C")
 
+(declaim (inline simd-pack-constant-p))
+(defun simd-pack-constant-p (leaf)
+  (declare (ignorable leaf))
+  #+(or sb-simd-pack sb-simd-pack-256 sb-simd-pack-512)
+  (and (constant-p leaf)
+       (typep (leaf-type leaf)
+              '(or #+sb-simd-pack simd-pack-type
+                   #+sb-simd-pack-256 simd-pack-256-type
+                   #+sb-simd-pack-512 simd-pack-512-type))))
+
 ;;;; interface for obtaining results of constant folding
 
 ;;; Return true for an LVAR whose sole use is a reference to a
@@ -84,7 +94,14 @@
                             nil)
                            (t
                             (push lvar seen)
-                            (process-lvar (lambda-var-ref-lvar principal-use)))))))))
+                            ;; Don't look through lambda-vars initialized with SIMD pack
+                            ;; constants, so uses inside loops are not treated as constant
+                            ;; literals and folded at compile time into fresh constant leaves.
+                            (let ((init-lvar (lambda-var-ref-lvar principal-use)))
+                              (when init-lvar
+                                (multiple-value-bind (const use) (process-lvar init-lvar)
+                                  (unless (and const (simd-pack-constant-p const))
+                                    (values const use))))))))))))
       (process-lvar lvar))))
 
 (defun constant-node-p (node)
@@ -2858,7 +2875,10 @@ not inlined.")
              (let ((use (lvar-uses arg)))
                (when (ref-p use)
                  (let ((leaf (ref-leaf use)))
+                   ;; Don't substitute SIMD pack constants into variable references,
+                   ;; which would move them into loop bodies.
                    (when (and (constant-reference-p use)
+                              (not (simd-pack-constant-p leaf))
                               (csubtypep (leaf-type leaf)
                                          ;; (NODE-DERIVED-TYPE USE) would
                                          ;; be better -- APD, 2003-05-15
@@ -2883,9 +2903,14 @@ not inlined.")
                             (eq (node-component ref) use-component))
                           leaf var)))
                      t))))))
+       ;; Don't substitute single-use LVARs carrying SIMD pack constants
+       ;; across block boundaries into loops. ignore-types=t ensures any
+       ;; constant SIMD pack is caught even if types have been narrowed.
        ((and arg
              (null (rest (leaf-refs var)))
              (not (preserve-single-use-debug-var-p call var))
+             (not (let ((const (lvar-constant arg t)))
+                    (and const (simd-pack-constant-p const))))
              (substitute-single-use-lvar arg var)))
        (t
         (propagate-to-refs var type))))
