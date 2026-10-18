@@ -76,7 +76,11 @@
          (let ((vop (tn-ref-vop writes)))
            (and (eq (vop-name vop) 'move)
                 (let ((arg-tn (tn-ref-tn (vop-args vop))))
-                  (and (or (not (tn-sc arg-tn))
+                  ;; Don't copy-propagate SIMD pack constant TNs, which would
+                  ;; eliminate the hoisted register move before loop entry.
+                  (and (not (and (eq (tn-kind arg-tn) :constant)
+                                 (simd-pack-constant-p (tn-leaf arg-tn))))
+                       (or (not (tn-sc arg-tn))
                            (eq (tn-kind arg-tn) :constant))
                        (or
                         (subsetp (primitive-type-scs (tn-primitive-type tn))
