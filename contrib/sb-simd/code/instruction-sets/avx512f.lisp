@@ -116,6 +116,7 @@
    (f32.16-fmadd          #:vfmadd213ps  (f32.16) (f32.16 f32.16 f32.16) :cost 1 :encoding :fma)
    (f32.16-fnmadd         #:vfnmadd213ps (f32.16) (f32.16 f32.16 f32.16) :cost 1 :encoding :fma)
    (f32.16-fmsub          #:vfmsub213ps  (f32.16) (f32.16 f32.16 f32.16) :cost 1 :encoding :fma)
+   (f32.16-fnmsub         #:vfnmsub213ps  (f32.16) (f32.16 f32.16 f32.16) :cost 1 :encoding :fma)
    (f32.16-fmaddsub       #:vfmaddsub213ps (f32.16) (f32.16 f32.16 f32.16) :cost 1 :encoding :fma)
    (f32.16-fmsubadd       #:vfmsubadd213ps (f32.16) (f32.16 f32.16 f32.16) :cost 1 :encoding :fma)
 
@@ -191,6 +192,7 @@
    (f64.8-fmadd           #:vfmadd213pd  (f64.8)  (f64.8 f64.8 f64.8) :cost 1 :encoding :fma)
    (f64.8-fnmadd          #:vfnmadd213pd (f64.8)  (f64.8 f64.8 f64.8) :cost 1 :encoding :fma)
    (f64.8-fmsub           #:vfmsub213pd  (f64.8)  (f64.8 f64.8 f64.8) :cost 1 :encoding :fma)
+   (f64.8-fnmsub          #:vfnmsub213pd  (f64.8)  (f64.8 f64.8 f64.8) :cost 1 :encoding :fma)
    (f64.8-fmaddsub        #:vfmaddsub213pd (f64.8) (f64.8 f64.8 f64.8) :cost 1 :encoding :fma)
    (f64.8-fmsubadd        #:vfmsubadd213pd (f64.8) (f64.8 f64.8 f64.8) :cost 1 :encoding :fma)
 
