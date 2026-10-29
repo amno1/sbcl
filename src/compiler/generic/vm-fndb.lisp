@@ -128,7 +128,7 @@
   (defknown sb-impl::%base-name= (simple-base-string simple-base-string (integer 1 64))
       boolean (flushable))
   (defknown sb-impl::%char-base-name= ((simple-array character (*)) simple-base-string
-                                       (integer 1 16))
+                                       (integer 1 32))
       boolean (flushable)))
 
 (defknown (symbol-hash) (symbol) hash-code (flushable movable))
