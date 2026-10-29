@@ -406,6 +406,8 @@ sufficiently motivated to do lengthy fixes."
   (stream-deinit)
   (setf sb-c::*compile-elapsed-time* 0
         sb-c::*compile-file-elapsed-time* 0)
+  (setf sb-c::*vop-parse-share-tables* nil
+        sb-c::*vop-info-coalesce-tables* nil)
   (setf * nil ** nil *** nil
         - nil + nil ++ nil +++ nil
         /// nil // nil / nil))
