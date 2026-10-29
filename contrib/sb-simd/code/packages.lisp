@@ -2853,6 +2853,10 @@
      #:u8.64-incf
      #:u8.64-decf
      #:u8.64-aref #:u8.64-row-major-aref #:u8.64-sap-ref
+     #:u8.64-load-masked-z #:u8.64-load-masked #:u8.64-store-masked
+     #:u8.64-aref-masked-z #:u8.64-aref-masked
+     #:u8.64-row-major-aref-masked-z #:u8.64-row-major-aref-masked
+     #:u8.64-sap-ref-masked-z #:u8.64-sap-ref-masked
      #:u8.64-non-temporal-aref #:u8.64-non-temporal-row-major-aref #:u8.64-non-temporal-sap-ref
      ;; u16.32
      #:make-u16.32
@@ -2910,6 +2914,10 @@
      #:u16.32-incf
      #:u16.32-decf
      #:u16.32-aref #:u16.32-row-major-aref #:u16.32-sap-ref
+     #:u16.32-load-masked-z #:u16.32-load-masked #:u16.32-store-masked
+     #:u16.32-aref-masked-z #:u16.32-aref-masked
+     #:u16.32-row-major-aref-masked-z #:u16.32-row-major-aref-masked
+     #:u16.32-sap-ref-masked-z #:u16.32-sap-ref-masked
      #:u16.32-non-temporal-aref #:u16.32-non-temporal-row-major-aref #:u16.32-non-temporal-sap-ref
      ;; s8.64
      #:make-s8.64
@@ -2959,6 +2967,10 @@
      #:s8.64-incf
      #:s8.64-decf
      #:s8.64-aref #:s8.64-row-major-aref #:s8.64-sap-ref
+     #:s8.64-load-masked-z #:s8.64-load-masked #:s8.64-store-masked
+     #:s8.64-aref-masked-z #:s8.64-aref-masked
+     #:s8.64-row-major-aref-masked-z #:s8.64-row-major-aref-masked
+     #:s8.64-sap-ref-masked-z #:s8.64-sap-ref-masked
      #:s8.64-non-temporal-aref #:s8.64-non-temporal-row-major-aref #:s8.64-non-temporal-sap-ref
      ;; s16.32
      #:make-s16.32
@@ -3022,6 +3034,10 @@
      #:s16.32-incf
      #:s16.32-decf
      #:s16.32-aref #:s16.32-row-major-aref #:s16.32-sap-ref
+     #:s16.32-load-masked-z #:s16.32-load-masked #:s16.32-store-masked
+     #:s16.32-aref-masked-z #:s16.32-aref-masked
+     #:s16.32-row-major-aref-masked-z #:s16.32-row-major-aref-masked
+     #:s16.32-sap-ref-masked-z #:s16.32-sap-ref-masked
      #:s16.32-non-temporal-aref #:s16.32-non-temporal-row-major-aref #:s16.32-non-temporal-sap-ref))
 
   #+x86-64
