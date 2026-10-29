@@ -202,8 +202,8 @@
 
 #+x86-64
 (macrolet
-    ((def-masked-aref (type-name element-type)
-       (let* ((pkg (find-package "SB-SIMD-AVX512F"))
+    ((def-masked-aref (type-name element-type &optional (package-name "SB-SIMD-AVX512F"))
+       (let* ((pkg (find-package package-name))
               (load-z            (mksym pkg type-name "-LOAD-MASKED-Z"))
               (load-m            (mksym pkg type-name "-LOAD-MASKED"))
               (store             (mksym pkg type-name "-STORE-MASKED"))
@@ -290,5 +290,9 @@
   (def-masked-aref u32.16 (unsigned-byte 32))
   (def-masked-aref s32.16 (signed-byte 32))
   (def-masked-aref u64.8  (unsigned-byte 64))
-  (def-masked-aref s64.8  (signed-byte 64)))
+  (def-masked-aref s64.8  (signed-byte 64))
+  (def-masked-aref u8.64  (unsigned-byte 8)  "SB-SIMD-AVX512BW")
+  (def-masked-aref s8.64  (signed-byte 8)    "SB-SIMD-AVX512BW")
+  (def-masked-aref u16.32 (unsigned-byte 16) "SB-SIMD-AVX512BW")
+  (def-masked-aref s16.32 (signed-byte 16)   "SB-SIMD-AVX512BW"))
 
