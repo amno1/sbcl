@@ -42,6 +42,14 @@
     (and (>= (cpuid 0) 1)
          (logbitp 12 (nth-value 2 (cpuid 1)))))
 
+  (defun bmi1-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 3 (nth-value 1 (cpuid 7 0)))))
+
+  (defun bmi2-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 8 (nth-value 1 (cpuid 7 0)))))
+
   (defun avx512f-supported-p ()
     (and (>= (cpuid 0) 7)
          (logbitp 16 (nth-value 1 (cpuid 7 0)))))
@@ -175,6 +183,12 @@
     nil)
 
   (defun avx512ifma-supported-p ()
+    nil)
+
+  (defun bmi1-supported-p ()
+    nil)
+
+  (defun bmi2-supported-p ()
     nil)
 
   (defun avx512bw-supported-p ()
