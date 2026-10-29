@@ -188,7 +188,7 @@
     (declare (ignore element-type))
     'phony-simd-pack-256))
 
-#-(or x86-64 sb-simd-pack-512)
+#-sb-simd-pack-512
 (progn
   (defstruct phony-simd-pack-512)
   (deftype simd-pack-512 (&optional element-type)
@@ -209,7 +209,7 @@
                                #-(or x86-64 sb-simd-pack-256)
                                'simd-pack-256))
                       (512 (or (find-symbol "SIMD-PACK-512" "SB-EXT")
-                               #-(or x86-64 sb-simd-pack-512)
+                               #-sb-simd-pack-512
                                'simd-pack-512)))))
               (cond ((not base-type) 't)
                     ((not scalar-record-name) base-type)
@@ -257,7 +257,7 @@
   (destructuring-bind (name scalar-record-name bits primitive-type scs) expr
     (let ((mask-pack-type
             (or (find-symbol "SIMD-PACK-512-MASK" "SB-EXT")
-                #-(or x86-64 sb-simd-pack-512)
+                #-sb-simd-pack-512
                 'simd-pack-512-mask)))
       `(let ((.scalar-record. (find-value-record ',(or scalar-record-name (find-symbol "U64")))))
          (let ((.mask-record.

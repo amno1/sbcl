@@ -398,7 +398,7 @@
  ("src/compiler/target-dstate" :not-host)
  ("src/compiler/asm-target/insts")
  #+avx2 ("src/compiler/{arch}/simd-support")
- #+avx512 ("src/compiler/{arch}/simd-insts")
+ #+avx2 ("src/compiler/{arch}/simd-insts")
  ("src/compiler/{arch}/macros")
 
  ("src/assembly/{arch}/support")
