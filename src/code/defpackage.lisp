@@ -763,9 +763,10 @@ error otherwise.")
 (defun tune-hashset-sizes-of-all-packages ()
   (flet ((tune (desired-lf table)
            (resize-symbol-table table (%symtbl-count table) 'intern desired-lf))
+         ;; Return true if TABLE is now perfectly hashed.
          (perfect (table &aux (cells (symtbl-%cells table)))
            (when (functionp (car cells))
-             (return-from perfect)) ; already perfectly hashed
+             (return-from perfect t)) ; already perfectly hashed
            (let* ((cells (cdr cells))
                   (hashes (map '(simple-array (unsigned-byte 32) (*))
                                #'symbol-name-hash
@@ -785,12 +786,10 @@ error otherwise.")
                (setf (symtbl-%cells table) (cons fun new-cells)
                      (symtbl-size table) (length hashes)
                      (symtbl-free table) 0
-                     (symtbl-deleted table) 0)))))
+                     (symtbl-deleted table) 0)
+               t))))
     (dolist (package (list-all-packages))
       ;; Choose load factor based on whether INTERN is expected at runtime
-      ;; FIXME: because changing a package from perfectly hashed back to
-      ;; an open-addressing table is not thread-safe, _only_ the CL package can
-      ;; become perfectly hashed.
       (let ((lf (cond ((eq (the package package) *keyword-package*) 60/100)
                       ((eq package *cl-package*) 1)
                       (t 8/10)))
@@ -799,6 +798,17 @@ error otherwise.")
         (cond ((= lf 1)
                ;; Should be no internals of CL, don't even bother tuning them
                (perfect externals))
+              ;; Externals of other locked packages rarely change, so hash them
+              ;; perfectly too. If one does change (e.g. a contrib exporting from
+              ;; SB-EXT), the table reverts to open addressing, which is safe for
+              ;; concurrent readers. Fall back to ordinary tuning if no perfect
+              ;; hash could be made (e.g. fewer than 3 symbols, or two names
+              ;; with the same hash).
+              ((and (package-locked-p package)
+                    (not (eq package *keyword-package*)))
+               (tune lf internals)
+               (unless (perfect externals)
+                 (tune lf externals)))
               (t
                (tune lf internals)
                (tune lf externals)))
