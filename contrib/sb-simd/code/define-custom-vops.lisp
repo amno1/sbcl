@@ -580,6 +580,9 @@
 
 
 
+  ;; AVX-512 masked loads, stores, broadcasts, gathers and scatters. These are
+  ;; plain DEFINE-VOPs, so they need the core's 512-bit packs and mask registers.
+  #+sb-simd-pack-512
   (macrolet
       ((def-masked-vref-vops (type-name reg-sc stack-sc mask-name mask-sc mnemonic move-inst vec-name bytes-per-element
                              &optional (package-name "SB-SIMD-AVX512F"))
@@ -847,6 +850,7 @@
     (def-masked-vref-vops s16.32 int-avx512-reg    int-avx512-stack    m16.32 unsigned-reg vmovdqu16-masked vmovdqa64 s16vec 2 "SB-SIMD-AVX512BW"))
 
     ;; Register compress and expand VOPs
+    #+sb-simd-pack-512
     (macrolet ((def-compress-z (name inst)
                  `(define-custom-vop ,name
                       (:args (mask) (a))
@@ -912,72 +916,84 @@
       (def-expand     sb-simd-avx512f::s64.8-expand      vmovdqa64 vpexpandq-masked))
 
     ;; Subvector broadcast custom VOPs
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:f32.16-broadcast-f32.4
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshuff32x4 dst src src 0)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:f32.16-broadcast-f32.8
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshuff32x4 dst src src #x44)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:f64.8-broadcast-f64.2
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshuff64x2 dst src src 0)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:f64.8-broadcast-f64.4
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshuff64x2 dst src src #x44)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:u32.16-broadcast-u32.4
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshufi32x4 dst src src 0)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:u32.16-broadcast-u32.8
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshufi32x4 dst src src #x44)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:s32.16-broadcast-s32.4
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshufi32x4 dst src src 0)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:s32.16-broadcast-s32.8
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshufi32x4 dst src src #x44)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:u64.8-broadcast-u64.2
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshufi64x2 dst src src 0)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:u64.8-broadcast-u64.4
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshufi64x2 dst src src #x44)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:s64.8-broadcast-s64.2
         (:args (src))
       (:results (dst))
       (:generator
        (inst vshufi64x2 dst src src 0)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:s64.8-broadcast-s64.4
         (:args (src))
       (:results (dst))
@@ -985,24 +1001,28 @@
        (inst vshufi64x2 dst src src #x44)))
 
     ;; Mask-to-vector broadcast custom VOPs
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:u32.16-from-mask
         (:args (mask))
       (:results (dst))
       (:generator
        (inst vpbroadcastmw2d dst mask)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:s32.16-from-mask
         (:args (mask))
       (:results (dst))
       (:generator
        (inst vpbroadcastmw2d dst mask)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:u64.8-from-mask
         (:args (mask))
       (:results (dst))
       (:generator
        (inst vpbroadcastmb2q dst mask)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512f:s64.8-from-mask
         (:args (mask))
       (:results (dst))
@@ -1010,24 +1030,28 @@
        (inst vpbroadcastmb2q dst mask)))
 
     ;; Native AVX-512BW byte/word broadcast custom VOPs
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512bw:u8.64-broadcast
         (:args (src))
       (:results (dst))
       (:generator
        (inst vpbroadcastb dst src)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512bw:s8.64-broadcast
         (:args (src))
       (:results (dst))
       (:generator
        (inst vpbroadcastb dst src)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512bw:u16.32-broadcast
         (:args (src))
       (:results (dst))
       (:generator
        (inst vpbroadcastw dst src)))
 
+    #+sb-simd-pack-512
     (define-custom-vop sb-simd-avx512bw:s16.32-broadcast
         (:args (src))
       (:results (dst))
@@ -1036,6 +1060,7 @@
 
     ;; Memory compress and expand VOPs
 
+    #+sb-simd-pack-512
     (macrolet
         ((def-compress-expand-memory-vops (type-name reg-sc mask-name compress-inst expand-inst move-inst vec-name bytes-per-element)
            (let* ((pkg (find-package "SB-SIMD-AVX512F"))
@@ -1303,6 +1328,7 @@
       (def-compress-expand-memory-vops s64.8  int-avx512-reg    m64.8  vpcompressq-masked vpexpandq-masked vmovdqa64 s64vec 8))
 
     ;; Memory scalar broadcast VOPs
+    #+sb-simd-pack-512
     (macrolet
         ((def-broadcast-memory-vops (type-name reg-sc mask-name unmasked-inst masked-inst move-inst vec-name bytes-per-element)
            (let* ((pkg (find-package "SB-SIMD-AVX512F"))
@@ -1549,6 +1575,7 @@
         (def-broadcast-memory-vops u64.8  int-avx512-reg    m64.8  vpbroadcastq vpbroadcastq-masked vmovdqa64 u64vec 8)
         (def-broadcast-memory-vops s64.8  int-avx512-reg    m64.8  vpbroadcastq vpbroadcastq-masked vmovdqa64 s64vec 8))
 
+    #+sb-simd-pack-512
     (macrolet
         ((def-gather-scatter-vops (type-name reg-sc mask-name gather-inst scatter-inst clear-inst copy-inst vec-name bytes-per-element)
            (let* ((pkg (find-package "SB-SIMD-AVX512F"))
