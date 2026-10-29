@@ -48,6 +48,25 @@
 
 (define-load-time-global *package-graph-lock* nil)
 
+;;; How a table with a perfectly hashed part reacts to its first change:
+;;;  :SPEED - keep the perfect part; new symbols go into the open-addressing
+;;;           part and removed ones are marked in a bitmap. Tables are merged
+;;;           back into a perfect part after LOAD (see MERGE-SYMBOL-TABLES).
+;;;  :SPACE - fold everything into one open-addressing table and drop the
+;;;           perfect part, as SBCL used to do for CL's externals.
+(define-load-time-global *symbol-table-policy* :speed)
+(declaim (type (member :speed :space) *symbol-table-policy*))
+
+;;; True once the image has been saved with perfectly hashed tables; until
+;;; then (i.e. while SBCL itself is being built) LOAD doesn't merge.
+(define-load-time-global *merge-symbol-tables-after-load* nil)
+
+;;; Whatever the outermost LOAD interned, put it in perfect parts now.
+;;; MERGE-SYMBOL-TABLES is defined later, in defpackage.lisp.
+(defun after-outermost-load ()
+  (when *merge-symbol-tables-after-load*
+    (funcall (symbol-function 'merge-symbol-tables))))
+
 (defmacro with-package-graph ((&key) &body forms)
   ;; FIXME: Since name conflicts can be signalled while holding the
   ;; mutex, user code can be run leading to lock ordering problems.
@@ -420,6 +439,23 @@ of :INHERITED :EXTERNAL :INTERNAL."
   (let ((perfect (symtbl-perfect table)))
     (+ (%symtbl-overflow-count table)
        (if perfect (psymtbl-count perfect) 0))))
+
+;;; Move every symbol of TABLE into a single open-addressing table and drop
+;;; the perfect part. The caller must exclude concurrent writers. The full
+;;; open-addressing part is published before PERFECT is cleared, so a reader
+;;; always finds each symbol in at least one of the parts it looks at.
+(defun flatten-symbol-table (table)
+  (let* ((symbols (remove-if-not #'symbolp (symtbl-all-cells table)))
+         (temp (make-symbol-table (length symbols))))
+    (dovector (s symbols)
+      (add-symbol temp s 'intern))
+    (setf (symtbl-%cells table) (symtbl-%cells temp)
+          (symtbl-size table) (symtbl-size temp)
+          (symtbl-free table) (symtbl-free temp)
+          (symtbl-deleted table) 0)
+    (sb-thread:barrier (:write))
+    (setf (symtbl-perfect table) nil)
+    table))
 
 ;;; Return a vector holding every symbol of TABLE (fixnums are to be skipped).
 ;;; This is the open-addressing vector or the perfect vector itself when the
@@ -1128,6 +1164,9 @@ Experimental: interface subject to change."
 ;;; Add a symbol to a hashset. The symbol MUST NOT be present.
 ;;; This operation is under the WITH-PACKAGE-GRAPH lock if called by %INTERN.
 (defun add-symbol (table symbol reason &aux (cells (symtbl-%cells table)))
+  (when (and (symtbl-perfect table) (eq *symbol-table-policy* :space))
+    (flatten-symbol-table table)
+    (setq cells (symtbl-%cells table)))
   (setf (symtbl-modified table) t)
   (when (or (zerop (symtbl-free table)) (/= 0 (symtbl-immutable (car cells))))
     ;; The hashtable is full. Resize it to be able to hold twice the
@@ -1238,6 +1277,30 @@ Experimental: interface subject to change."
 (define-load-time-global *sym-hit-1st-try* 0)
 |#
 
+;;; Compare the first NAME-LENGTH characters of STRING with NAME, a symbol's
+;;; name of that length. With AVX-512BW, short names are compared with one
+;;; masked vector compare instead of a character loop.
+#+sb-simd-pack-512
+(progn
+  (defun %base-name= (a b n) (%base-name= a b n))
+  (defun %char-base-name= (a b n) (%char-base-name= a b n)))
+
+(declaim (inline lookup-name=))
+(defun lookup-name= (string name name-length)
+  (declare (simple-string string name) (index name-length))
+  #+sb-simd-pack-512
+  (when (and (simple-base-string-p name)
+             (<= 1 name-length)
+             (sb-vm::cpu-has-avx512bw-p))
+    (typecase string
+      (simple-base-string
+       (when (<= name-length 64)
+         (return-from lookup-name= (%base-name= string name name-length))))
+      ((simple-array character (*))
+       (when (<= name-length 16)
+         (return-from lookup-name= (%char-base-name= string name name-length))))))
+  (string= string name :end1 name-length :end2 name-length))
+
 ;;; Look up STRING in the open-addressing part of TABLE only.
 ;;; Return the symbol and its index in that part, or 0 and -1.
 (defun %lookup-overflow-symbol (table string name-length name-hash)
@@ -1257,8 +1320,7 @@ Experimental: interface subject to change."
                          ;; optimization, but passing it for both :end arguments
                          ;; requires that it be within bounds for the probed symbol.
                          (when (and (= (length name) name-length)
-                                    (string= string name
-                                             :end1 name-length :end2 name-length))
+                                    (lookup-name= string name name-length))
                            (return-from %lookup-overflow-symbol (values symbol index)))))))
                   ;; either a never used cell or a tombstone left by UNINTERN
                   ((eql item 0) ; never used
@@ -1320,7 +1382,7 @@ Experimental: interface subject to change."
             (and (eq (symbol-name-hash symbol) name-hash)
                  (let ((name (symbol-name symbol)))
                    (and (= (length name) name-length)
-                        (string= string name :end1 name-length :end2 name-length))))
+                        (lookup-name= string name name-length))))
           (return (values symbol -1))))
       ;; An empty open-addressing part (size 0, as left by a merge) has
       ;; nothing to probe.
@@ -1374,24 +1436,30 @@ Experimental: interface subject to change."
           (when (eq (symtbl-perfect table) perfect)
             (return nil)))))))
 
-;;; Delete SYMBOL from TABLE. SYMBOL must exist. In the perfect part this
-;;; publishes a new PERFECT-SYMTBL whose DELETED bitmap marks the symbol, so
-;;; the perfect part itself is never written (it may be in read-only space).
-;;; In the open-addressing part it stores -1 in the symbol's place.
+;;; Delete SYMBOL from TABLE. SYMBOL must exist. Wherever it is, -1 is
+;;; stored in its place, so that the symbol can be garbage collected, and
+;;; lookups treat the cell as a miss. The exception is a perfect part in
+;;; read-only space, which can't be written: then a new PERFECT-SYMTBL is
+;;; published whose DELETED bitmap marks the symbol.
 (defun nuke-symbol (table symbol reason)
+  (when (and (symtbl-perfect table) (eq *symbol-table-policy* :space))
+    (flatten-symbol-table table))
   (let ((perfect (symtbl-perfect table))
         (hash (symbol-name-hash symbol)))
     (declare (hash-code hash))
     (when perfect
       (with-perfect-cell (s index perfect hash) (eq s symbol)
         (let* ((cells (psymtbl-cells perfect))
-               (old (psymtbl-deleted perfect))
-               (deleted (if old
-                            (copy-seq old)
-                            (make-array (length cells) :element-type 'bit
-                                                       :initial-element 0)))
+               (deleted (psymtbl-deleted perfect))
                (count (1- (psymtbl-count perfect))))
-          (setf (sbit deleted index) 1)
+          (cond ((read-only-space-obj-p cells)
+                 (setq deleted (if deleted
+                                   (copy-seq deleted)
+                                   (make-array (length cells) :element-type 'bit
+                                                              :initial-element 0)))
+                 (setf (sbit deleted index) 1))
+                (t
+                 (setf (svref cells index) -1)))
           (setf (symtbl-perfect table)
                 (if (zerop count)
                     nil

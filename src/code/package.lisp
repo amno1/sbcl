@@ -53,9 +53,10 @@
   )
 
 ;;; The frozen part of a two-part symbol table: a perfect hash over the
-;;; symbol-name-hash of the symbols it held when it was built. It is never
-;;; written after construction, so it may live in read-only space; removing a
-;;; symbol publishes a new instance with a fresh DELETED bitmap instead.
+;;; symbol-name-hash of the symbols it held when it was built. Symbols are
+;;; never added to it. Removing one stores -1 in its cell, unless CELLS is in
+;;; read-only space; then a new instance with a fresh DELETED bitmap is
+;;; published instead.
 (sb-xc:defstruct (perfect-symtbl
                   (:conc-name "PSYMTBL-")
                   (:predicate nil)
