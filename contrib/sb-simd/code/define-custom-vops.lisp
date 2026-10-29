@@ -1785,6 +1785,20 @@
       (def-gather-scatter-vops s64.8  int-avx512-reg    m64.8  vpgatherqq vpscatterqq vpxorq  vmovdqa64 s64vec 8)))
 
 
+;; BMI2
+#+x86-64
+(macrolet ((def-mulx (name size)
+             `(define-custom-vop ,name
+                (:args (a :target rdx) (b))
+                (:temporary (:sc unsigned-reg :offset rdx-offset
+                             :from (:argument 0) :to :result) rdx)
+                (:results (hi) (lo))
+                (:generator
+                 (move rdx a)
+                 (inst mulx ,size hi lo b)))))
+  (def-mulx sb-simd-bmi2::u32-mulx :dword)
+  (def-mulx sb-simd-bmi2::u64-mulx :qword))
+
 ;; Neon
 #+arm64
 (progn
