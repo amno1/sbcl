@@ -664,3 +664,73 @@
   (:result-types simd-pack-512-single)
   (:generator 2
     (move x y)))
+
+;;;; AVX-512BW comparison of short strings, for symbol lookup.
+;;;; Masked loads read only the first N characters (faults on the masked-off
+;;;; bytes are suppressed), so no padding or page check is needed.
+;;;; zmm16/zmm17 are used because registers 16-31 don't make the upper
+;;;; state dirty, so no VZEROUPPER is needed afterwards.
+
+(define-vop (cpu-has-avx512bw-p)
+  (:translate cpu-has-avx512bw-p)
+  (:policy :fast-safe)
+  (:conditional :ne)
+  (:generator 1
+    (multiple-value-bind (byte bit) (floor cpu-has-avx512bw n-byte-bits)
+      (inst test :byte (static-constant-ea cpu-feature-bits byte) (ash 1 bit)))))
+
+(macrolet ((string-data (x) `(ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) ,x))
+           (low-bits-mask (mask n rcx)
+             ;; MASK = N one bits (1 <= N <= 64): -1 shifted right by (-N mod 64)
+             `(progn (move ,rcx ,n)
+                     (inst neg ,rcx)
+                     (inst mov ,mask -1)
+                     (inst shr ,mask :cl))))
+
+  ;; Two base strings of N <= 64 characters
+  (define-vop (%base-name=)
+    (:translate sb-impl::%base-name=)
+    (:policy :fast-safe)
+    (:args (a :scs (descriptor-reg))
+           (b :scs (descriptor-reg))
+           (n :scs (unsigned-reg)))
+    (:arg-types simple-base-string simple-base-string unsigned-num)
+    (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+    (:temporary (:sc unsigned-reg) mask)
+    (:temporary (:sc int-avx512-reg :offset 16) va)
+    (:temporary (:sc int-avx512-reg :offset 17) vb)
+    (:temporary (:sc mask-reg) k1)
+    (:temporary (:sc mask-reg) k2)
+    (:conditional :e)
+    (:generator 10
+      (low-bits-mask mask n rcx)
+      (inst kmovq k1 mask)
+      (inst vmovdqu8-masked-z va (string-data a) k1)
+      (inst vmovdqu8-masked-z vb (string-data b) k1)
+      (inst vpcmpneqb k2 va vb)
+      (inst kortestq k2 k2)))
+
+  ;; A character string against a base string, N <= 16 characters:
+  ;; widen the base string's bytes to 32 bits and compare 16 at once.
+  (define-vop (%char-base-name=)
+    (:translate sb-impl::%char-base-name=)
+    (:policy :fast-safe)
+    (:args (a :scs (descriptor-reg))
+           (b :scs (descriptor-reg))
+           (n :scs (unsigned-reg)))
+    (:arg-types simple-character-string simple-base-string unsigned-num)
+    (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+    (:temporary (:sc unsigned-reg) mask)
+    (:temporary (:sc int-avx512-reg :offset 16) va)
+    (:temporary (:sc int-avx512-reg :offset 17) vb)
+    (:temporary (:sc mask-reg) k1)
+    (:temporary (:sc mask-reg) k2)
+    (:conditional :e)
+    (:generator 10
+      (low-bits-mask mask n rcx)
+      (inst kmovq k1 mask)
+      (inst vmovdqu32-masked-z va (string-data a) k1)
+      (inst vmovdqu8-masked-z vb (string-data b) k1)
+      (inst vpmovzxbd vb vb)
+      (inst vpcmpneqd k2 va vb)
+      (inst kortestq k2 k2))))
