@@ -6,6 +6,14 @@
     (declare (type (unsigned-byte 32) eax ecx))
     (sb-vm::%cpu-identification eax ecx))
 
+  ;; AVX-512 and AVX10 need 512-bit SIMD packs and mask registers in the
+  ;; core; without them, report those instruction sets as unsupported
+  ;; whatever the CPU can do.
+  (declaim (inline core-has-avx512-p))
+  (defun core-has-avx512-p ()
+    #+sb-simd-pack-512 t
+    #-sb-simd-pack-512 nil)
+
   (defun sse-supported-p ()
     (and (>= (cpuid 0) 1)
          (logbitp 25 (nth-value 3 (cpuid 1)))))
@@ -51,81 +59,99 @@
          (logbitp 8 (nth-value 1 (cpuid 7 0)))))
 
   (defun avx512f-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 16 (nth-value 1 (cpuid 7 0)))))
 
   (defun avx512dq-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 17 (nth-value 1 (cpuid 7 0)))))
 
   (defun avx512cd-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 28 (nth-value 1 (cpuid 7 0)))))
 
   (defun avx512vpopcntdq-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 14 (nth-value 2 (cpuid 7 0)))))
 
   (defun avx512bitalg-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 12 (nth-value 2 (cpuid 7 0)))))
 
   (defun avx512vbmi-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 1 (nth-value 2 (cpuid 7 0)))))
 
   (defun avx512vbmi2-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 6 (nth-value 2 (cpuid 7 0)))))
 
   (defun avx512vnni-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 11 (nth-value 2 (cpuid 7 0)))))
 
   (defun avx512ifma-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 21 (nth-value 1 (cpuid 7 0)))))
 
   (defun avx512bw-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 30 (nth-value 1 (cpuid 7 0)))))
 
   (defun avx512vl-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (logbitp 31 (nth-value 1 (cpuid 7 0)))))
 
   (defun avx512fp16-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (avx512f-supported-p)
          (logbitp 23 (nth-value 3 (cpuid 7 0)))))
 
   (defun avx10-supported-p ()
-    (and (>= (cpuid 0) 7)
+    (and (core-has-avx512-p)
+         (>= (cpuid 0) 7)
          (>= (nth-value 0 (cpuid 7 0)) 1)
          (logbitp 19 (nth-value 3 (cpuid 7 1)))))
 
   (defun avx10.1-supported-p ()
-    (and (avx10-supported-p)
+    (and (core-has-avx512-p)
+         (avx10-supported-p)
          (>= (cpuid 0) #x24)
          (>= (ldb (byte 8 0) (nth-value 1 (cpuid #x24 0))) 1)))
 
   (defun avx10.2-supported-p ()
-    (and (avx10-supported-p)
+    (and (core-has-avx512-p)
+         (avx10-supported-p)
          (>= (cpuid 0) #x24)
          (>= (ldb (byte 8 0) (nth-value 1 (cpuid #x24 0))) 2)))
 
   (defun avx10-128-supported-p ()
-    (and (avx10-supported-p)
+    (and (core-has-avx512-p)
+         (avx10-supported-p)
          (>= (cpuid 0) #x24)
          (logbitp 16 (nth-value 1 (cpuid #x24 0)))))
 
   (defun avx10-256-supported-p ()
-    (and (avx10-supported-p)
+    (and (core-has-avx512-p)
+         (avx10-supported-p)
          (>= (cpuid 0) #x24)
          (logbitp 17 (nth-value 1 (cpuid #x24 0)))))
 
   (defun avx10-512-supported-p ()
-    (and (avx10-supported-p)
+    (and (core-has-avx512-p)
+         (avx10-supported-p)
          (>= (cpuid 0) #x24)
          (logbitp 18 (nth-value 1 (cpuid #x24 0))))))
 

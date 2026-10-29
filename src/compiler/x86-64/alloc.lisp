@@ -213,6 +213,7 @@
 (define-vop (sb-c::end-pseudo-atomic)
   (:generator 1 (emit-end-pseudo-atomic)))
 
+#+sb-simd-pack-512
 (defun avx512-tn-p (tn)
   (sc-is tn int-avx512-reg double-avx512-reg single-avx512-reg mask-reg))
 
@@ -1219,7 +1220,7 @@
   (:temporary (:sc unsigned-reg :offset rbx-offset) rbx)
   (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
   (:temporary (:sc unsigned-reg) header)
-  (:save-p :avx512)
+  #+sb-simd-pack-512 (:save-p :avx512)
   (:generator 1
     ;; fixedobj_pages alien linkage entry: 1 PTE per page, 12-byte struct
     (inst mov rbx (rip-relative-ea (make-fixup "fixedobj_pages" :foreign-dataref)))
