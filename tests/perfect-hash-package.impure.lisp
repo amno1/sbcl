@@ -52,8 +52,8 @@ perfectly hashed."
       (assert (eq (nth-value 1 (find-symbol "INT-3" p)) :external))
       (unexport s p)
       (assert (eq (nth-value 1 (find-symbol "INT-3" p)) :internal)))
-    ;; UNINTERN from the perfect part marks it deleted without writing the
-    ;; perfect vector, which may be in read-only space.
+    ;; UNINTERN from the perfect part stores -1 in the symbol's cell (or, for a
+    ;; vector in read-only space, marks it in a deleted bitmap).
     (let ((s (find-symbol "EXT-9" p)))
       (assert (unintern s p))
       (assert (null (find-symbol "EXT-9" p)))
@@ -65,7 +65,10 @@ perfectly hashed."
         (assert (not (eq s s2)))
         (assert (eq (find-symbol "EXT-9" p) s2))))
     (assert (eq (sb-impl::psymtbl-cells (perfect-part ext)) perfect-cells))
-    (assert (equalp perfect-cells perfect-copy))
+    ;; Only the removed symbol's cell changed, to -1, so it can be collected.
+    (assert (= 1 (loop for a across perfect-cells for b across perfect-copy
+                       count (not (eq a b)))))
+    (assert (= 1 (count -1 perfect-cells)))
     ;; DO-SYMBOLS sees each symbol once.
     (let ((all (package-symbol-set p)))
       (assert (= (length all) (length (remove-duplicates all)))))
@@ -132,3 +135,46 @@ perfectly hashed."
                  (sb-impl::perfect-symbol-table (sb-impl::package-external-symbols p)))))
     (setf stop t)
     (assert (= 0 (reduce #'+ (mapcar #'sb-thread:join-thread threads))))))
+
+;;; DEFPACKAGE computes a perfect hash for its :EXPORT names at macroexpansion
+;;; time, so the externals are perfectly hashed as soon as the package exists.
+(with-test (:name (defpackage :perfect-hash :externals))
+  (eval '(defpackage "PERFECT-DEFPKG" (:use) (:export "A1" "A2" "A3" "A4" "A5")))
+  (let* ((p (find-package "PERFECT-DEFPKG"))
+         (perfect (perfect-part (sb-impl::package-external-symbols p))))
+    (assert perfect)
+    (assert (= (sb-impl::psymtbl-count perfect) 5))
+    (dolist (n '("A1" "A2" "A3" "A4" "A5"))
+      (assert (eq (nth-value 1 (find-symbol n p)) :external)))))
+
+;;; The outermost LOAD merges tables that have grown enough.
+(with-test (:name (load :merges-symbol-tables))
+  (let ((p (make-package "PERFECT-LOAD" :use nil))
+        (file (scratch-file-name "lisp")))
+    (with-open-file (s file :direction :output)
+      (format s "(in-package \"PERFECT-LOAD\")~%")
+      (dotimes (i 20) (format s "(cl:defvar *v~D* ~D)~%" i i)))
+    (unwind-protect
+         (let ((sb-fasl::*load-depth* 0)) ; pretend we're not inside LOAD
+           (load file))
+      (delete-file file))
+    (let ((int (sb-impl::package-internal-symbols p)))
+      (assert (perfect-part int))
+      (assert (= (sb-impl::%symtbl-overflow-count int) 0))
+      (assert (find-symbol "*V7*" p)))))
+
+;;; With the :SPACE policy the first change drops the perfect part.
+(with-test (:name (find-symbol :perfect-hash :space-policy))
+  (let* ((p (make-perfect-package "PERFECT-SPACE" 50))
+         (int (sb-impl::package-internal-symbols p)))
+    (assert (perfect-part int))
+    (setf sb-impl::*symbol-table-policy* :space)
+    (unwind-protect
+         (progn
+           (intern "ANOTHER" p)
+           (assert (null (perfect-part int)))
+           (assert (= (sb-impl::%symtbl-count int) 51))
+           (assert (find-symbol "INT-17" p))
+           (unintern (find-symbol "INT-17" p) p)
+           (assert (null (find-symbol "INT-17" p))))
+      (setf sb-impl::*symbol-table-policy* :speed))))

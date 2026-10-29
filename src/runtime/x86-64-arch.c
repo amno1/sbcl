@@ -43,6 +43,7 @@
 #define BREAKPOINT_WIDTH 1
 
 int avx_supported = 0, avx2_supported = 0, avx512_supported = 0, avx512fp16_supported = 0;
+int avx512bw_supported = 0;
 int avx10_supported = 0, avx10_version = 0, avx10_128_supported = 0, avx10_256_supported = 0, avx10_512_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
@@ -113,6 +114,10 @@ static int detect_cpu_features(void)
     if ((ebx & (1u << 16)) && ((xcr0 & 0xE6) == 0xE6)) { // AVX512F + OS ZMM
         avx512_supported = 1;
         bits |= (1 << 2);
+        if (ebx & (1u << 30)) { // AVX512BW
+            avx512bw_supported = 1;
+            bits |= (1 << 7);
+        }
         if (edx & (1u << 23)) { // AVX512_FP16
             avx512fp16_supported = 1;
             bits |= (1 << 6);
