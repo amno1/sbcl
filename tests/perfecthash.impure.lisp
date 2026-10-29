@@ -58,7 +58,7 @@
           ;; thereby undoing the perfect hash and creating empty cells.
           ;; It's moot, now that I've temporarily disabled perfect hashing of packages.
           (remove-if-not #'symbolp
-                         (sb-impl::symtbl-cells (sb-impl::package-internal-symbols
+                         (sb-impl::symtbl-all-cells (sb-impl::package-internal-symbols
                                                  (find-package "SB-WALKER")))))
          (hashes (map '(simple-array (unsigned-byte 32) (*))
                       #'sb-kernel::symbol-name-hash
@@ -249,7 +249,7 @@
     (labels ((filter (reader)
                (coerce
                 (remove-if-not 'symbolp
-                               (sb-impl::symtbl-cells (funcall reader pkg)))
+                               (sb-impl::symtbl-all-cells (funcall reader pkg)))
                 'list))
              (int () (filter 'sb-impl::package-internal-symbols))
              (ext () (filter 'sb-impl::package-external-symbols)))
