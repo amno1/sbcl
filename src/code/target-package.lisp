@@ -1244,11 +1244,21 @@ Experimental: interface subject to change."
             (let ((perfect-hash (funcall magic name-hash)))
               (declare (type fixnum perfect-hash))
               (when (< perfect-hash len)
-                (let ((symbol (truly-the symbol (svref vec perfect-hash))))
-                  (when (and (eql (symbol-name-hash symbol) name-hash)
-                             (string= (symbol-name symbol) string :end2 name-length))
-                    (return-from try (values symbol perfect-hash))))))
-            (return-from try (values 0 -1)))
+                ;; VEC may have been splatted with 0 by a concurrent resize,
+                ;; so don't assume that the cell holds a symbol.
+                (let ((item (svref vec perfect-hash)))
+                  (when (and (not (fixnump item))
+                             (eql (symbol-name-hash (truly-the symbol item)) name-hash)
+                             (string= (symbol-name (truly-the symbol item)) string
+                                      :end2 name-length))
+                    (return-from try (values item perfect-hash))))))
+            ;; A miss is only conclusive if CELLS is still current. Otherwise
+            ;; the table was converted to open addressing (by INTERN or
+            ;; UNINTERN) and the symbol may be in the new vector.
+            (sb-thread:barrier (:read))
+            (return-from try
+              (let ((new (symtbl-%cells table)))
+                (if (eq new cells) (values 0 -1) (try new)))))
           (let* ((reciprocals magic)
                  (index (symbol-table-hash 1 name-hash len)))
             (declare (index index))
@@ -1285,8 +1295,13 @@ Experimental: interface subject to change."
                (len (length vec)))
           (when (functionp magic)
             (let ((perfect-hash (funcall magic name-hash)))
+              (when (and (< perfect-hash len) (eq (svref vec perfect-hash) symbol))
+                (return-from try t))
+              ;; As in %LOOKUP-SYMBOL, a miss is conclusive only if CELLS is current.
+              (sb-thread:barrier (:read))
               (return-from try
-                (and (< perfect-hash len) (eq (svref vec perfect-hash) symbol)))))
+                (let ((new (symtbl-%cells table)))
+                  (if (eq new cells) nil (try new))))))
           (let* ((reciprocals magic)
                  (index (symbol-table-hash 1 name-hash len)))
             (declare (index index))
