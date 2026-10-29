@@ -494,18 +494,22 @@
 (sb-simd-test-suite:define-simple-simd-test f32.4-fmadd  (f32.4) (f32.4 f32.4 f32.4) f32-fmadd)
 (sb-simd-test-suite:define-simple-simd-test f32.4-fnmadd (f32.4) (f32.4 f32.4 f32.4) f32-fnmadd)
 (sb-simd-test-suite:define-simple-simd-test f32.4-fmsub  (f32.4) (f32.4 f32.4 f32.4) f32-fmsub)
+(sb-simd-test-suite:define-simple-simd-test f32.4-fnmsub  (f32.4) (f32.4 f32.4 f32.4) f32-fnmsub)
 
 (sb-simd-test-suite:define-simple-simd-test f32.8-fmadd  (f32.8) (f32.8 f32.8 f32.8) f32-fmadd)
 (sb-simd-test-suite:define-simple-simd-test f32.8-fnmadd (f32.8) (f32.8 f32.8 f32.8) f32-fnmadd)
 (sb-simd-test-suite:define-simple-simd-test f32.8-fmsub (f32.8) (f32.8 f32.8 f32.8) f32-fmsub)
+(sb-simd-test-suite:define-simple-simd-test f32.8-fnmsub (f32.8) (f32.8 f32.8 f32.8) f32-fnmsub)
 
 (sb-simd-test-suite:define-simple-simd-test f64.2-fmadd  (f64.2) (f64.2 f64.2 f64.2) f64-fmadd)
 (sb-simd-test-suite:define-simple-simd-test f64.2-fnmadd (f64.2) (f64.2 f64.2 f64.2) f64-fnmadd)
 (sb-simd-test-suite:define-simple-simd-test f64.2-fmsub (f64.2) (f64.2 f64.2 f64.2) f64-fmsub)
+(sb-simd-test-suite:define-simple-simd-test f64.2-fnmsub (f64.2) (f64.2 f64.2 f64.2) f64-fnmsub)
 
 (sb-simd-test-suite:define-simple-simd-test f64.4-fmadd  (f64.4) (f64.4 f64.4 f64.4) f64-fmadd)
 (sb-simd-test-suite:define-simple-simd-test f64.4-fnmadd (f64.4) (f64.4 f64.4 f64.4) f64-fnmadd)
 (sb-simd-test-suite:define-simple-simd-test f64.4-fmsub (f64.4) (f64.4 f64.4 f64.4) f64-fmsub)
+(sb-simd-test-suite:define-simple-simd-test f64.4-fnmsub (f64.4) (f64.4 f64.4 f64.4) f64-fnmsub)
 
 (in-package #:sb-simd-avx512f)
 
@@ -532,6 +536,7 @@
 (sb-simd-test-suite:define-simple-simd-test f32.16-fmadd (f32.16) (f32.16 f32.16 f32.16) f32-fmadd)
 (sb-simd-test-suite:define-simple-simd-test f32.16-fnmadd (f32.16) (f32.16 f32.16 f32.16) f32-fnmadd)
 (sb-simd-test-suite:define-simple-simd-test f32.16-fmsub (f32.16) (f32.16 f32.16 f32.16) f32-fmsub)
+(sb-simd-test-suite:define-simple-simd-test f32.16-fnmsub (f32.16) (f32.16 f32.16 f32.16) f32-fnmsub)
 
 ;; f64.8
 (sb-simd-test-suite:define-simple-simd-test f64.8-if (f64.8) (u64.8 f64.8 f64.8) f64-if)
@@ -556,6 +561,7 @@
 (sb-simd-test-suite:define-simple-simd-test f64.8-fmadd (f64.8) (f64.8 f64.8 f64.8) f64-fmadd)
 (sb-simd-test-suite:define-simple-simd-test f64.8-fnmadd (f64.8) (f64.8 f64.8 f64.8) f64-fnmadd)
 (sb-simd-test-suite:define-simple-simd-test f64.8-fmsub (f64.8) (f64.8 f64.8 f64.8) f64-fmsub)
+(sb-simd-test-suite:define-simple-simd-test f64.8-fnmsub (f64.8) (f64.8 f64.8 f64.8) f64-fnmsub)
 
 ;; u32.16
 (sb-simd-test-suite:define-simple-simd-test u32.16-if (u32.16) (u32.16 u32.16 u32.16) u32-if)
