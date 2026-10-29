@@ -52,6 +52,22 @@
   (immutable 0 :type sb-vm:word) ; copy-on-write if immutable > 0
   )
 
+;;; The frozen part of a two-part symbol table: a perfect hash over the
+;;; symbol-name-hash of the symbols it held when it was built. It is never
+;;; written after construction, so it may live in read-only space; removing a
+;;; symbol publishes a new instance with a fresh DELETED bitmap instead.
+(sb-xc:defstruct (perfect-symtbl
+                  (:conc-name "PSYMTBL-")
+                  (:predicate nil)
+                  (:copier nil)
+                  (:constructor make-perfect-symtbl (hash-fn cells count deleted)))
+  (hash-fn (missing-arg) :type (function (hash-code) index) :read-only t)
+  (cells (missing-arg) :type simple-vector :read-only t)
+  ;; number of live (not deleted) symbols
+  (count (missing-arg) :type index :read-only t)
+  ;; bit I set = (SVREF CELLS I) was removed. NIL if nothing was removed.
+  (deleted nil :type (or null simple-bit-vector) :read-only t))
+
 (sb-xc:defstruct (symbol-table
                   (:conc-name "SYMTBL-")
                   (:predicate nil)
@@ -60,8 +76,11 @@
                   (:copier nil))
   ;; An extra indirection to the symbol vector allows atomically changing the symbols
   ;; and the division magic parameters.
-  (%cells (missing-arg) :type (cons (or symtbl-magic (function (hash-code) index))
-                                    simple-vector))
+  ;; The open-addressing part. In a two-part table it holds only symbols
+  ;; added after PERFECT was built.
+  (%cells (missing-arg) :type (cons symtbl-magic simple-vector))
+  ;; The perfectly hashed part, consulted before %CELLS, or NIL.
+  (perfect nil :type (or null perfect-symtbl))
   (modified nil :type boolean)
   (package nil :type (or null package)) ; backpointer, only if externals
   ;; SIZE is roughly related to the number of symbols the client code asked to be

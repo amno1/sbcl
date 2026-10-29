@@ -363,7 +363,7 @@
   (map 'vector 'copy-symbol
        (remove-if-not
         #'symbolp
-        (symtbl-cells (package-internal-symbols (find-package "SB-C"))))))
+        (sb-impl::symtbl-all-cells (package-internal-symbols (find-package "SB-C"))))))
 ;; Return a set of symbols to play around with
 (defun classoid-cell-test-get-lotsa-symbols () *lotsa-symbols*)
 
