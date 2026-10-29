@@ -8,14 +8,16 @@
   (declare (function predicate))
   (let (list)
     (flet ((weaken (table accessibility)
-             (let ((cells (symtbl-cells table))
+             (let ((cells (symtbl-all-cells table))
                    (result))
                (dovector (x cells)
                  (when (symbolp x)
                    (if (funcall predicate x accessibility)
                        (push x result) ; keep a strong reference to this symbol
                        (push (cons (string x) (make-weak-pointer x)) result))))
-               (fill cells 0)
+               ;; The perfect part may be in read-only space; just drop it.
+               (setf (symtbl-perfect table) nil)
+               (fill (symtbl-cells table) 0)
                (resize-symbol-table table 0 'intern)
                result)))
       (dolist (package (list-all-packages))
