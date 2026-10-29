@@ -461,7 +461,7 @@
 (defun get-test-strings (package-name)
   (map 'list #'string
    (remove-if-not #'symbolp
-                  (sb-impl::symtbl-cells
+                  (sb-impl::symtbl-all-cells
                    (sb-impl::package-internal-symbols
                     (find-package package-name))))))
 

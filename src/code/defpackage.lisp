@@ -708,7 +708,7 @@ error otherwise.")
                             (string (the simple-string (cdr candidate)))
                             (length (length string)))
                        (add-to-bag-if-found table string length hash result)))
-                   (dovector (entry (symtbl-cells table))
+                   (dovector (entry (symtbl-all-cells table))
                      ;; I would have guessed that GETHASH is faster than SEARCH, but if
                      ;; interposed between SYMBOLP and SEARCH, it slows down this loop.
                      ;; That's because almost always the symbol is NOT yet in the result,
@@ -760,58 +760,67 @@ error otherwise.")
 ;;; Freshly restarted image with perfect hash:
 ;;;   0.012 seconds of real time
 ;;;
+;;; Rebuild TABLE so that all of its symbols are in a new perfectly hashed
+;;; part and its open-addressing part is empty. Return true on success, or
+;;; NIL (leaving TABLE unchanged) if no perfect hash could be made, e.g.
+;;; for fewer than 3 symbols or two names with the same hash.
+;;; The caller must exclude concurrent writers; readers are safe.
+(defun perfect-symbol-table (table)
+  (declare (symbol-table table))
+  (let* ((overflow (symtbl-cells table))
+         (perfect (symtbl-perfect table)))
+    (when (and perfect
+               (not (psymtbl-deleted perfect))
+               (every #'fixnump overflow))
+      (return-from perfect-symbol-table t)) ; nothing to merge
+    (let* ((symbols
+             (nconc (when perfect
+                      (let ((d (psymtbl-deleted perfect)))
+                        (loop for s across (psymtbl-cells perfect)
+                              for i fixnum from 0
+                              when (and (symbolp s) (or (not d) (zerop (sbit d i))))
+                                collect s)))
+                    (loop for s across overflow when (symbolp s) collect s)))
+           (n (length symbols)))
+      (when (< n 3)
+        (return-from perfect-symbol-table nil))
+      (let* ((hashes (map '(simple-array (unsigned-byte 32) (*))
+                          #'symbol-name-hash symbols))
+             (hash-expr (sb-c:make-perfect-hash-lambda hashes)))
+        (unless hash-expr
+          (return-from perfect-symbol-table nil))
+        (let ((fun (compile nil hash-expr))
+              (cells (make-array n :initial-element 0)))
+          (declare (function fun))
+          (dolist (s symbols)
+            (let ((i (funcall fun (symbol-name-hash s))))
+              (aver (eql (svref cells i) 0))
+              (setf (svref cells i) s)))
+          ;; Publish the perfect part before emptying the open-addressing part.
+          ;; A reader that sees the old perfect part and the new, empty
+          ;; open-addressing part retries because PERFECT changed.
+          (setf (symtbl-perfect table) (make-perfect-symtbl fun cells n nil))
+          (sb-thread:barrier (:write))
+          (resize-symbol-table table 0 'intern)
+          t)))))
+
+;;; Every table except KEYWORD's is rebuilt with a perfectly hashed part
+;;; holding all of its symbols. Symbols added later go into the (initially
+;;; empty) open-addressing part, and removed ones are marked in a bitmap, so
+;;; the perfect part survives INTERN, EXPORT, UNINTERN etc. until the next save.
+;;; A table for which no perfect hash can be made is tuned as before.
 (defun tune-hashset-sizes-of-all-packages ()
   (flet ((tune (desired-lf table)
-           (resize-symbol-table table (%symtbl-count table) 'intern desired-lf))
-         ;; Return true if TABLE is now perfectly hashed.
-         (perfect (table &aux (cells (symtbl-%cells table)))
-           (when (functionp (car cells))
-             (return-from perfect t)) ; already perfectly hashed
-           (let* ((cells (cdr cells))
-                  (hashes (map '(simple-array (unsigned-byte 32) (*))
-                               #'symbol-name-hash
-                               (remove-if-not #'symbolp cells)))
-                  (hash-expr (sb-c:make-perfect-hash-lambda hashes)))
-             (unless hash-expr
-               ;; hmm, this seems like it should be a hard error
-               ;; since it's confined to the CL package.
-               (return-from perfect))
-             (let ((fun (compile nil hash-expr))
-                   (new-cells (make-array (length hashes) :initial-element 0)))
-               (dovector (s cells)
-                 (when (symbolp s)
-                   (let ((hash (funcall fun (symbol-name-hash s))))
-                     (aver (eq (svref new-cells hash) 0))
-                     (setf (svref new-cells hash) s))))
-               (setf (symtbl-%cells table) (cons fun new-cells)
-                     (symtbl-size table) (length hashes)
-                     (symtbl-free table) 0
-                     (symtbl-deleted table) 0)
-               t))))
+           (resize-symbol-table table (%symtbl-overflow-count table) 'intern desired-lf)))
     (dolist (package (list-all-packages))
       ;; Choose load factor based on whether INTERN is expected at runtime
-      (let ((lf (cond ((eq (the package package) *keyword-package*) 60/100)
-                      ((eq package *cl-package*) 1)
-                      (t 8/10)))
-            (internals (package-internal-symbols (truly-the package package)))
-            (externals (package-external-symbols package)))
-        (cond ((= lf 1)
-               ;; Should be no internals of CL, don't even bother tuning them
-               (perfect externals))
-              ;; Externals of other locked packages rarely change, so hash them
-              ;; perfectly too. If one does change (e.g. a contrib exporting from
-              ;; SB-EXT), the table reverts to open addressing, which is safe for
-              ;; concurrent readers. Fall back to ordinary tuning if no perfect
-              ;; hash could be made (e.g. fewer than 3 symbols, or two names
-              ;; with the same hash).
-              ((and (package-locked-p package)
-                    (not (eq package *keyword-package*)))
-               (tune lf internals)
-               (unless (perfect externals)
-                 (tune lf externals)))
-              (t
-               (tune lf internals)
-               (tune lf externals)))
+      (let* ((keywordp (eq (the package package) *keyword-package*))
+             (lf (if keywordp 60/100 8/10))
+             (internals (package-internal-symbols (truly-the package package)))
+             (externals (package-external-symbols package)))
+        (dolist (table (list internals externals))
+          (unless (and (not keywordp) (perfect-symbol-table table))
+            (tune lf table)))
         ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
         #-darwin-jit
         (setf (symtbl-modified externals) nil
@@ -825,7 +834,7 @@ error otherwise.")
                               (reciprocals (car cells))
                               (vec (cdr cells))
                               (nslots (length vec)))
-           (when (functionp reciprocals)
+           (when (symtbl-perfect table) ; report the perfect part only
              (return-from metrics (values 1 1 1))) ; 1 probe max+avg, 100% load
            (flet ((probe-seq-len (symbol)
                     (let* ((name-hash (symbol-name-hash symbol))
@@ -851,8 +860,8 @@ error otherwise.")
                (int (package-internal-symbols pkg))
                ((ext-max ext-psl ext-lf) (metrics ext))
                ((int-max int-psl int-lf) (metrics int))
-               (ncells (+ (length (symtbl-cells int))
-                          (length (symtbl-cells ext)))))
+               (ncells (+ (length (symtbl-all-cells int))
+                          (length (symtbl-all-cells ext)))))
       (incf tot-ncells ncells)
       (format t "~8d ~:{~:[~2*~18@t~;~:* ~2d ~6,2f  ~5,1,2f%~] |~} ~a~%"
               ncells
