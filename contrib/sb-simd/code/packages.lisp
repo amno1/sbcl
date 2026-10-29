@@ -2143,36 +2143,42 @@
      #:f32-fmadd
      #:f32-fnmadd
      #:f32-fmsub
+     #:f32-fnmsub
      #:f32-fmaddsub
      #:f32-fmsubadd
      ;; f64
      #:f64-fmadd
      #:f64-fnmadd
      #:f64-fmsub
+     #:f64-fnmsub
      #:f64-fmaddsub
      #:f64-fmsubadd
      ;; f32.4
      #:f32.4-fmadd
      #:f32.4-fnmadd
      #:f32.4-fmsub
+     #:f32.4-fnmsub
      #:f32.4-fmaddsub
      #:f32.4-fmsubadd
      ;; f32.8
      #:f32.8-fmadd
      #:f32.8-fnmadd
      #:f32.8-fmsub
+     #:f32.8-fnmsub
      #:f32.8-fmaddsub
      #:f32.8-fmsubadd
      ;; f64.2
      #:f64.2-fmadd
      #:f64.2-fnmadd
      #:f64.2-fmsub
+     #:f64.2-fnmsub
      #:f64.2-fmaddsub
      #:f64.2-fmsubadd
      ;; f64.4
      #:f64.4-fmadd
      #:f64.4-fnmadd
      #:f64.4-fmsub
+     #:f64.4-fnmsub
      #:f64.4-fmaddsub
      #:f64.4-fmsubadd))
 
@@ -2302,6 +2308,7 @@
      #:f32.16-fmadd
      #:f32.16-fnmadd
      #:f32.16-fmsub
+     #:f32.16-fnmsub
      #:f32.16-fmaddsub
      #:f32.16-fmsubadd
      #:f32.16-incf
@@ -2397,6 +2404,7 @@
      #:f64.8-fmadd
      #:f64.8-fnmadd
      #:f64.8-fmsub
+     #:f64.8-fnmsub
      #:f64.8-fmaddsub
      #:f64.8-fmsubadd
      #:f64.8-incf
