@@ -714,6 +714,7 @@
   ;; halves of 16: widen each half of the base string's bytes to 32 bits
   ;; and compare it with 16 characters. For N <= 16 the second half's mask
   ;; is empty, so its loads read nothing.
+  #+sb-unicode ; without it every string is a base string
   (define-vop (%char-base-name=)
     (:translate sb-impl::%char-base-name=)
     (:policy :fast-safe)

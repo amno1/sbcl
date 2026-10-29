@@ -1283,6 +1283,7 @@ Experimental: interface subject to change."
 #+sb-simd-pack-512
 (progn
   (defun %base-name= (a b n) (%base-name= a b n))
+  #+sb-unicode
   (defun %char-base-name= (a b n) (%char-base-name= a b n)))
 
 (declaim (inline lookup-name=))
@@ -1296,6 +1297,7 @@ Experimental: interface subject to change."
       (simple-base-string
        (when (<= name-length 64)
          (return-from lookup-name= (%base-name= string name name-length))))
+      #+sb-unicode
       ((simple-array character (*))
        (when (<= name-length 32)
          (return-from lookup-name= (%char-base-name= string name name-length))))))
