@@ -1,0 +1,81 @@
+(in-package #:sb-simd-test-suite)
+
+(defun bmi-available-p (name)
+  (sb-simd-internals:instruction-set-available-p
+   (sb-simd-internals:find-instruction-set name)))
+
+(defun reference-pdep (src mask)
+  (loop with result = 0 and k = 0
+        for i below 64
+        when (logbitp i mask)
+          do (when (logbitp k src) (setf result (logior result (ash 1 i))))
+             (incf k)
+        finally (return result)))
+
+(defun reference-pext (src mask)
+  (loop with result = 0 and k = 0
+        for i below 64
+        when (logbitp i mask)
+          do (when (logbitp i src) (setf result (logior result (ash 1 k))))
+             (incf k)
+        finally (return result)))
+
+(define-test bmi1-instructions
+  (when (bmi-available-p :bmi1)
+    (let ((x #xF0F0F0F0F0F0F0A8)
+          (y #x123456789ABCDEF0))
+      (is (= (sb-simd-bmi1:u64-andn x y) (logand (lognot x) y (1- (ash 1 64)))))
+      (is (= (sb-simd-bmi1:u64-blsr x) (logand x (1- x))))
+      (is (= (sb-simd-bmi1:u64-blsi x) (logand x (- x))))
+      (is (= (sb-simd-bmi1:u64-blsmsk x) (logxor x (1- x))))
+      (is (= (sb-simd-bmi1:u64-tzcnt x) 3))
+      (is (= (sb-simd-bmi1:u64-tzcnt 0) 64))
+      ;; bextr: start 4, length 8
+      (is (= (sb-simd-bmi1:u64-bextr y (logior 4 (ash 8 8))) (ldb (byte 8 4) y)))
+      (is (= (sb-simd-bmi1:u32-andn #xFF00FF00 #x12345678) #x00340078))
+      (is (= (sb-simd-bmi1:u32-blsr #x80000000) 0))
+      (is (= (sb-simd-bmi1:u32-tzcnt 0) 32))
+      (is (= (sb-simd-bmi1:u32-bextr #xABCD1234 (logior 16 (ash 16 8))) #xABCD)))))
+
+(define-test bmi2-instructions
+  (when (bmi-available-p :bmi2)
+    (let ((masks '(0 1 #xFF00FF00FF00FF00 #x8000000000000001 #xFFFFFFFFFFFFFFFF #x0F0F0F0F12345678))
+          (srcs '(0 #xFFFFFFFFFFFFFFFF #x123456789ABCDEF0 #xDEADBEEFCAFEBABE)))
+      (dolist (m masks)
+        (dolist (s srcs)
+          (is (= (sb-simd-bmi2:u64-pdep s m) (reference-pdep s m)))
+          (is (= (sb-simd-bmi2:u64-pext s m) (reference-pext s m)))
+          (is (= (sb-simd-bmi2:u32-pdep (ldb (byte 32 0) s) (ldb (byte 32 0) m))
+                 (ldb (byte 32 0) (reference-pdep (ldb (byte 32 0) s) (ldb (byte 32 0) m)))))
+          (is (= (sb-simd-bmi2:u32-pext (ldb (byte 32 0) s) (ldb (byte 32 0) m))
+                 (reference-pext (ldb (byte 32 0) s) (ldb (byte 32 0) m)))))))
+    (let ((x #x8123456789ABCDEF))
+      (is (= (sb-simd-bmi2:u64-bzhi x 12) (ldb (byte 12 0) x)))
+      (is (= (sb-simd-bmi2:u64-bzhi x 200) x))
+      (is (= (sb-simd-bmi2:u64-shlx x 4) (ldb (byte 64 0) (ash x 4))))
+      (is (= (sb-simd-bmi2:u64-shrx x 4) (ash x -4)))
+      (is (= (sb-simd-bmi2:u64-shrx x 68) (ash x -4)))   ; count is masked to 6 bits
+      (is (= (sb-simd-bmi2:u64-sarx x 4) (ldb (byte 64 0) (ash (- x (ash 1 64)) -4))))
+      (is (= (sb-simd-bmi2:u64-rorx x 8)
+             (logior (ash x -8) (ldb (byte 64 0) (ash (ldb (byte 8 0) x) 56)))))
+      (is (= (sb-simd-bmi2:u32-rorx #x12345678 8) #x78123456))
+      (is (= (sb-simd-bmi2:u32-sarx #x80000000 31) #xFFFFFFFF))
+      (multiple-value-bind (hi lo) (sb-simd-bmi2:u64-mulx x #xFEDCBA9876543210)
+        (let ((p (* x #xFEDCBA9876543210)))
+          (is (= hi (ash p -64)))
+          (is (= lo (ldb (byte 64 0) p)))))
+      (multiple-value-bind (hi lo) (sb-simd-bmi2:u32-mulx #xFFFFFFFF #xFFFFFFFE)
+        (let ((p (* #xFFFFFFFF #xFFFFFFFE)))
+          (is (= hi (ash p -32)))
+          (is (= lo (ldb (byte 32 0) p))))))
+    ;; Compiled with constant-free arguments so the VOPs are exercised.
+    (let ((f (compile nil '(lambda (a b)
+                            (declare (type (unsigned-byte 64) a b) (optimize speed))
+                            (multiple-value-bind (hi lo) (sb-simd-bmi2:u64-mulx a b)
+                              (values hi lo (sb-simd-bmi2:u64-pext a b) (sb-simd-bmi2:u64-pdep a b)))))))
+      (multiple-value-bind (hi lo pext pdep) (funcall f (opaque-identity #xFFFFFFFFFFFFFFFF) #x00FF00FF00FF00FF)
+        (let ((p (* #xFFFFFFFFFFFFFFFF #x00FF00FF00FF00FF)))
+          (is (= hi (ash p -64)))
+          (is (= lo (ldb (byte 64 0) p))))
+        (is (= pext #xFFFFFFFF))
+        (is (= pdep #x00FF00FF00FF00FF))))))
