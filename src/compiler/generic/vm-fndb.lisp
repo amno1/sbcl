@@ -121,6 +121,15 @@
 (defknown (%sxhash-simple-substring) (simple-string index index) hash-code
   (foldable flushable))
 (defknown sb-impl::calc-symbol-name-hash (simple-string index) symbol-name-hash ())
+;;; AVX-512BW string comparison for symbol lookup (see target-package.lisp)
+#+sb-simd-pack-512
+(progn
+  (defknown sb-vm::cpu-has-avx512bw-p () boolean (flushable))
+  (defknown sb-impl::%base-name= (simple-base-string simple-base-string (integer 1 64))
+      boolean (flushable))
+  (defknown sb-impl::%char-base-name= ((simple-array character (*)) simple-base-string
+                                       (integer 1 16))
+      boolean (flushable)))
 
 (defknown (symbol-hash) (symbol) hash-code (flushable movable))
 (defknown (symbol-name-hash) (symbol) symbol-name-hash (flushable movable))

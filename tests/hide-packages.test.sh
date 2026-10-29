@@ -107,9 +107,11 @@ run_sbcl <<\EOF
   (or (eq this that) ; symbol-value
       ;; :SB-THREAD, :SB-UNICODE, :SB-EVAL are pointed to by the
       ;; keyword package
-      (and (eq this (sb-impl::symtbl-cells
-                     (sb-impl::package-external-symbols
-                      (find-package "KEYWORD"))))
+      ;; (in either part of a two-part symbol table)
+      (and (let ((table (sb-impl::package-external-symbols (find-package "KEYWORD"))))
+             (or (eq this (sb-impl::symtbl-cells table))
+                 (let ((perfect (sb-impl::symtbl-perfect table)))
+                   (and perfect (eq this (sb-impl::psymtbl-cells perfect))))))
            (keywordp that)))))
 
 (defun points-to-string-ok (this that)

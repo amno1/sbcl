@@ -150,9 +150,13 @@
          (*load-truename* (when *load-pathname*
                             (handler-case (truename stream)
                               (file-error () nil))))
+         (outermost (zerop *load-depth*))
          ;; Bindings used internally.
          (*load-depth* (1+ *load-depth*)))
-    (funcall function stream arg)))
+    (if outermost
+        (multiple-value-prog1 (funcall function stream arg)
+          (sb-impl::after-outermost-load))
+        (funcall function stream arg))))
 
 (defun resolve-load-truename (symbol untruename)
   (if (boundp symbol)
