@@ -68,7 +68,7 @@
 
 (defparameter *allstrings*
   (map 'vector #'string
-       (remove 0 (sb-impl::symtbl-cells
+       (remove 0 (sb-impl::symtbl-all-cells
                   (sb-impl::package-internal-symbols
                    (find-package "SB-C"))))))
 

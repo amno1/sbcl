@@ -4709,11 +4709,10 @@ static char *event_printf_format[] = {~{~%  ~S~^,~}~%};~%#endif~2%"
                        sb-c::compiled-debug-info))
         (out-to (string-downcase class)
                 ;; parent/child structs like to be output as one header, child first
-                (let ((child (case class
-                               (defstruct-description 'defstruct-slot-description)
-                               (package 'sb-impl::symbol-table))))
-                  (when child
-                    (write-structure-type (layout-info (find-layout child)) stream)))
+                (dolist (child (case class
+                                 (defstruct-description '(defstruct-slot-description))
+                                 (package '(sb-impl::perfect-symtbl sb-impl::symbol-table))))
+                  (write-structure-type (layout-info (find-layout child)) stream))
                 (write-structure-type (layout-info (find-layout class)) stream)))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
                                 :direction :output :if-exists :supersede)
