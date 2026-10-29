@@ -7,11 +7,11 @@
 (defgeneric mask-value (mask)
   (:documentation "Returns the integer bit pattern of MASK."))
 
-#+x86-64
+#+sb-simd-pack-512
 (defmethod mask-value ((mask sb-ext:simd-pack-512-mask))
   (sb-kernel:%simd-pack-512-mask-value mask))
 
-#-x86-64
+#-sb-simd-pack-512
 (defmethod mask-value ((mask phony-simd-pack-512-mask))
   (phony-simd-pack-512-mask-value mask))
 
@@ -73,7 +73,7 @@
                          '(sb-simd-avx::f64-from-f32 x))
                        (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
                          '(sb-simd-avx::f64-from-s64 x))))
-                    #+x86-64
+                    #+sb-simd-pack-512
                     ((sb-simd-avx512f:m64.8
                       sb-simd-avx512f:m32.16
                       sb-simd-avx512bw:m16.32
@@ -111,7 +111,7 @@
                        `((sb-simd-avx:f32 (call-vop sb-simd-avx::f64-from-f32 x))
                          (sb-simd-avx:s64 (call-vop sb-simd-avx::f64-from-s64 x))
                          (real (coerce x ',name))))
-                      #+x86-64
+                      #+sb-simd-pack-512
                       ((sb-simd-avx512f:m64.8
                         sb-simd-avx512f:m32.16
                         sb-simd-avx512bw:m16.32
@@ -138,9 +138,9 @@
                     `((declaim (inline ,val-fn ,cnt-fn ,zero-fn ,all-fn))
                       (defun ,val-fn (mask)
                         (declare (type ,name mask))
-                        #+x86-64
+                        #+sb-simd-pack-512
                         (ldb (byte ,width 0) (sb-kernel:%simd-pack-512-mask-value mask))
-                        #-x86-64
+                        #-sb-simd-pack-512
                         (ldb (byte ,width 0) (phony-simd-pack-512-mask-value mask)))
                       (defun ,cnt-fn (mask)
                         (declare (type ,name mask))
