@@ -43,6 +43,7 @@
 #define BREAKPOINT_WIDTH 1
 
 int avx_supported = 0, avx2_supported = 0, avx512_supported = 0, avx512fp16_supported = 0;
+int avx512bw_supported = 0;
 int avx10_supported = 0, avx10_version = 0, avx10_128_supported = 0, avx10_256_supported = 0, avx10_512_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
@@ -134,6 +135,8 @@ void tune_asm_routines_for_microarch(void)
                     if ((ebx & (1u << 16)) &&       // AVX512F
                         ((xcr0 & 0xE6) == 0xE6)) {  // OS supports ZMM
                         avx512_supported = 1;
+                        if (ebx & (1u << 30))       // AVX512BW
+                            avx512bw_supported = 1;
                         if (edx & (1u << 23)) {     // AVX512_FP16
                             avx512fp16_supported = 1;
                         }
@@ -172,6 +175,8 @@ void tune_asm_routines_for_microarch(void)
     if (avx10_512_supported) our_cpu_feature_bits |= (1 << 5);
     // avx512_fp16 supported in bit 6
     if (avx512fp16_supported) our_cpu_feature_bits |= (1 << 6);
+    // avx512bw supported in bit 7
+    if (avx512bw_supported) our_cpu_feature_bits |= (1 << 7);
     consts->cpu_feature_bits = our_cpu_feature_bits;
 
 #ifdef LISP_FEATURE_WIN32
