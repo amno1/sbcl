@@ -8,6 +8,8 @@
   #+x86-64
   (progn
     (check-package '#:sb-simd-x86-64)
+    (check-package '#:sb-simd-bmi1)
+    (check-package '#:sb-simd-bmi2)
     (check-package '#:sb-simd-sse)
     (check-package '#:sb-simd-sse2)
     (check-package '#:sb-simd-sse3)
@@ -66,6 +68,8 @@
     (is (typep (sb-simd-internals:avx512vbmi2-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx512vnni-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx512ifma-supported-p) 'boolean))
+    (is (typep (sb-simd-internals:bmi1-supported-p) 'boolean))
+    (is (typep (sb-simd-internals:bmi2-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx512fp16-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx10-supported-p) 'boolean))
     (is (typep (sb-simd-internals:avx10.1-supported-p) 'boolean))
