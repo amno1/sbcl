@@ -2024,40 +2024,57 @@
                (vop-jumper ,@(label-tags)))
             form)))))
 
+;;; EQUALP is too weak a comparator for arbitrary sexprs,
+;;; since (EQUALP "foo" #(#\F #\O #\O)) is T, not that
+;;; we expect such weirdness in the LOAD-IF expression.
+(defun operand-parse= (a b)
+  (and (equal (operand-parse-load a) (operand-parse-load b))
+       (equalp a b)))
+
+;;; Return a cons of an EQUALP table mapping an OPERAND-PARSE to a list of
+;;; OPERAND-PARSE= candidates, and an EQUAL table of operand lists.
+(defun vop-parse-share-tables ()
+  (or *vop-parse-share-tables*
+      (let ((ops (make-hash-table :test 'equalp))
+            (lists (make-hash-table :test 'equal)))
+        (dohash ((key parse) *backend-parsed-vops*)
+          (declare (ignore key))
+          (dolist (op (vop-parse-operands parse))
+            (unless (find op (gethash op ops) :test #'operand-parse=)
+              (push op (gethash op ops))))
+          (dolist (list (list (vop-parse-temps parse) (vop-parse-args parse)
+                              (vop-parse-results parse)))
+            (unless (gethash list lists)
+              (setf (gethash list lists) list))))
+        (setq *vop-parse-share-tables* (cons ops lists)))))
+
 (macrolet
     ((def ()
        `(defun register-vop-parse ,vop-parse-slot-names
           ;; Try to share each OPERAND-PARSE structure with a similar existing one.
-          (labels ((share-list (operand-specs accessor kind)
-                     (let ((new (mapcar (lambda (x) (share x kind)) operand-specs)))
-                       (dohash ((key parse) *backend-parsed-vops* :result new)
-                         (declare (ignore key))
-                         (when (equal (funcall accessor parse) new)
-                           (return (funcall accessor parse))))))
-                   (share (operand-spec kind)
-                     ;; OPERAND-PARSE structures are immutable. Scan all vops for one
-                     ;; with an operand matching OPERAND-SPEC, and use that if found.
-                     (destructuring-bind (name targ temp born dies load-tn load scs offs)
-                         operand-spec
-                       (let ((op (make-operand-parse
-                                  :name name :kind kind :target targ :temp temp
-                                  :born born :dies dies :load-tn load-tn :load load
-                                  :scs scs :offset offs)))
-                         (dohash ((key parse) *backend-parsed-vops* :result op)
-                           (declare (ignore key))
-                           (awhen (find op (vop-parse-operands parse) :test #'operand=)
-                             (return it))))))
-                   (operand= (a b)
-                     ;; EQUALP is too weak a comparator for arbitrary sexprs,
-                     ;; since (EQUALP "foo" #(#\F #\O #\O)) is T, not that
-                     ;; we expect such weirdness in the LOAD-IF expression.
-                     (and (equal (operand-parse-load a) (operand-parse-load b))
-                          (equalp a b))))
-            (setq temps (share-list temps #'vop-parse-temps :temporary)
-                  args (share-list args #'vop-parse-args :argument)
-                  results (share-list results #'vop-parse-results :result))
-            (when more-args (setq more-args (share more-args :more-argument)))
-            (when more-results (setq more-results (share more-results :more-result))))
+          (let* ((tables (vop-parse-share-tables))
+                 (ops (car tables))
+                 (lists (cdr tables)))
+            (labels ((share-list (operand-specs kind)
+                       (let ((new (mapcar (lambda (x) (share x kind)) operand-specs)))
+                         (or (gethash new lists)
+                             (setf (gethash new lists) new))))
+                     (share (operand-spec kind)
+                       ;; OPERAND-PARSE structures are immutable. Use an existing
+                       ;; operand matching OPERAND-SPEC if there is one.
+                       (destructuring-bind (name targ temp born dies load-tn load scs offs)
+                           operand-spec
+                         (let ((op (make-operand-parse
+                                    :name name :kind kind :target targ :temp temp
+                                    :born born :dies dies :load-tn load-tn :load load
+                                    :scs scs :offset offs)))
+                           (or (find op (gethash op ops) :test #'operand-parse=)
+                               (progn (push op (gethash op ops)) op))))))
+              (setq temps (share-list temps :temporary)
+                    args (share-list args :argument)
+                    results (share-list results :result))
+              (when more-args (setq more-args (share more-args :more-argument)))
+              (when more-results (setq more-results (share more-results :more-result)))))
           (let ((parse
                   (make-vop-parse ,@(mapcan (lambda (x) (list (keywordicate x) x))
                                             vop-parse-slot-names))))
@@ -2065,59 +2082,66 @@
             (setf (gethash name *backend-parsed-vops*) parse)))))
   (def))
 
+(defmacro do-coalesced-vop-info-slots ((accessor setter) &body body)
+  `(progn
+     ,@(mapcar (lambda (slot)
+                 `(let ((,accessor #',slot)
+                        (,setter (lambda (new info) (setf (,slot info) new))))
+                    ,@body))
+               '(vop-info-arg-types vop-info-arg-costs vop-info-arg-load-scs
+                 vop-info-result-types vop-info-result-costs vop-info-result-load-scs
+                 vop-info-more-arg-costs vop-info-more-result-costs
+                 vop-info-temps vop-info-ref-ordering vop-info-targets))))
+
+;;; Return a list of an EQUAL table from type specifier to CTYPE, followed by
+;;; one (ACCESSOR SETTER WHOLE-TABLE . VECTOR-TABLE) entry per coalesced slot. The
+;;; EQUALP tables map slot values, and the vectors in slot values that are
+;;; lists of vectors, to themselves.
+(defun vop-info-coalesce-tables ()
+  (or *vop-info-coalesce-tables*
+      (let ((types (make-hash-table :test 'equal))
+            (slots))
+        (do-coalesced-vop-info-slots (accessor setter)
+          (push (list* accessor setter (make-hash-table :test 'equalp)
+                       (make-hash-table :test 'equalp))
+                slots))
+        (dohash ((name info) *backend-template-names*)
+          (declare (ignore name))
+          (note-coalesced-vop-info info types slots))
+        (setq *vop-info-coalesce-tables* (cons types slots)))))
+
+(defun note-coalesced-vop-info (info types slots)
+  (let ((spec (template-type-specifier info)))
+    (unless (gethash spec types)
+      (setf (gethash spec types) (vop-info-type info))))
+  (loop for (accessor nil whole . vectors) in slots
+        for val = (funcall accessor info)
+        do (unless (gethash val whole)
+             (setf (gethash val whole) val))
+           (when (and (listp val) (vectorp (car val)))
+             (dolist (vector val)
+               (unless (gethash vector vectors)
+                 (setf (gethash vector vectors) vector))))))
+
 (defun store-vop-info (vop-info)
-  ;; This is an inefficent way to perform coalescing, but it doesn't matter.
-  (let* ((my-type-spec (template-type-specifier vop-info))
-         (my-type (specifier-type my-type-spec)))
-    (unless (block found
-              (maphash (lambda (name other)
-                         (declare (ignore name))
-                         ;; we get better coaelesecing by TYPE= rather than
-                         ;; EQUALP on (template-type-specifier vop-info)
-                         ;; because some types have multiple spellings.
-                         (when (type= (vop-info-type other) my-type)
-                           (setf (vop-info-type vop-info) (vop-info-type other))
-                           (return-from found t)))
-                       *backend-template-names*))
-      (setf (vop-info-type vop-info) (specifier-type my-type-spec))))
-  (flet ((find-equalp (accessor)
-           ;; Read the slot from VOP-INFO and try to find any other vop-info
-           ;; that has an EQUALP value in that slot, returning that value.
-           ;; Failing that, try again at a finer grain.
-           (let ((my-val (funcall accessor vop-info))) ; list of vectors
-             (maphash (lambda (name other)
-                        (declare (ignore name))
-                        (let ((other-val (funcall accessor other)))
-                          (when (equalp other-val my-val)
-                            (return-from find-equalp other-val))))
-                      *backend-template-names*)
-             (unless (and (listp my-val) (vectorp (car my-val)))
-               (return-from find-equalp my-val))
-             (mapl (lambda (cell)
-                     (let ((my-vector (car cell)))
-                       (block found
-                         (maphash (lambda (name other)
-                                    (declare (ignore name))
-                                    (dolist (other-vector
-                                             (funcall accessor other))
-                                      (when (equalp other-vector my-vector)
-                                        (rplaca cell other-vector)
-                                        (return-from found))))
-                                  *backend-template-names*))))
-                   (copy-list my-val))))) ; was a quoted constant, don't mutate
-    (macrolet ((try-coalescing (accessor)
-                 `(setf (,accessor vop-info) (find-equalp #',accessor))))
-      (try-coalescing vop-info-arg-types)
-      (try-coalescing vop-info-arg-costs)
-      (try-coalescing vop-info-arg-load-scs)
-      (try-coalescing vop-info-result-types)
-      (try-coalescing vop-info-result-costs)
-      (try-coalescing vop-info-result-load-scs)
-      (try-coalescing vop-info-more-arg-costs)
-      (try-coalescing vop-info-more-result-costs)
-      (try-coalescing vop-info-temps)
-      (try-coalescing vop-info-ref-ordering)
-      (try-coalescing vop-info-targets)))
+  (destructuring-bind (types . slots) (vop-info-coalesce-tables)
+    ;; Some types have multiple spellings, which coalesce only if
+    ;; SPECIFIER-TYPE gives back the same CTYPE for them.
+    (let ((spec (template-type-specifier vop-info)))
+      (setf (vop-info-type vop-info)
+            (or (gethash spec types) (specifier-type spec))))
+    ;; Use an EQUALP value from another vop-info in each slot.
+    ;; Failing that, try again at a finer grain.
+    (loop for (accessor setter whole . vectors) in slots
+          for my-val = (funcall accessor vop-info) ; list of vectors
+          do (funcall setter
+                      (or (gethash my-val whole)
+                          (if (and (listp my-val) (vectorp (car my-val)))
+                              (mapcar (lambda (v) (or (gethash v vectors) v))
+                                      my-val) ; was a quoted constant, don't mutate
+                              my-val))
+                      vop-info))
+    (note-coalesced-vop-info vop-info types slots))
   ;; redefinition is allowed, but a dup in the cross-compiler is a mistake
   #+sb-xc-host
   (when (gethash (vop-info-name vop-info) *backend-template-names*)
