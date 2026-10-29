@@ -127,6 +127,7 @@
   (defknown sb-vm::cpu-has-avx512bw-p () boolean (flushable))
   (defknown sb-impl::%base-name= (simple-base-string simple-base-string (integer 1 64))
       boolean (flushable))
+  #+sb-unicode
   (defknown sb-impl::%char-base-name= ((simple-array character (*)) simple-base-string
                                        (integer 1 32))
       boolean (flushable)))
