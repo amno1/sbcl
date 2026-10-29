@@ -22,6 +22,8 @@
        :components
        ((:file "sb-simd")
         (:file "x86-64" :if-feature :x86-64)
+        (:file "bmi1" :if-feature :x86-64)
+        (:file "bmi2" :if-feature :x86-64)
         (:file "sse" :if-feature :x86-64)
         (:file "sse2" :if-feature :x86-64)
         (:file "sse3" :if-feature :x86-64)
