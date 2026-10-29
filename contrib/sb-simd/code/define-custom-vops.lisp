@@ -581,9 +581,10 @@
 
 
   (macrolet
-      ((def-masked-vref-vops (type-name reg-sc stack-sc mask-name mask-sc mnemonic move-inst vec-name bytes-per-element)
+      ((def-masked-vref-vops (type-name reg-sc stack-sc mask-name mask-sc mnemonic move-inst vec-name bytes-per-element
+                             &optional (package-name "SB-SIMD-AVX512F"))
          (declare (ignore stack-sc mask-sc))
-         (let* ((pkg (find-package "SB-SIMD-AVX512F"))
+         (let* ((pkg (find-package package-name))
                 (load-z-name       (sb-simd-internals:mksym pkg "%" type-name "-LOAD-MASKED-Z"))
                 (load-z-c-name     (sb-simd-internals:mksym pkg "%" type-name "-LOAD-MASKED-Z-C"))
                 (sap-load-z-name   (sb-simd-internals:mksym pkg "%" type-name "-SAP-REF-MASKED-Z"))
@@ -839,7 +840,11 @@
     (def-masked-vref-vops u32.16 int-avx512-reg    int-avx512-stack    m32.16 unsigned-reg vmovdqu32-masked vmovdqa32 u32vec 4)
     (def-masked-vref-vops s32.16 int-avx512-reg    int-avx512-stack    m32.16 unsigned-reg vmovdqu32-masked vmovdqa32 s32vec 4)
     (def-masked-vref-vops u64.8  int-avx512-reg    int-avx512-stack    m64.8  unsigned-reg vmovdqu64-masked vmovdqa64 u64vec 8)
-    (def-masked-vref-vops s64.8  int-avx512-reg    int-avx512-stack    m64.8  unsigned-reg vmovdqu64-masked vmovdqa64 s64vec 8))
+    (def-masked-vref-vops s64.8  int-avx512-reg    int-avx512-stack    m64.8  unsigned-reg vmovdqu64-masked vmovdqa64 s64vec 8)
+    (def-masked-vref-vops u8.64  int-avx512-reg    int-avx512-stack    m8.64  unsigned-reg vmovdqu8-masked  vmovdqa64 u8vec  1 "SB-SIMD-AVX512BW")
+    (def-masked-vref-vops s8.64  int-avx512-reg    int-avx512-stack    m8.64  unsigned-reg vmovdqu8-masked  vmovdqa64 s8vec  1 "SB-SIMD-AVX512BW")
+    (def-masked-vref-vops u16.32 int-avx512-reg    int-avx512-stack    m16.32 unsigned-reg vmovdqu16-masked vmovdqa64 u16vec 2 "SB-SIMD-AVX512BW")
+    (def-masked-vref-vops s16.32 int-avx512-reg    int-avx512-stack    m16.32 unsigned-reg vmovdqu16-masked vmovdqa64 s16vec 2 "SB-SIMD-AVX512BW"))
 
     ;; Register compress and expand VOPs
     (macrolet ((def-compress-z (name inst)
