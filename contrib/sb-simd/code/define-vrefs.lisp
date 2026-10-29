@@ -73,8 +73,9 @@
 
 #+x86-64
 (macrolet
-    ((def-masked-vref (type element-type mask-type)
-       (let* ((pkg (find-package "SB-SIMD-AVX512F"))
+    ((def-masked-vref (type element-type mask-type
+                       &optional (package-name "SB-SIMD-AVX512F") (instruction-set :avx512f))
+       (let* ((pkg (find-package package-name))
               (load-z-name     (mksym pkg type "-LOAD-MASKED-Z"))
               (load-m-name     (mksym pkg type "-LOAD-MASKED"))
               (store-name      (mksym pkg type "-STORE-MASKED"))
@@ -88,29 +89,29 @@
               (vop-sap-store   (mksym pkg "%SET-" type "-SAP-REF-MASKED"))
               (type-cast       (mksym pkg type))
               (mask-cast       (mksym pkg mask-type)))
-         (if (not (instruction-set-available-p (find-instruction-set :avx512f)))
+         (if (not (instruction-set-available-p (find-instruction-set instruction-set)))
              `(progn
                 (defun ,load-z-name (mask array index)
                   (declare (ignore mask array index))
-                  (error "AVX512F instruction ~S not supported." ',load-z-name))
+                  (error "~A instruction ~S not supported." ,instruction-set ',load-z-name))
                 (defun ,load-m-name (mask default array index)
                   (declare (ignore mask default array index))
-                  (error "AVX512F instruction ~S not supported." ',load-m-name))
+                  (error "~A instruction ~S not supported." ,instruction-set ',load-m-name))
                 (defun ,store-name (mask value array index)
                   (declare (ignore mask value array index))
-                  (error "AVX512F instruction ~S not supported." ',store-name))
+                  (error "~A instruction ~S not supported." ,instruction-set ',store-name))
                 (defun ,sap-load-z-name (mask sap index)
                   (declare (ignore mask sap index))
-                  (error "AVX512F instruction ~S not supported." ',sap-load-z-name))
+                  (error "~A instruction ~S not supported." ,instruction-set ',sap-load-z-name))
                 (defun ,sap-load-m-name (mask default sap index)
                   (declare (ignore mask default sap index))
-                  (error "AVX512F instruction ~S not supported." ',sap-load-m-name))
+                  (error "~A instruction ~S not supported." ,instruction-set ',sap-load-m-name))
                 (defun (setf ,sap-load-m-name) (value mask sap index)
                   (declare (ignore value mask sap index))
-                  (error "AVX512F instruction ~S not supported." '(setf ,sap-load-m-name)))
+                  (error "~A instruction ~S not supported." ,instruction-set '(setf ,sap-load-m-name)))
                 (defun (setf ,sap-load-z-name) (value mask sap index)
                   (declare (ignore value mask sap index))
-                  (error "AVX512F instruction ~S not supported." '(setf ,sap-load-z-name))))
+                  (error "~A instruction ~S not supported." ,instruction-set '(setf ,sap-load-z-name))))
              `(progn
                 ;; Zeroing load
                 (define-inline ,load-z-name (mask array index)
@@ -176,7 +177,11 @@
   (def-masked-vref u32.16 (unsigned-byte 32)    m32.16)
   (def-masked-vref s32.16 (signed-byte 32)      m32.16)
   (def-masked-vref u64.8  (unsigned-byte 64)    m64.8)
-  (def-masked-vref s64.8  (signed-byte 64)      m64.8))
+  (def-masked-vref s64.8  (signed-byte 64)      m64.8)
+  (def-masked-vref u8.64  (unsigned-byte 8)     m8.64  "SB-SIMD-AVX512BW" :avx512bw)
+  (def-masked-vref s8.64  (signed-byte 8)       m8.64  "SB-SIMD-AVX512BW" :avx512bw)
+  (def-masked-vref u16.32 (unsigned-byte 16)    m16.32 "SB-SIMD-AVX512BW" :avx512bw)
+  (def-masked-vref s16.32 (signed-byte 16)      m16.32 "SB-SIMD-AVX512BW" :avx512bw))
 
 #+x86-64
 (macrolet

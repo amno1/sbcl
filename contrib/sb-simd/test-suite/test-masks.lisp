@@ -1522,3 +1522,52 @@
           (let ((res-sse (first (multiple-value-list (sb-simd-sse2:s32.4-values (sb-simd-sse2:s32.4-shifta (sb-simd-sse2:s32.4 val) c)))))
                 (res-avx2 (first (multiple-value-list (sb-simd-avx2:s32.4-values (sb-simd-avx2:s32.4-shifta (sb-simd-avx2:s32.4 val) (sb-simd-avx2:s32.4 c)))))))
             (is (= res-sse res-avx2))))))))
+
+(define-test masked-memory-avx512bw
+  (when (and (find-package "SB-SIMD-AVX512BW")
+             (sb-simd-internals:instruction-set-available-p (sb-simd-internals:find-instruction-set :avx512bw)))
+    ;; u8.64: short array, zeroing/merging loads, store, SAP at odd offset, bounds
+    (let* ((arr (make-array 13 :element-type '(unsigned-byte 8)
+                               :initial-contents (loop for i from 1 to 13 collect i)))
+           (m (1- (ash 1 13)))
+           (vals-z (multiple-value-list
+                    (sb-simd-avx512bw:u8.64-values (sb-simd-avx512bw:u8.64-load-masked-z m arr 0))))
+           (vals-m (multiple-value-list
+                    (sb-simd-avx512bw:u8.64-values
+                     (sb-simd-avx512bw:u8.64-load-masked #b111 (sb-simd-avx512bw:u8.64 200) arr 0)))))
+      (is (equal (subseq vals-z 0 13) (loop for i from 1 to 13 collect i)))
+      (is (every #'zerop (subseq vals-z 13)))
+      (is (equal (subseq vals-m 0 3) '(1 2 3)))
+      (is (every (lambda (x) (= x 200)) (subseq vals-m 3)))
+      (sb-simd-avx512bw:u8.64-store-masked #b101 (sb-simd-avx512bw:u8.64 77) arr 4)
+      (is (equal (coerce (subseq arr 3 8) 'list) '(4 77 6 77 8)))
+      (sb-sys:with-pinned-objects (arr)
+        (let* ((sap (sb-sys:vector-sap arr))
+               (vals (multiple-value-list
+                      (sb-simd-avx512bw:u8.64-values
+                       (sb-simd-avx512bw:u8.64-sap-ref-masked-z #b11 sap 9)))))
+          (is (equal (subseq vals 0 3) '(10 11 0)))
+          (setf (sb-simd-avx512bw:u8.64-sap-ref-masked #b1 sap 12) (sb-simd-avx512bw:u8.64 99))
+          (is (= (aref arr 12) 99))))
+      (setf (sb-simd-avx512bw:u8.64-aref-masked #b1 arr 0) (sb-simd-avx512bw:u8.64 42))
+      (is (= (aref arr 0) 42))
+      (signals error (sb-simd-avx512bw:u8.64-load-masked-z (opaque-identity (ash 1 13)) arr 0)))
+    ;; s8.64
+    (let* ((arr (make-array 4 :element-type '(signed-byte 8) :initial-contents '(-1 -2 3 -4)))
+           (vals (multiple-value-list
+                  (sb-simd-avx512bw:s8.64-values (sb-simd-avx512bw:s8.64-load-masked-z #b1111 arr 0)))))
+      (is (equal (subseq vals 0 5) '(-1 -2 3 -4 0))))
+    ;; u16.32 / s16.32
+    (let* ((arr (make-array 5 :element-type '(unsigned-byte 16)
+                              :initial-contents '(1000 2000 3000 4000 65535)))
+           (vals (multiple-value-list
+                  (sb-simd-avx512bw:u16.32-values (sb-simd-avx512bw:u16.32-load-masked-z #b11110 arr 0)))))
+      (is (equal (subseq vals 0 6) '(0 2000 3000 4000 65535 0)))
+      (sb-simd-avx512bw:u16.32-store-masked #b10 (sb-simd-avx512bw:u16.32 7) arr 2)
+      (is (equal (coerce arr 'list) '(1000 2000 3000 7 65535)))
+      (signals error (sb-simd-avx512bw:u16.32-load-masked-z (opaque-identity #b111111) arr 0)))
+    (let* ((arr (make-array 3 :element-type '(signed-byte 16) :initial-contents '(-300 5 -7)))
+           (vals (multiple-value-list
+                  (sb-simd-avx512bw:s16.32-values
+                   (sb-simd-avx512bw:s16.32-load-masked #b101 (sb-simd-avx512bw:s16.32 9) arr 0)))))
+      (is (equal (subseq vals 0 4) '(-300 9 -7 9))))))
