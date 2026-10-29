@@ -76,6 +76,16 @@
 (defglobal *backend-parsed-vops* (make-hash-table)) ; keys are symbols
 (declaim (type hash-table *backend-parsed-vops*))
 
+;;; Hash-consing tables for REGISTER-VOP-PARSE and STORE-VOP-INFO, so that
+;;; sharing a value with an equivalent one from an existing vop costs a hash
+;;; lookup rather than a scan of every vop defined so far. They are created on
+;;; first use by meta-vmdef from the current contents of *BACKEND-PARSED-VOPS* and
+;;; *BACKEND-TEMPLATE-NAMES*. Entries from redefined vops are not removed,
+;;; which is harmless since everything stored in them is immutable.
+;;; SAVE-LISP-AND-DIE discards them.
+(defglobal *vop-parse-share-tables* nil)
+(defglobal *vop-info-coalesce-tables* nil)
+
 ;;; Mapping of predicate name (a symbol) to a type.
 ;;; This is an EQL table so that it uses symbol-hash.
 (defglobal *backend-predicate-types* (make-hash-table))
