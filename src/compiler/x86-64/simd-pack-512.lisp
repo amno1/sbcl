@@ -710,8 +710,10 @@
       (inst vpcmpneqb k2 va vb)
       (inst kortestq k2 k2)))
 
-  ;; A character string against a base string, N <= 16 characters:
-  ;; widen the base string's bytes to 32 bits and compare 16 at once.
+  ;; A character string against a base string, N <= 32 characters, in two
+  ;; halves of 16: widen each half of the base string's bytes to 32 bits
+  ;; and compare it with 16 characters. For N <= 16 the second half's mask
+  ;; is empty, so its loads read nothing.
   (define-vop (%char-base-name=)
     (:translate sb-impl::%char-base-name=)
     (:policy :fast-safe)
@@ -721,16 +723,33 @@
     (:arg-types simple-character-string simple-base-string unsigned-num)
     (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
     (:temporary (:sc unsigned-reg) mask)
-    (:temporary (:sc int-avx512-reg :offset 16) va)
-    (:temporary (:sc int-avx512-reg :offset 17) vb)
+    (:temporary (:sc int-avx512-reg :offset 16) va1)
+    (:temporary (:sc int-avx512-reg :offset 17) vb1)
+    (:temporary (:sc int-avx512-reg :offset 18) va2)
+    (:temporary (:sc int-avx512-reg :offset 19) vb2)
     (:temporary (:sc mask-reg) k1)
     (:temporary (:sc mask-reg) k2)
+    (:temporary (:sc mask-reg) k3)
+    (:temporary (:sc mask-reg) k4)
     (:conditional :e)
-    (:generator 10
-      (low-bits-mask mask n rcx)
-      (inst kmovq k1 mask)
-      (inst vmovdqu32-masked-z va (string-data a) k1)
-      (inst vmovdqu8-masked-z vb (string-data b) k1)
-      (inst vpmovzxbd vb vb)
-      (inst vpcmpneqd k2 va vb)
-      (inst kortestq k2 k2))))
+    (:generator 12
+      (low-bits-mask mask n rcx)            ; bits 0..N-1, N <= 32
+      (inst kmovq k1 mask)                  ; characters 0-15 (upper bits unused)
+      (inst shr mask 16)
+      (inst kmovq k2 mask)                  ; characters 16-31
+      (inst vmovdqu32-masked-z va1 (string-data a) k1)
+      (inst vmovdqu8-masked-z vb1 (string-data b) k1)
+      (inst vmovdqu32-masked-z va2 (ea (+ 64 (- (* vector-data-offset n-word-bytes)
+                                                other-pointer-lowtag))
+                                       a)
+            k2)
+      (inst vmovdqu8-masked-z vb2 (ea (+ 16 (- (* vector-data-offset n-word-bytes)
+                                               other-pointer-lowtag))
+                                      b)
+            k2)
+      (inst vpmovzxbd vb1 vb1)
+      (inst vpmovzxbd vb2 vb2)
+      (inst vpcmpneqd k3 va1 vb1)
+      (inst vpcmpneqd k4 va2 vb2)
+      ;; ZF = 1 iff no character differs in either half
+      (inst kortestq k3 k4))))

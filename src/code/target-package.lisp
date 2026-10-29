@@ -1297,7 +1297,7 @@ Experimental: interface subject to change."
        (when (<= name-length 64)
          (return-from lookup-name= (%base-name= string name name-length))))
       ((simple-array character (*))
-       (when (<= name-length 16)
+       (when (<= name-length 32)
          (return-from lookup-name= (%char-base-name= string name name-length))))))
   (string= string name :end1 name-length :end2 name-length))
 
