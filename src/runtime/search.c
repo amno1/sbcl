@@ -201,6 +201,27 @@ static bool sym_stringeq(lispobj sym, const char *string, int len)
         && !memcmp(name->data, string, len);
 }
 
+// Scan the symbol vector SYMBOLS linearly. If DELETED is a bit-vector,
+// skip the cells whose bit is set (removed from a perfectly hashed part).
+static lispobj* search_symbol_vector(lispobj symbols, lispobj deleted, char* symbol_name)
+{
+    gc_assert(simple_vector_p(symbols));
+    struct vector* v = VECTOR(symbols);
+    uword_t* bits = deleted != NIL ? (uword_t*)VECTOR(deleted)->data : 0;
+    lispobj namelen = strlen(symbol_name);
+    int index;
+    for (index = vector_len(v)-1; index >= 0 ; --index) {
+        lispobj thing = v->data[index];
+        if (lowtag_of(thing) == OTHER_POINTER_LOWTAG
+            && widetag_of(&SYMBOL(thing)->header) == SYMBOL_WIDETAG
+            && !(bits && (bits[index / N_WORD_BITS] >> (index % N_WORD_BITS) & 1))
+            && sym_stringeq(thing, symbol_name, namelen)) {
+            return (lispobj*)SYMBOL(thing);
+        }
+    }
+    return 0;
+}
+
 static lispobj* search_package_symbols(lispobj package, char* symbol_name)
 {
     // Since we don't have Lisp's string hash algorithm in C, we can only
@@ -211,21 +232,19 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name)
         struct symbol_table* table = (void*)
           INSTANCE(barrier_load(pass ? &pkg->external_symbols : &pkg->internal_symbols));
         gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
+        lispobj perfect = barrier_load(&table->perfect);
+        if (perfect != NIL) {
+            struct perfect_symtbl* p = (void*)INSTANCE(perfect);
+            lispobj* found = search_symbol_vector(barrier_load(&p->cells),
+                                                  barrier_load(&p->deleted),
+                                                  symbol_name);
+            if (found) return found;
+        }
         lispobj cells = barrier_load(&table->_cells);
         gc_assert(listp(cells));
-        lispobj symbols = barrier_load(&CONS(cells)->cdr);
-        gc_assert(simple_vector_p(symbols));
-        struct vector* v = VECTOR(symbols);
-        lispobj namelen = strlen(symbol_name);
-        int index;
-        for (index = vector_len(v)-1; index >= 0 ; --index) {
-            lispobj thing = v->data[index];
-            if (lowtag_of(thing) == OTHER_POINTER_LOWTAG
-                && widetag_of(&SYMBOL(thing)->header) == SYMBOL_WIDETAG
-                && sym_stringeq(thing, symbol_name, namelen)) {
-                return (lispobj*)SYMBOL(thing);
-            }
-        }
+        lispobj* found = search_symbol_vector(barrier_load(&CONS(cells)->cdr), NIL,
+                                              symbol_name);
+        if (found) return found;
     }
     return 0;
 }

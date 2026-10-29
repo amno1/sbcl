@@ -411,18 +411,49 @@ of :INHERITED :EXTERNAL :INTERNAL."
 (declaim (inline symtbl-cells))
 (defun symtbl-cells (table) (truly-the simple-vector (cdr (symtbl-%cells table))))
 
-(defun %symtbl-count (table)
+(defun %symtbl-overflow-count (table)
   (the fixnum (- (symtbl-size table)
                  (the fixnum (+ (symtbl-deleted table)
                                 (symtbl-free table))))))
 
+(defun %symtbl-count (table)
+  (let ((perfect (symtbl-perfect table)))
+    (+ (%symtbl-overflow-count table)
+       (if perfect (psymtbl-count perfect) 0))))
+
+;;; Return a vector holding every symbol of TABLE (fixnums are to be skipped).
+;;; This is the open-addressing vector or the perfect vector itself when the
+;;; other part is empty, otherwise a fresh vector. Must not be modified.
+(defun symtbl-all-cells (table)
+  ;; Read the open-addressing part before PERFECT. A concurrent rebuild
+  ;; publishes PERFECT first, so we may see a symbol twice but never miss one.
+  (let ((overflow (symtbl-cells table)))
+    (sb-thread:barrier (:read))
+    (let ((perfect (symtbl-perfect table)))
+      (cond ((not perfect) overflow)
+            ((and (not (psymtbl-deleted perfect)) (every #'fixnump overflow))
+             (psymtbl-cells perfect))
+            (t
+             (let ((d (psymtbl-deleted perfect)))
+               (coerce (nconc (loop for s across (psymtbl-cells perfect)
+                                    for i fixnum from 0
+                                    when (or (not d) (zerop (sbit d i)))
+                                      collect s)
+                              (loop for s across overflow
+                                    when (symbolp s) collect s))
+                       'simple-vector)))))))
+
 (defmethod print-object ((table symbol-table) stream)
   (declare (type stream stream))
   (print-unreadable-object (table stream :type t :identity t)
-    (let* ((n-live (%symtbl-count table))
+    (let* ((n-live (%symtbl-overflow-count table))
            (n-deleted (symtbl-deleted table))
            (n-filled (+ n-live n-deleted))
-           (n-cells (length (symtbl-cells table))))
+           (n-cells (length (symtbl-cells table)))
+           (perfect (symtbl-perfect table)))
+      (when perfect
+        (format stream "perfect ~D/~D + "
+                (psymtbl-count perfect) (length (psymtbl-cells perfect))))
       (format stream
               "(~D+~D)/~D [~@[~,3f words/sym,~]load=~,1f%]"
               n-live n-deleted n-cells
@@ -620,7 +651,7 @@ if PACKAGE doesn't designate a valid package."
   "Locks PACKAGE and returns T. Has no effect if PACKAGE was already
 locked. Signals an error if PACKAGE is not a valid package designator."
   (flet ((unoptimize (table)
-           (dovector (x (symtbl-cells table))
+           (dovector (x (symtbl-all-cells table))
              ;; By some small miracle this was mostly correct for NIL
              ;; except that on ppc64le, (GET-HEADER-DATA NIL) returns #x52D00
              ;; which appears to have the +symbol-fast-bindable+ bit on.
@@ -1207,7 +1238,9 @@ Experimental: interface subject to change."
 (define-load-time-global *sym-hit-1st-try* 0)
 |#
 
-(defun %lookup-symbol (table string name-length name-hash)
+;;; Look up STRING in the open-addressing part of TABLE only.
+;;; Return the symbol and its index in that part, or 0 and -1.
+(defun %lookup-overflow-symbol (table string name-length name-hash)
   (declare (optimize (sb-c::verify-arg-count 0)
                      (sb-c::insert-array-bounds-checks 0)))
   (declare (symbol-table table) (simple-string string) (index name-length))
@@ -1226,7 +1259,7 @@ Experimental: interface subject to change."
                          (when (and (= (length name) name-length)
                                     (string= string name
                                              :end1 name-length :end2 name-length))
-                           (return-from %lookup-symbol (values symbol index)))))))
+                           (return-from %lookup-overflow-symbol (values symbol index)))))))
                   ;; either a never used cell or a tombstone left by UNINTERN
                   ((eql item 0) ; never used
                    ;; Prevent CPU from speculating the re-load of %CELLS
@@ -1237,102 +1270,151 @@ Experimental: interface subject to change."
                            (values 0 -1)
                            (try new)))))))))
       (named-let try ((cells (symtbl-%cells table)))
-        (let* ((magic (car cells))
+        (let* ((reciprocals (car cells))
                (vec (truly-the simple-vector (cdr cells)))
-               (len (length vec)))
-          (when (functionp magic)
-            (let ((perfect-hash (funcall magic name-hash)))
-              (declare (type fixnum perfect-hash))
-              (when (< perfect-hash len)
-                ;; VEC may have been splatted with 0 by a concurrent resize,
-                ;; so don't assume that the cell holds a symbol.
-                (let ((item (svref vec perfect-hash)))
-                  (when (and (not (fixnump item))
-                             (eql (symbol-name-hash (truly-the symbol item)) name-hash)
-                             (string= (symbol-name (truly-the symbol item)) string
-                                      :end2 name-length))
-                    (return-from try (values item perfect-hash))))))
-            ;; A miss is only conclusive if CELLS is still current. Otherwise
-            ;; the table was converted to open addressing (by INTERN or
-            ;; UNINTERN) and the symbol may be in the new vector.
-            (sb-thread:barrier (:read))
-            (return-from try
-              (let ((new (symtbl-%cells table)))
-                (if (eq new cells) (values 0 -1) (try new)))))
-          (let* ((reciprocals magic)
-                 (index (symbol-table-hash 1 name-hash len)))
-            (declare (index index))
-            (probe (atomic-incf *sym-hit-1st-try*))
+               (len (length vec))
+               (index (symbol-table-hash 1 name-hash len)))
+          (declare (index index))
+          (probe (atomic-incf *sym-hit-1st-try*))
           ;; Compute a secondary hash H2, and add it successively to INDEX,
           ;; treating the vector as a ring. This loop is guaranteed to terminate
           ;; because there has to be at least one cell with a 0 in it.
           ;; Whenever we change a cell containing 0 to a symbol, the FREE count
           ;; is decremented. And FREE starts as a smaller number than the vector length.
-            (let ((h2 (symbol-table-hash 2 name-hash len)))
-              (declare (index h2))
-              (loop (when (>= (incf (truly-the index index) h2) len)
-                      (decf (truly-the index index) len))
-                    (probe nil))))))))
+          (let ((h2 (symbol-table-hash 2 name-hash len)))
+            (declare (index h2))
+            (loop (when (>= (incf (truly-the index index) h2) len)
+                    (decf (truly-the index index) len))
+                  (probe nil)))))))
+
+;;; Return the index in the perfect part P that NAME-HASH maps to, if that
+;;; cell holds a live symbol satisfying TEST (a form using SYMBOL), else NIL.
+(defmacro with-perfect-cell ((symbol index p name-hash) test &body body)
+  (with-unique-names (cells d)
+    `(let* ((,cells (psymtbl-cells ,p))
+            (,index (funcall (psymtbl-hash-fn ,p) ,name-hash)))
+       (declare (index ,index))
+       (when (< ,index (length ,cells))
+         (let ((,symbol (svref ,cells ,index)))
+           (when (and (not (fixnump ,symbol))
+                      (let ((,symbol (truly-the symbol ,symbol)))
+                        (declare (ignorable ,symbol))
+                        ,test)
+                      (let ((,d (psymtbl-deleted ,p)))
+                        (or (not ,d) (zerop (sbit ,d ,index)))))
+             (let ((,symbol (truly-the symbol ,symbol)))
+               (declare (ignorable ,symbol))
+               ,@body)))))))
+
+;;; Look up STRING in TABLE: first in its perfectly hashed part, if any, then in
+;;; its open-addressing part. Return the symbol and, if it was found in the
+;;; open-addressing part, its index there (else -1). Return 0 and -1 if not found.
+(defun %lookup-symbol (table string name-length name-hash)
+  (declare (optimize (sb-c::verify-arg-count 0)
+                     (sb-c::insert-array-bounds-checks 0)))
+  (declare (symbol-table table) (simple-string string) (index name-length))
+  (loop
+    (let ((perfect (symtbl-perfect table)))
+      (when perfect
+        (with-perfect-cell (symbol index perfect name-hash)
+            (and (eq (symbol-name-hash symbol) name-hash)
+                 (let ((name (symbol-name symbol)))
+                   (and (= (length name) name-length)
+                        (string= string name :end1 name-length :end2 name-length))))
+          (return (values symbol -1))))
+      ;; An empty open-addressing part (size 0, as left by a merge) has
+      ;; nothing to probe.
+      (unless (eql (symtbl-size table) 0)
+        (multiple-value-bind (symbol index)
+            (%lookup-overflow-symbol table string name-length name-hash)
+          (unless (eql symbol 0)
+            (return (values symbol index)))))
+      ;; A miss is conclusive only if PERFECT is still current. Otherwise
+      ;; the table was rebuilt and the symbol may have moved from the old
+      ;; open-addressing part into the new perfect part.
+      (sb-thread:barrier (:read))
+      (when (eq (symtbl-perfect table) perfect)
+        (return (values 0 -1))))))
 
 ;;; Almost like %lookup-symbol but compare by EQ, not by name.
 (defun symbol-externalp (symbol package)
   (declare (symbol symbol) (package package))
   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-  (macrolet ((probe ()
-               `(let ((item (svref vec index)))
-                  (when (eq item symbol) (return-from symbol-externalp t))
-                  (when (eql item 0)
-                    ;; Prevent CPU from speculating the re-load of %CELLS
-                    (sb-thread:barrier (:read))
-                    (return-from try
-                      (let ((new (symtbl-%cells table)))
-                        (if (eq new cells) nil (try new))))))))
-    (let ((table (package-external-symbols package))
-          (name-hash (symbol-name-hash symbol)))
-      (named-let try ((cells (symtbl-%cells table)))
-        (let* ((magic (car cells))
-               (vec (truly-the simple-vector (cdr cells)))
-               (len (length vec)))
-          (when (functionp magic)
-            (let ((perfect-hash (funcall magic name-hash)))
-              (when (and (< perfect-hash len) (eq (svref vec perfect-hash) symbol))
-                (return-from try t))
-              ;; As in %LOOKUP-SYMBOL, a miss is conclusive only if CELLS is current.
-              (sb-thread:barrier (:read))
-              (return-from try
-                (let ((new (symtbl-%cells table)))
-                  (if (eq new cells) nil (try new))))))
-          (let* ((reciprocals magic)
-                 (index (symbol-table-hash 1 name-hash len)))
-            (declare (index index))
-            (probe)
-            (let ((h2 (symbol-table-hash 2 name-hash len)))
-              (loop (when (>= (incf index h2) len) (decf index len))
-                    (probe)))))))))
+  (let ((table (package-external-symbols package))
+        (name-hash (symbol-name-hash symbol)))
+    (flet ((overflow-memq ()
+             (macrolet ((probe ()
+                          `(let ((item (svref vec index)))
+                             (when (eq item symbol) (return-from overflow-memq t))
+                             (when (eql item 0)
+                               ;; Prevent CPU from speculating the re-load of %CELLS
+                               (sb-thread:barrier (:read))
+                               (return-from try
+                                 (let ((new (symtbl-%cells table)))
+                                   (if (eq new cells) nil (try new))))))))
+               (named-let try ((cells (symtbl-%cells table)))
+                 (let* ((reciprocals (car cells))
+                        (vec (truly-the simple-vector (cdr cells)))
+                        (len (length vec))
+                        (index (symbol-table-hash 1 name-hash len)))
+                   (declare (index index))
+                   (probe)
+                   (let ((h2 (symbol-table-hash 2 name-hash len)))
+                     (loop (when (>= (incf index h2) len) (decf index len))
+                           (probe))))))))
+      (loop
+        (let ((perfect (symtbl-perfect table)))
+          (when perfect
+            (with-perfect-cell (s index perfect name-hash) (eq s symbol)
+              (return t)))
+          (when (and (not (eql (symtbl-size table) 0)) (overflow-memq))
+            (return t))
+          ;; As in %LOOKUP-SYMBOL, a miss is conclusive only if PERFECT is current.
+          (sb-thread:barrier (:read))
+          (when (eq (symtbl-perfect table) perfect)
+            (return nil)))))))
 
-;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
+;;; Delete SYMBOL from TABLE. SYMBOL must exist. In the perfect part this
+;;; publishes a new PERFECT-SYMTBL whose DELETED bitmap marks the symbol, so
+;;; the perfect part itself is never written (it may be in read-only space).
+;;; In the open-addressing part it stores -1 in the symbol's place.
 (defun nuke-symbol (table symbol reason)
-  (let ((cells (symtbl-%cells table)))
-    (when (functionp (car cells)) ; change table back to not-perfectly-hashed
-      (resize-symbol-table table (length (cdr cells)) reason)))
-  (let* ((string (symbol-name symbol))
-         (length (length string))
-         (hash (symbol-name-hash symbol)))
-    (declare (type index length)
-             (hash-code hash))
-    (with-symbol ((symbol index) table string length hash)
-      ;; It is suboptimal to grab the vectors again, but not broken,
-      ;; because we have exclusive use of the table for writing.
-      (let ((symvec (symtbl-cells table)))
-        (setf (aref symvec index) -1))
-      (incf (symtbl-deleted table))))
-  ;; If the table is less than one quarter full, halve its size and
-  ;; rehash the entries.
+  (let ((perfect (symtbl-perfect table))
+        (hash (symbol-name-hash symbol)))
+    (declare (hash-code hash))
+    (when perfect
+      (with-perfect-cell (s index perfect hash) (eq s symbol)
+        (let* ((cells (psymtbl-cells perfect))
+               (old (psymtbl-deleted perfect))
+               (deleted (if old
+                            (copy-seq old)
+                            (make-array (length cells) :element-type 'bit
+                                                       :initial-element 0)))
+               (count (1- (psymtbl-count perfect))))
+          (setf (sbit deleted index) 1)
+          (setf (symtbl-perfect table)
+                (if (zerop count)
+                    nil
+                    (make-perfect-symtbl (psymtbl-hash-fn perfect) cells count deleted))))
+        (return-from nuke-symbol)))
+    (let* ((string (symbol-name symbol))
+           (length (length string)))
+      (declare (type index length))
+      (multiple-value-bind (found index)
+          (%lookup-overflow-symbol table string length hash)
+        (unless (eql found 0)
+          ;; It is suboptimal to grab the vectors again, but not broken,
+          ;; because we have exclusive use of the table for writing.
+          (let ((symvec (symtbl-cells table)))
+            (setf (aref symvec index) -1))
+          (incf (symtbl-deleted table))))))
+  ;; If the open-addressing part is less than one quarter full, halve its
+  ;; size and rehash the entries.
   (let ((size (symtbl-size table))
-        (used (%symtbl-count table)))
+        (used (%symtbl-overflow-count table)))
     (when (< used (truncate size 4))
       (resize-symbol-table table (* used 2) reason))))
-
+
 (defun list-all-packages ()
   "Return a list of all existing packages."
   (let ((result ()))
@@ -2067,20 +2149,21 @@ PACKAGE."
                    (next-state (the fixnum (+ bits #b100)))
                    (table-idx (ash next-state -2)))
               (if (< table-idx (length tables)) ; remain in state 2
-                  (start next-state (symtbl-cells (svref tables table-idx)))
+                  (start next-state (symtbl-all-cells (svref tables table-idx)))
                   (start-next-pkg))))
            (1 ; finished internals, switch to inherited if desired
             (let ((tables (package-tables cur-pkg)))
               (setf (pkg-iter-exclude iter) (package-%shadowing-symbols cur-pkg))
               (if (and (plusp (length tables)) (logbitp 2 (pkg-iter-enable iter)))
-                  (start 2 (symtbl-cells (svref tables 0)))
+                  (start 2 (symtbl-all-cells (svref tables 0)))
                   (start-next-pkg)))) ; bypass state 2 entirely
            (0 ; finished externals, switch to internals if desired
             (if (logbitp 1 (pkg-iter-enable iter)) ; enter state 1
                 (let ((snapshot (shiftf (pkg-iter-snapshot iter) nil)))
                   (start 1 (cond ((null snapshot)
-                                  (symtbl-cells (package-internal-symbols cur-pkg)))
-                                 (t (atomic-decf (symtbl-immutable (car snapshot)))
+                                  (symtbl-all-cells (package-internal-symbols cur-pkg)))
+                                 (t (when (car snapshot)
+                                      (atomic-decf (symtbl-immutable (car snapshot))))
                                     (cdr snapshot)))))
                 (advance-from-state 1))) ; skip the internals
            (3 ; initial state
@@ -2098,12 +2181,16 @@ PACKAGE."
                          ;;   through non-local exit. If that occurs, the C-O-W status sticks,
                          ;;   causing ADD-SYMBOL to copy the table as though immutable,
                          ;;   which has no effect other than extra consing.
-                         ;; FIXME: %CELLS isn't an instance of SYMTBL-MAGIC if perfectly hashed
-                         ;;        though for the time being that can't happen.
-                         (let ((other (symtbl-%cells (package-internal-symbols pkg))))
-                           (atomic-incf (symtbl-immutable (car other)))
-                           (setf (pkg-iter-snapshot iter) other)))
-                       (start 0 (symtbl-cells (package-external-symbols pkg))))))))))
+                         ;; - With a perfect part, SYMTBL-ALL-CELLS returns a vector
+                         ;;   that is never modified, so no copy-on-write vote is needed.
+                         (let ((internals (package-internal-symbols pkg)))
+                           (setf (pkg-iter-snapshot iter)
+                                 (if (symtbl-perfect internals)
+                                     (cons nil (symtbl-all-cells internals))
+                                     (let ((other (symtbl-%cells internals)))
+                                       (atomic-incf (symtbl-immutable (car other)))
+                                       other)))))
+                       (start 0 (symtbl-all-cells (package-external-symbols pkg))))))))))
        (start (state vec)
          (setf (pkg-iter-symbols iter) vec
                (pkg-iter-cur-index iter) (length vec)
@@ -2281,7 +2368,7 @@ PACKAGE."
     (when (and (not boundp) *deferred-package-names*)
       (maphash
        (lambda (name package)
-         (dovector (sym (symtbl-cells (package-internal-symbols package)))
+         (dovector (sym (symtbl-all-cells (package-internal-symbols package)))
            (when (symbolp sym)
                (error 'simple-package-error
                       :format-control
