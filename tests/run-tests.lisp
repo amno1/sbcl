@@ -316,7 +316,9 @@
       #+win32 sb-impl::*timer-thread*
       sb-unicode::*name->char-buffers*
       sb-impl::*finalizer-thread*
-      sb-impl::*read-line-buffers*)))
+      sb-impl::*read-line-buffers*
+      sb-c::*vop-parse-share-tables*
+      sb-c::*vop-info-coalesce-tables*)))
 
 (defun collect-symbol-values ()
   (let (result)
