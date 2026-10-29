@@ -336,8 +336,21 @@ SB-MANUAL:@PACKAGE-LOCAL-NICKNAMES."
                     ',(if implement-p implement (list package))
                     ',local-nicknames
                     ',lock (sb-c:source-location)
-                    ,@(and doc
-                           `(,doc))))))
+                    ,doc
+                    ;; A perfect hash function for the exported names, made
+                    ;; now, so that it is compiled into the fasl.
+                    ,(perfect-hash-form-for-names exports)))))
+
+;;; Return a LAMBDA form of a perfect hash function over the name hashes of
+;;; NAMES, or NIL.
+(defun perfect-hash-form-for-names (names)
+  #+sb-xc-host (declare (ignore names))
+  #-sb-xc-host
+  (when (>= (length names) 3)
+    (let ((hashes (map '(simple-array (unsigned-byte 32) (*))
+                       (lambda (name) (calc-symbol-name-hash name (length name)))
+                       (remove-duplicates names :test #'string=))))
+      (values (sb-c:make-perfect-hash-lambda hashes)))))
 
 (defun check-disjoint (&rest args)
   ;; An arg is (:key . set)
@@ -567,7 +580,7 @@ error otherwise.")
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
                     use imports interns exports implement local-nicknames
-                    lock source-location &optional doc)
+                    lock source-location &optional doc externals-hash-fn)
   (declare (type simple-string name)
            (type list nicknames shadows shadowing-imports
                  imports interns exports)
@@ -595,7 +608,12 @@ error otherwise.")
                             shadows shadowing-imports
                             use imports interns exports
                             implement local-nicknames
-                            lock doc))))))
+                            lock doc)
+            ;; Install the externals' perfect hash made by DEFPACKAGE, if any.
+            (when externals-hash-fn
+              (perfect-symbol-table (package-external-symbols package)
+                                    externals-hash-fn))
+            package)))))
 
 (defun find-or-make-symbol (name package)
   (multiple-value-bind (symbol how) (find-symbol name package)
@@ -765,8 +783,8 @@ error otherwise.")
 ;;; NIL (leaving TABLE unchanged) if no perfect hash could be made, e.g.
 ;;; for fewer than 3 symbols or two names with the same hash.
 ;;; The caller must exclude concurrent writers; readers are safe.
-(defun perfect-symbol-table (table)
-  (declare (symbol-table table))
+(defun perfect-symbol-table (table &optional hash-fn)
+  (declare (symbol-table table) (type (or null function) hash-fn))
   (let* ((overflow (symtbl-cells table))
          (perfect (symtbl-perfect table)))
     (when (and perfect
@@ -784,17 +802,24 @@ error otherwise.")
            (n (length symbols)))
       (when (< n 3)
         (return-from perfect-symbol-table nil))
-      (let* ((hashes (map '(simple-array (unsigned-byte 32) (*))
-                          #'symbol-name-hash symbols))
-             (hash-expr (sb-c:make-perfect-hash-lambda hashes)))
-        (unless hash-expr
-          (return-from perfect-symbol-table nil))
-        (let ((fun (compile nil hash-expr))
-              (cells (make-array n :initial-element 0)))
+      (let ((fun
+              (or hash-fn
+                  (let* ((hashes (map '(simple-array (unsigned-byte 32) (*))
+                                      #'symbol-name-hash symbols))
+                         (hash-expr (sb-c:make-perfect-hash-lambda hashes)))
+                    (unless hash-expr
+                      (return-from perfect-symbol-table nil))
+                    (handler-bind ((warning #'muffle-warning))
+                      (compile nil hash-expr)))))
+            (cells (make-array n :initial-element 0)))
           (declare (function fun))
           (dolist (s symbols)
             (let ((i (funcall fun (symbol-name-hash s))))
-              (aver (eql (svref cells i) 0))
+              ;; A supplied HASH-FN was made for a set of names that may not
+              ;; match the table any more; reject it if it isn't perfect here.
+              (unless (and (< i n) (eql (svref cells i) 0))
+                (aver hash-fn)
+                (return-from perfect-symbol-table nil))
               (setf (svref cells i) s)))
           ;; Publish the perfect part before emptying the open-addressing part.
           ;; A reader that sees the old perfect part and the new, empty
@@ -802,9 +827,33 @@ error otherwise.")
           (setf (symtbl-perfect table) (make-perfect-symtbl fun cells n nil))
           (sb-thread:barrier (:write))
           (resize-symbol-table table 0 'intern)
-          t)))))
+          t))))
 
-;;; Every table except KEYWORD's is rebuilt with a perfectly hashed part
+;;; Is it worth rebuilding TABLE's perfect part? Merging costs time linear in
+;;; the table size, so only merge when the open-addressing part has grown to
+;;; the size of the perfect part (or has 16 symbols, for a small or new
+;;; table), or when over half the perfect part has been removed. Doubling
+;;; keeps the total merge work linear in the number of symbols ever added.
+(defun symbol-table-merge-worthwhile-p (table)
+  (let* ((perfect (symtbl-perfect table))
+         (overflow (%symtbl-overflow-count table))
+         (live (if perfect (psymtbl-count perfect) 0)))
+    (or (and (not perfect) (>= overflow 3))
+        (>= overflow (max 16 live))
+        (and perfect (> (- (length (psymtbl-cells perfect)) live) live)))))
+
+;;; Merge the tables of every package for which that is worthwhile.
+;;; Called after the outermost LOAD returns; may be called at any time.
+(defun merge-symbol-tables (&optional force)
+  (when (eq *symbol-table-policy* :speed)
+    (with-package-graph ()
+      (dolist (package (list-all-packages))
+        (dolist (table (list (package-internal-symbols package)
+                             (package-external-symbols package)))
+          (when (or force (symbol-table-merge-worthwhile-p table))
+            (perfect-symbol-table table)))))))
+
+;;; Every table is rebuilt with a perfectly hashed part
 ;;; holding all of its symbols. Symbols added later go into the (initially
 ;;; empty) open-addressing part, and removed ones are marked in a bitmap, so
 ;;; the perfect part survives INTERN, EXPORT, UNINTERN etc. until the next save.
@@ -819,12 +868,13 @@ error otherwise.")
              (internals (package-internal-symbols (truly-the package package)))
              (externals (package-external-symbols package)))
         (dolist (table (list internals externals))
-          (unless (and (not keywordp) (perfect-symbol-table table))
+          (unless (perfect-symbol-table table)
             (tune lf table)))
         ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
         #-darwin-jit
         (setf (symtbl-modified externals) nil
-              (symtbl-modified internals) nil)))))
+              (symtbl-modified internals) nil)))
+    (setq *merge-symbol-tables-after-load* t)))
 
 ;;; This function is mainly of interest to developers, should we remove it
 ;;; from the image?
