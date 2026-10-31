@@ -1125,3 +1125,83 @@
       ;; Mask of nonzero digits.
       (inst pmovmskb mask y)
       (inst xor :dword mask #xFFFF))))
+
+;;; Unaligned loads at byte offset INDEX into the data of VECTOR, for
+;;; STRING=. The vector is in a register for the whole load, so it
+;;; needn't be pinned.
+(macrolet ((def (name size result-sc result-type)
+             `(define-vop (,name)
+                (:translate ,name)
+                (:policy :fast-safe)
+                (:args (vector :scs (descriptor-reg))
+                       (index :scs (unsigned-reg)))
+                (:arg-types * unsigned-num)
+                (:results (result :scs (,result-sc)))
+                (:result-types ,result-type)
+                (:generator 2
+                  (inst mov ,@(if (eq size :dword) '(:dword)) result
+                        (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                            vector index))))))
+  (def %vector-unaligned-ref64 :qword unsigned-reg unsigned-num)
+  (def %vector-unaligned-ref32 :dword unsigned-reg unsigned-num))
+
+;;; For STRING=: the 8 (or 4) characters of S from character I,
+;;; split into their low bytes (one word) and their high bits (code >> 8,
+;;; 16 bits each: characters 0-3 in HIGH-A, 4-7 in HIGH-B), in registers
+;;; with SSE2. (Going through memory instead costs a failed store-to-load
+;;; forward per load.) Codes are below #x110000, so code >> 8 fits in 16
+;;; signed bits and PACKSSDW doesn't saturate it. The caller must keep I+8
+;;; (or I+4) within the string.
+#+sb-unicode
+(define-vop (%char-fetch64)
+  (:translate %char-fetch64)
+  (:policy :fast-safe)
+  (:args (s :scs (descriptor-reg)) (i :scs (unsigned-reg)))
+  (:arg-types simple-character-string unsigned-num)
+  (:temporary (:sc int-sse-reg) x0 x1 h0 h1 mask)
+  (:results (low :scs (unsigned-reg)) (high-a :scs (unsigned-reg)) (high-b :scs (unsigned-reg)))
+  (:result-types unsigned-num unsigned-num unsigned-num)
+  (:generator 10
+    (flet ((data (offset)
+             (ea (+ offset (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)) s i 4)))
+      (inst movdqu x0 (data 0))
+      (inst movdqu x1 (data 16))
+      (move h0 x0)
+      (move h1 x1)
+      (inst psrld h0 8)
+      (inst psrld h1 8)
+      (inst packssdw h0 h1)
+      (inst movq high-a h0)
+      (inst punpckhqdq h0 h0)
+      (inst movq high-b h0)
+      (inst pcmpeqd mask mask)
+      (inst psrld mask 24)                ; #xFF in each dword
+      (inst pand x0 mask)
+      (inst pand x1 mask)
+      (inst packssdw x0 x1)
+      (inst packuswb x0 x0)
+      (inst movq low x0))))
+
+#+sb-unicode
+(define-vop (%char-fetch32)
+  (:translate %char-fetch32)
+  (:policy :fast-safe)
+  (:args (s :scs (descriptor-reg)) (i :scs (unsigned-reg)))
+  (:arg-types simple-character-string unsigned-num)
+  (:temporary (:sc int-sse-reg) x0 h0 mask)
+  (:results (low :scs (unsigned-reg)) (high :scs (unsigned-reg)))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 8
+    (inst movdqu x0 (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) s i 4))
+    (move h0 x0)
+    (inst psrld h0 8)
+    (inst packssdw h0 h0)
+    (inst movq high h0)
+    (inst pcmpeqd mask mask)
+    (inst psrld mask 24)
+    (inst pand x0 mask)
+    (inst packssdw x0 x0)
+    (inst packuswb x0 x0)
+    (inst movq low x0)
+    (inst mov :dword low low)))         ; the low 4 bytes
+

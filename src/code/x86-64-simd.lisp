@@ -624,47 +624,98 @@
       DONE))
   target)
 
-(defun simd-cmp-8-32 (byte-array 32-bit-array length)
-  (declare (optimize speed (safety 0)))
-  (with-pinned-objects (byte-array 32-bit-array)
-    (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
-                 ((32-bit-array sap-reg t) (vector-sap 32-bit-array))
-                 ((end))
-                 ((length any-reg) length)
-                 ((cmp unsigned-reg))
-                 ((bytes int-sse-reg))
-                 ((32-bits))
-                 ((zero)))
-        ((res descriptor-reg t :from :load))
-      (load-symbol res t)
-      (inst test length length)
-      (inst jmp :z DONE)
-      (inst pxor zero zero)
-      (inst shr length 1)
-      (inst lea end (ea length byte-array))
+;;; LEN >= 16 characters of a character string at the SAP CHARS against
+;;; the bytes of a base string at the SAP BYTES. Each step widens base bytes
+;;; to 32 bits and compares them with as many characters; the last step
+;;; overlaps the one before it instead of reading past the end.
+#+sb-unicode
+(progn
+(defun simd-char-base= (chars bytes len)
+  (declare (optimize speed (safety 0)) (system-area-pointer chars bytes))
+  (inline-vop (((chars sap-reg t) chars)
+               ((bytes sap-reg t) bytes)
+               ((len any-reg tagged-num) len)
+               ((end unsigned-reg))
+               ((cmp unsigned-reg))
+               ((x0 int-sse-reg))
+               ((x1))
+               ((c0))
+               ((c1))
+               ((zero)))
+      ((res descriptor-reg t :from :load))
+    (inst shr len 1)
+    (inst lea end (ea -8 bytes len))       ; last 8-character step
+    (inst pxor zero zero)
+    LOOP
+    (inst movq x0 (ea bytes))
+    (inst punpcklbw x0 zero)
+    (inst movdqa x1 x0)
+    (inst punpcklwd x0 zero)
+    (inst punpckhwd x1 zero)
+    (inst movdqu c0 (ea chars))
+    (inst movdqu c1 (ea 16 chars))
+    (inst pcmpeqd x0 c0)
+    (inst pcmpeqd x1 c1)
+    (inst pand x0 x1)
+    (inst pmovmskb cmp x0)
+    (inst cmp :dword cmp #xFFFF)
+    (inst jmp :ne FALSE)
+    (inst cmp bytes end)
+    (inst jmp :ae DONE-TRUE)
+    (inst add bytes 8)
+    (inst add chars 32)
+    (inst cmp bytes end)
+    (inst jmp :be LOOP)
+    ;; Back up to the last step
+    (inst sub bytes end)
+    (inst shl bytes 2)
+    (inst sub chars bytes)
+    (inst mov bytes end)
+    (inst jmp LOOP)
+    FALSE
+    (load-symbol res nil)
+    (inst jmp DONE)
+    DONE-TRUE
+    (load-symbol res t)
+    DONE))
 
-      LOOP
-      (inst movd bytes (ea byte-array))
-      (inst movdqa 32-bits (ea 32-bit-array))
-      (inst add byte-array 4)
-      (inst add 32-bit-array 16)
-      ;; Interleaving with zero widens bytes to halfwords, and then
-      ;; again to words.
-      ;; PMOVZXBD from SSE4.1 doesn't seem to be faster.
-      (inst punpcklbw bytes zero)
-      (inst punpcklwd bytes zero)
-      (inst pcmpeqd bytes 32-bits)
-      (inst pmovmskb cmp bytes)
-      (inst cmp :dword cmp #xFFFF)
-      (inst jmp :ne FALSE)
-
-      (inst cmp byte-array end)
-      (inst jmp :b LOOP)
-      (inst jmp DONE)
-
-      FALSE
-      (load-symbol res nil)
-      DONE)))
+(def-variant simd-char-base= :avx2 (chars bytes len)
+  (declare (optimize speed (safety 0)) (system-area-pointer chars bytes))
+  (inline-vop (((chars sap-reg t) chars)
+               ((bytes sap-reg t) bytes)
+               ((len any-reg tagged-num) len)
+               ((end unsigned-reg))
+               ((y0 int-avx2-reg))
+               ((y1)))
+      ((res descriptor-reg t :from :load))
+    (inst shr len 1)
+    (inst lea end (ea -16 bytes len))      ; last 16-character step
+    LOOP
+    (inst vpmovzxbd y0 (ea bytes))
+    (inst vpmovzxbd y1 (ea 8 bytes))
+    (inst vpxor y0 y0 (ea chars))
+    (inst vpxor y1 y1 (ea 32 chars))
+    (inst vpor y0 y0 y1)
+    (inst vptest y0 y0)
+    (inst jmp :nz FALSE)
+    (inst cmp bytes end)
+    (inst jmp :ae DONE-TRUE)
+    (inst add bytes 16)
+    (inst add chars 64)
+    (inst cmp bytes end)
+    (inst jmp :be LOOP)
+    (inst sub bytes end)
+    (inst shl bytes 2)
+    (inst sub chars bytes)
+    (inst mov bytes end)
+    (inst jmp LOOP)
+    FALSE
+    (load-symbol res nil)
+    (inst jmp DONE)
+    DONE-TRUE
+    (load-symbol res t)
+    DONE
+    (inst vzeroupper))))
 
 #+sb-unicode
 (defun utf8-to-character-string (start end string ibuf)
