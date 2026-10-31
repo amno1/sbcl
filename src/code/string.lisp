@@ -95,6 +95,90 @@
   (declare (optimize (safety 1)))
   (setf (schar string index) new-el))
 
+;;; Word-at-a-time comparisons for STRING=, on x86-64. None of them reads
+;;; outside the compared range: after whole words, the last word is the
+;;; one ending at the end of the range, overlapping bytes already found
+;;; equal. Short ranges use 4-byte loads the same way, then bytes.
+#+(and x86-64 sb-unicode)
+(progn
+  (declaim (inline %bytes=))
+  ;; NBYTES bytes of the data of A from byte A0 and of B from byte B0
+  (defun %bytes= (a a0 b b0 nbytes)
+    (declare (index a0 b0 nbytes) (optimize speed (safety 0)))
+    (macrolet ((w64 (s i) `(sb-vm::%vector-unaligned-ref64 ,s ,i))
+               (w32 (s i) `(sb-vm::%vector-unaligned-ref32 ,s ,i)))
+      (cond ((>= nbytes 96)
+             ;; Long enough for memcmp() to beat this loop, call and all
+             (with-pinned-objects (a b)
+               (zerop (alien-funcall
+                       (extern-alien "memcmp" (function int (* char) (* char) long))
+                       (sap+ (vector-sap a) a0) (sap+ (vector-sap b) b0) nbytes))))
+            ((>= nbytes 16)
+             ;; 16 bytes per step, then the last 16. Stepping SAPs keeps
+             ;; the offsets untagged; index arguments would stay fixnums.
+             (with-pinned-objects (a b)
+               (let* ((pa (sap+ (vector-sap a) a0))
+                      (pb (sap+ (vector-sap b) b0))
+                      (last (sap+ pa (- nbytes 16))))
+                 (macrolet ((diff16 (p q)
+                              `(logior (logxor (sap-ref-64 ,p 0) (sap-ref-64 ,q 0))
+                                       (logxor (sap-ref-64 ,p 8) (sap-ref-64 ,q 8)))))
+                   (loop
+                     (unless (zerop (diff16 pa pb))
+                       (return nil))
+                     (setq pa (sap+ pa 16) pb (sap+ pb 16))
+                     (unless (sap< pa last)
+                       (let ((pb (sap+ pb (- (sap- pa last)))))
+                         (return (zerop (diff16 last pb))))))))))
+            ((>= nbytes 8)
+             (let ((i (- nbytes 8)))
+               (zerop (logior (logxor (w64 a a0) (w64 b b0))
+                              (logxor (w64 a (+ a0 i)) (w64 b (+ b0 i)))))))
+            ((>= nbytes 4)
+             (let ((i (- nbytes 4)))
+               (and (= (w32 a a0) (w32 b b0))
+                    (= (w32 a (+ a0 i)) (w32 b (+ b0 i))))))
+            (t                          ; only base strings get here
+             (with-pinned-objects (a b)
+               (dotimes (i nbytes t)
+                 (unless (= (sap-ref-8 (vector-sap a) (+ a0 i))
+                            (sap-ref-8 (vector-sap b) (+ b0 i)))
+                   (return nil))))))))
+
+  (declaim (inline %character-base-chars=))
+  ;; LEN characters of the character string C from C0 and of the base
+  ;; string B from B0: C's characters narrowed in registers 8 (or 4) at a
+  ;; time, equal if their low bytes are B's and their high bits are 0.
+  (defun %character-base-chars= (c c0 b b0 len)
+    (declare (type (simple-array character (*)) c) (simple-base-string b)
+             (index c0 b0 len) (optimize speed (safety 0)))
+    (macrolet ((same8 (i)
+                 `(let ((i ,i))
+                    (multiple-value-bind (low high-a high-b) (sb-vm::%char-fetch64 c (+ c0 i))
+                      (and (= low (sb-vm::%vector-unaligned-ref64 b (+ b0 i)))
+                           (zerop (logior high-a high-b))))))
+               (same4 (i)
+                 `(let ((i ,i))
+                    (multiple-value-bind (low high) (sb-vm::%char-fetch32 c (+ c0 i))
+                      (and (= low (sb-vm::%vector-unaligned-ref32 b (+ b0 i)))
+                           (zerop high))))))
+      (cond ((>= len 64)
+             ;; Wider steps (AVX2 or SSE2) pay for the call
+             (with-pinned-objects (c b)
+               (sb-vm::simd-char-base= (sap+ (vector-sap c) (* 4 c0))
+                                       (sap+ (vector-sap b) b0)
+                                       len)))
+            ((>= len 8)
+             (do ((i 0 (+ i 8)))
+                 ((>= (+ i 8) len) (same8 (- len 8)))
+               (declare (index i))
+               (unless (same8 i) (return nil))))
+            ((>= len 4) (and (same4 0) (same4 (- len 4))))
+            (t
+             (dotimes (i len t)
+               (unless (char= (schar c (+ c0 i)) (schar b (+ b0 i)))
+                 (return nil))))))))
+
 (macrolet ((memcmp (shift)
              ;; Efficiently compute byte indices. Derive-type on ASH isn't
              ;; good enough. For 32-bit, it should be ok because
@@ -142,7 +226,7 @@
                 (cond #+sb-unicode
                       ((simple-character-string-p string2)
                        (go 8-32))
-                      #+arm64
+                      #+(or arm64 x86-64)
                       ((simple-base-string-p string2)
                        (go 8-8))
                       (t
@@ -152,7 +236,7 @@
                 (cond ((simple-base-string-p string2)
                        (rotatef string1 string2)
                        (go 8-32))
-                      #+arm64
+                      #+(or arm64 x86-64)
                       ((simple-character-string-p string2)
                        (go 32-32))
                       (t
@@ -164,22 +248,25 @@
            (let ((length1 (length string1)))
              (and (= length1
                      (length string2))
-                  (sb-vm::simd-cmp-8-32 string1 string2 length1))))
+                  #+arm64 (sb-vm::simd-cmp-8-32 string1 string2 length1)
+                  #+x86-64 (%character-base-chars= string2 0 string1 0 length1))))
        8-8
-         #+arm64
+         #+(or arm64 x86-64)
          (return-from string=*
            (let ((length1 (length string1)))
              (and (= length1
                      (length string2))
-                  (sb-vm::simd-cmp-8-8 string1 string2 length1))))
+                  #+arm64 (sb-vm::simd-cmp-8-8 string1 string2 length1)
+                  #+x86-64 (%bytes= string1 0 string2 0 length1))))
 
        32-32
-         #+arm64
+         #+(or arm64 x86-64)
          (return-from string=*
            (let ((length1 (length string1)))
              (and (= length1
                      (length string2))
-                  (sb-vm::simd-cmp-32-32 string1 string2 length1))))
+                  #+arm64 (sb-vm::simd-cmp-32-32 string1 string2 length1)
+                  #+x86-64 (%bytes= string1 0 string2 0 (* 4 length1)))))
        normal))
     (with-two-strings string1 string2 start1 end1 nil start2 end2
       (let ((len (- end1 start1)))
@@ -202,7 +289,24 @@
                               (unless (char= (schar string1 index1)
                                              (schar string2 index2))
                                 (return nil)))))))
-            (cond #+(or x86 x86-64)
+            (cond #+x86-64
+                  ((and (= widetag1 widetag2 sb-vm:simple-base-string-widetag))
+                   (return-from string=* (%bytes= string1 start1 string2 start2 len)))
+                  #+x86-64
+                  ((and (= widetag1 widetag2 sb-vm:simple-character-string-widetag))
+                   (return-from string=*
+                     (%bytes= string1 (* 4 start1) string2 (* 4 start2) (* 4 len))))
+                  #+x86-64
+                  ((and (= widetag1 sb-vm:simple-character-string-widetag)
+                        (= widetag2 sb-vm:simple-base-string-widetag))
+                   (return-from string=*
+                     (%character-base-chars= string1 start1 string2 start2 len)))
+                  #+x86-64
+                  ((and (= widetag1 sb-vm:simple-base-string-widetag)
+                        (= widetag2 sb-vm:simple-character-string-widetag))
+                   (return-from string=*
+                     (%character-base-chars= string2 start2 string1 start1 len)))
+                  #+x86
                   ;; The cost of WITH-PINNED-OBJECTS is near nothing on x86,
                   ;; and memcmp() is much faster except below a cutoff point.
                   ;; The threshold is higher on x86-32 because the overhead
@@ -247,7 +351,9 @@
       (let ((len (- end1 start1)))
         (cond ((/= len (- end2 start2))
                nil)
-              #+(or x86 x86-64)
+              #+(and x86-64 sb-unicode)
+              (t (%bytes= string1 start1 string2 start2 len))
+              #+(or x86 (and x86-64 (not sb-unicode)))
               ((>= len #+x86 16
                        #+x86-64 8)
                (memcmp 0))
@@ -270,9 +376,10 @@
       (let ((len (- end1 start1)))
         (cond ((/= len (- end2 start2))
                nil)
-              #+(or x86 x86-64)
-              ((>= len #+x86 16
-                       #+x86-64 8)
+              #+x86-64
+              (t (%bytes= string1 (* 4 start1) string2 (* 4 start2) (* 4 len)))
+              #+x86
+              ((>= len 16)
                (memcmp 2))
               (t
                (char-loop character character)))))))

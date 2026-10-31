@@ -284,6 +284,19 @@
 (defknown %vector-raw-bits (t index) sb-vm:word
   (flushable))
 (defknown (%set-vector-raw-bits) (t index sb-vm:word) (values) ())
+;;; Unaligned little-endian loads at a byte offset into a vector's data, for
+;;; STRING= (string.lisp). The caller must keep them in bounds.
+#+x86-64
+(defknown (sb-vm::%vector-unaligned-ref64) (t index) sb-vm:word (flushable))
+#+x86-64
+(defknown (sb-vm::%vector-unaligned-ref32) (t index) (unsigned-byte 32) (flushable))
+;;; Narrow characters to bytes in registers, for STRING=.
+#+(and x86-64 sb-unicode)
+(defknown sb-vm::%char-fetch64 ((simple-array character (*)) index)
+    (values sb-vm:word sb-vm:word sb-vm:word) (flushable movable))
+#+(and x86-64 sb-unicode)
+(defknown sb-vm::%char-fetch32 ((simple-array character (*)) index)
+    (values (unsigned-byte 32) sb-vm:word) (flushable movable))
 
 
 ;;; Allocate an unboxed, non-fancy vector with type code TYPE, length LENGTH,
