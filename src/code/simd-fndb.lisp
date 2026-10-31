@@ -33,6 +33,11 @@
     (boolean)
     (sb-c::no-verify-arg-count))
 
+#+(and x86-64 sb-unicode)
+(defknown simd-char-base= (system-area-pointer system-area-pointer index)
+    boolean
+    (sb-c::no-verify-arg-count))
+
 (defknown (simd-position8 simd-position8-from-end
            simd-position32 simd-position32-from-end)
     (fixnum (simple-array * (*)) fixnum fixnum)
