@@ -1135,6 +1135,11 @@ produces silently wrong addresses."
   (reg/mem :fields (list (byte 2 (+ 24 14)) (byte 3 (+ 24 8))) :type 'reg/mem)
   (reg :field (byte 3 (+ 24 11)) :type 'reg))
 
+;;; With a trailing imm8 (RORX), which the disassembler must consume.
+(define-instruction-format (vex3-vex-gpr-imm (+ 24 16) :include vex3-vex-gpr
+                                                       :default-printer '(:name :tab reg ", " reg/mem ", " imm))
+  (imm :type 'imm-byte))
+
 
 (define-instruction mulx (segment &prefix prefix hi lo src)
   (:emitter
@@ -1223,9 +1228,9 @@ produces silently wrong addresses."
                         (:dword 0))
                    :remaining-bytes 1)
    (emit-byte segment imm))
-  . #.(avx2-inst-printer-list 'vex-gpr #xF2 #xF0
+  . #.(avx2-inst-printer-list 'vex-gpr-imm #xF2 #xF0
                               :opcode-prefix #x0f3a
-                              :printer '(:name :tab reg ", " reg/mem)))
+                              :printer '(:name :tab reg ", " reg/mem ", " imm)))
 (macrolet ((def (name reg)
              `(define-instruction ,name (segment &prefix prefix dst src)
                 ,@(avx2-inst-printer-list 'vex-gpr nil #xF3
