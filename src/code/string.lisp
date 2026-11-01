@@ -179,6 +179,184 @@
                (unless (char= (schar c (+ c0 i)) (schar b (+ b0 i)))
                  (return nil))))))))
 
+;;; The first mismatch, and comparisons ignoring case, a word at a time.
+;;; Base characters are ASCII, so a base string's bytes are its codes.
+#+(and x86-64 sb-unicode)
+(progn
+  (defmacro with-string-widetags ((s1 s2) &key base-base char-char char-base
+                                                base-char other)
+    `(let ((w1 (%other-pointer-widetag ,s1))
+           (w2 (%other-pointer-widetag ,s2)))
+       (macrolet ((is (w kind)
+                    `(= ,w ,(if (eq kind :base)
+                                'sb-vm:simple-base-string-widetag
+                                'sb-vm:simple-character-string-widetag))))
+         (cond ((and (is w1 :base) (is w2 :base)) ,base-base)
+               ((and (is w1 :char) (is w2 :char)) ,char-char)
+               ((and (is w1 :char) (is w2 :base)) ,char-base)
+               ((and (is w1 :base) (is w2 :char)) ,base-char)
+               (t ,other)))))   ; (SIMPLE-ARRAY NIL (*))
+
+  ;; Index of the lowest nonzero byte of the nonzero word X
+  (declaim (inline %first-byte))
+  (defun %first-byte (x)
+    (declare (type (and word (not (eql 0))) x))
+    (ash (1- (integer-length (logand x (- x)))) -3))
+
+  ;; The number of leading characters of S1 from I1 and S2 from I2, among
+  ;; the first N, that are CHAR=.
+  (defun %string-prefix (s1 i1 s2 i2 n)
+    (declare (simple-string s1 s2) (index i1 i2 n)
+             (optimize speed (safety 0) (sb-c:insert-array-bounds-checks 0)))
+    (macrolet ((scan (k)
+                 ;; From character K, the first mismatch, one at a time
+                 `(do ((k ,k (1+ k)))
+                      ((>= k n) n)
+                    (declare (index k))
+                    (unless (char= (schar s1 (+ i1 k)) (schar s2 (+ i2 k)))
+                      (return k))))
+               (words (shift)
+                 ;; Same type: SHIFT is log2 of the bytes per character
+                 `(let ((nbytes (ash n ,shift)))
+                    (if (< nbytes 8)
+                        (scan 0)
+                        (with-pinned-objects (s1 s2)
+                          (let ((p1 (sap+ (vector-sap s1) (ash i1 ,shift)))
+                                (p2 (sap+ (vector-sap s2) (ash i2 ,shift))))
+                            (flet ((at (j)
+                                     (declare (index j))
+                                     (logxor (sap-ref-64 p1 j) (sap-ref-64 p2 j))))
+                              (declare (inline at))
+                              (do ((j 0 (+ j 8)))
+                                  ((> (+ j 8) nbytes)
+                                   (let* ((j (- nbytes 8)) (x (at j)))
+                                     (if (zerop x)
+                                         n
+                                         (ash (+ j (%first-byte x)) (- ,shift)))))
+                                (declare (index j))
+                                (let ((x (at j)))
+                                  (unless (zerop x)
+                                    (return (ash (+ j (%first-byte x)) (- ,shift))))))))))))
+               (narrowed (c ci b bi)
+                 ;; C a character string, B a base string: find the first
+                 ;; 8 characters that differ, then the character
+                 `(flet ((same8 (k)
+                           (declare (index k))
+                           (multiple-value-bind (low high-a high-b)
+                               (sb-vm::%char-fetch64 ,c (+ ,ci k))
+                             (and (= low (sb-vm::%vector-unaligned-ref64 ,b (+ ,bi k)))
+                                  (zerop (logior high-a high-b))))))
+                    (declare (inline same8))
+                    (if (< n 8)
+                        (scan 0)
+                        (do ((k 0 (+ k 8)))
+                            ((> (+ k 8) n)
+                             (let ((k (- n 8)))
+                               (if (same8 k) n (scan k))))
+                          (declare (index k))
+                          (unless (same8 k)
+                            (return (scan k))))))))
+      (with-string-widetags (s1 s2)
+        :base-base (words 0)
+        :char-char (words 2)
+        :char-base (narrowed (truly-the (simple-array character (*)) s1) i1
+                             (truly-the simple-base-string s2) i2)
+        :base-char (narrowed (truly-the (simple-array character (*)) s2) i2
+                             (truly-the simple-base-string s1) i1)
+        :other (scan 0))))
+
+  ;; Like %SP-STRING-COMPARE on simple strings
+  (declaim (inline %string-compare))
+  (defun %string-compare (s1 s2 start1 end1 start2 end2)
+    (declare (simple-string s1 s2) (index start1 end1 start2 end2))
+    (let* ((len1 (- end1 start1))
+           (len2 (- end2 start2))
+           (n (min len1 len2))
+           (k (if (< n 8)
+                  ;; Short: not worth the call and the dispatch
+                  (do ((k 0 (1+ k)))
+                      ((or (= k n)
+                           (char/= (schar s1 (+ start1 k)) (schar s2 (+ start2 k))))
+                       k)
+                    (declare (index k)))
+                  (%string-prefix s1 start1 s2 start2 n))))
+      (if (< k n)
+          (values (+ start1 k)
+                  (- (char-code (schar s1 (+ start1 k)))
+                     (char-code (schar s2 (+ start2 k)))))
+          (values (+ start1 n) (signum (- len1 len2))))))
+
+  ;; Eight ASCII codes in each of A and B are CHAR-EQUAL: they're equal,
+  ;; or differ only in bit 5 where A's code is a letter.
+  (declaim (inline %ascii8-equal))
+  (defun %ascii8-equal (a b)
+    (declare (word a b))
+    (let ((x (logxor a b)))
+      (or (zerop x)
+          (and (zerop (logand x (lognot #x2020202020202020)))
+               (let* ((l (logior a #x2020202020202020))
+                      ;; Bit 7 of each byte: #x61 <= L and L < #x7B
+                      (letter (logand (+ l #x1F1F1F1F1F1F1F1F)
+                                      (lognot (+ l #x0505050505050505))
+                                      #x8080808080808080)))
+                 ;; X's bytes are 0 or #x20 here: bit 5 becomes bit 7
+                 (zerop (logand (ash x 2) #x8080808080808080 (lognot letter))))))))
+
+  ;; The first N characters of S1 from I1 and S2 from I2 are CHAR-EQUAL.
+  ;; Eight at a time when they're ASCII; other blocks go by CHAR-EQUAL.
+  (defun %string-equal-chars (s1 i1 s2 i2 n)
+    (declare (simple-string s1 s2) (index i1 i2 n)
+             (optimize speed (safety 0) (sb-c:insert-array-bounds-checks 0)))
+    (macrolet ((slow (k count)
+                 `(let ((k ,k))
+                    (declare (index k))
+                    (dotimes (j ,count t)
+                      (unless (two-arg-char-equal-inline
+                               (schar s1 (+ i1 k j)) (schar s2 (+ i2 k j)))
+                        (return nil)))))
+               (blocks (same8)
+                 ;; SAME8 returns T, NIL, or :SLOW for a non-ASCII block
+                 `(if (< n 8)
+                      (slow 0 n)
+                      (flet ((ok (k)
+                               (declare (index k))
+                               (let ((r ,same8))
+                                 (if (eq r :slow) (slow k 8) r))))
+                        (declare (inline ok))
+                        (do ((k 0 (+ k 8)))
+                            ((> (+ k 8) n) (ok (- n 8)))
+                          (declare (index k))
+                          (unless (ok k) (return nil))))))
+               (char-word (s i)
+                 ;; 8 characters' low bytes, and whether they're all ASCII
+                 ;; (two values, so the word isn't boxed)
+                 `(multiple-value-bind (low high-a high-b) (sb-vm::%char-fetch64 ,s ,i)
+                    (values low (not (or (logtest low #x8080808080808080)
+                                         (/= 0 (logior high-a high-b))))))))
+      (with-string-widetags (s1 s2)
+        :base-base
+        (blocks (%ascii8-equal (sb-vm::%vector-unaligned-ref64 s1 (+ i1 k))
+                               (sb-vm::%vector-unaligned-ref64 s2 (+ i2 k))))
+        :char-char
+        (let ((s1 (truly-the (simple-array character (*)) s1))
+              (s2 (truly-the (simple-array character (*)) s2)))
+          (blocks (multiple-value-bind (a a-ascii) (char-word s1 (+ i1 k))
+                    (multiple-value-bind (b b-ascii) (char-word s2 (+ i2 k))
+                      (if (and a-ascii b-ascii) (%ascii8-equal a b) :slow)))))
+        :char-base
+        (let ((s1 (truly-the (simple-array character (*)) s1)))
+          (blocks (multiple-value-bind (a ascii) (char-word s1 (+ i1 k))
+                    (if ascii
+                        (%ascii8-equal a (sb-vm::%vector-unaligned-ref64 s2 (+ i2 k)))
+                        :slow))))
+        :base-char
+        (let ((s2 (truly-the (simple-array character (*)) s2)))
+          (blocks (multiple-value-bind (b ascii) (char-word s2 (+ i2 k))
+                    (if ascii
+                        (%ascii8-equal (sb-vm::%vector-unaligned-ref64 s1 (+ i1 k)) b)
+                        :slow))))
+        :other (slow 0 n)))))
+
 (macrolet ((memcmp (shift)
              ;; Efficiently compute byte indices. Derive-type on ASH isn't
              ;; good enough. For 32-bit, it should be ok because
@@ -387,7 +565,9 @@
 (defun string/=* (string1 string2 start1 end1 start2 end2)
   (with-two-strings string1 string2 start1 end1 offset1 start2 end2
     (multiple-value-bind (index diff)
-        (%sp-string-compare string1 string2 start1 end1 start2 end2)
+        (#+(and x86-64 sb-unicode) %string-compare
+         #-(and x86-64 sb-unicode) %sp-string-compare
+         string1 string2 start1 end1 start2 end2)
       (if (zerop diff)
           nil
           (- index offset1)))))
@@ -395,8 +575,9 @@
 (defmacro string<>=*-body (test index)
   `(with-two-strings string1 string2 start1 end1 offset1 start2 end2
      (multiple-value-bind (index diff)
-         (%sp-string-compare string1 string2
-                             start1 end1 start2 end2)
+         (#+(and x86-64 sb-unicode) %string-compare
+          #-(and x86-64 sb-unicode) %sp-string-compare
+          string1 string2 start1 end1 start2 end2)
        (if (,test diff 0)
            ,(if index '(- index offset1) nil)
            ,(if index nil '(- index offset1))))))
@@ -511,6 +692,11 @@
       (declare (fixnum slen1 slen2))
       (when (= slen1 slen2)
         ;;return NIL immediately if lengths aren't equal.
+        #+(and x86-64 sb-unicode)
+        (if (< slen1 8)
+            (string-not-equal-loop 1 t nil)
+            (%string-equal-chars string1 start1 string2 start2 slen1))
+        #-(and x86-64 sb-unicode)
         (string-not-equal-loop 1 t nil)))))
 
 (defun two-arg-string-equal (string1 string2)
@@ -557,6 +743,11 @@
           (slen2 (- (the fixnum end2) start2)))
       (declare (fixnum slen1 slen2))
       (when (= slen1 slen2)
+        #+(and x86-64 sb-unicode)
+        (if (< slen1 8)
+            (string-not-equal-loop 1 t nil)
+            (%string-equal-chars string1 start1 string2 start2 slen1))
+        #-(and x86-64 sb-unicode)
         (string-not-equal-loop 1 t nil)))))
 
 (defun string-not-equal (string1 string2 &key (start1 0) end1 (start2 0) end2)
