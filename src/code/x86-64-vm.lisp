@@ -333,6 +333,11 @@
     (values (logbitp of-bit flags)
             (logbitp cf-bit flags))))
 
+;;; Defined first so that it is installed last, after the :avx2 routines
+#+sb-simd-pack-512
+(def-cpu-feature :avx512
+    (plusp (sb-alien:extern-alien "avx512_supported" int)))
+
 (def-cpu-feature :avx2
     (plusp (sb-alien:extern-alien "avx2_supported" int)))
 
