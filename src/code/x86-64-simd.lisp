@@ -715,7 +715,48 @@
     DONE-TRUE
     (load-symbol res t)
     DONE
-    (inst vzeroupper))))
+    (inst vzeroupper)))
+
+;;; AVX-512F, 32 characters a step. zmm16 and up leave no dirty upper
+;;; state, so no VZEROUPPER.
+#+sb-simd-pack-512
+(def-variant simd-char-base= :avx512 (chars bytes len)
+  (declare (optimize speed (safety 0)) (system-area-pointer chars bytes))
+  (inline-vop (((chars sap-reg t) chars)
+               ((bytes sap-reg t) bytes)
+               ((len any-reg tagged-num) len)
+               ((end unsigned-reg))
+               ((z0 int-avx512-reg nil :offset 16))
+               ((z1 int-avx512-reg nil :offset 17))
+               ((k0 mask-reg))
+               ((k1 mask-reg)))
+      ((res descriptor-reg t :from :load))
+    (inst shr len 1)
+    (inst lea end (ea -32 bytes len))      ; last 32-character step
+    LOOP
+    (inst vpmovzxbd z0 (ea bytes))
+    (inst vpmovzxbd z1 (ea 16 bytes))
+    (inst vpcmpd k0 z0 (ea chars) 4)       ; 4 = not equal
+    (inst vpcmpd k1 z1 (ea 64 chars) 4)
+    (inst kortestw k0 k1)
+    (inst jmp :nz FALSE)
+    (inst cmp bytes end)
+    (inst jmp :ae DONE-TRUE)
+    (inst add bytes 32)
+    (inst add chars 128)
+    (inst cmp bytes end)
+    (inst jmp :be LOOP)
+    (inst sub bytes end)
+    (inst shl bytes 2)
+    (inst sub chars bytes)
+    (inst mov bytes end)
+    (inst jmp LOOP)
+    FALSE
+    (load-symbol res nil)
+    (inst jmp DONE)
+    DONE-TRUE
+    (load-symbol res t)
+    DONE)))
 
 #+sb-unicode
 (defun utf8-to-character-string (start end string ibuf)
