@@ -2668,6 +2668,27 @@
      #:s32.16-rotaterv
      #:s32.16-alignr
      #:s32.16-from-f32.16
+     #:s32.16-from-s16.16
+     #:s32.16-from-u16.16
+     #:s32.16-from-s8.16
+     #:s32.16-from-u8.16
+     #:u32.16-from-u16.16
+     #:u32.16-from-u8.16
+     #:s64.8-from-s32.8
+     #:s64.8-from-u32.8
+     #:s64.8-from-s16.8
+     #:s64.8-from-u16.8
+     #:s64.8-from-s8.16
+     #:s64.8-from-u8.16
+     #:u64.8-from-u32.8
+     #:u64.8-from-u16.8
+     #:u64.8-from-u8.16
+     #:s32.8-from-s64.8
+     #:u32.8-from-u64.8
+     #:s16.8-from-s64.8
+     #:u16.8-from-u64.8
+     #:s8.16-from-s32.16
+     #:u8.16-from-u32.16
      #:s32.8-from-s32.16
      #:s32.16-insert-s32.8
      #:s32.16-incf
