@@ -1986,21 +1986,63 @@ variable: an unreadable object representing the error is printed instead.")
         (write-decimal-digits g n string 0)
         (values k string)))))
 
+;;; FLONUM-TO-BUFFER for FDIGITS = NIL: all the shortest digits, laid out as
+;;; FLONUM-TO-STRING without a width does. The digits come from zmij's digit
+;;; string (written eight at a time) and are copied into place. NIL on
+;;; 32-bit platforms, and if the result does not fit in BUFFER.
+(defun flonum-shortest-to-buffer (buffer x scale exponent-zero)
+  (declare (type simple-base-string buffer)
+           (type (or single-float double-float) x)
+           (type (or null fixnum) scale exponent-zero)
+           (ignorable buffer x scale exponent-zero))
+  #+64-bit
+  (with-zmij-digit-string (digits start end k) x
+    (let* ((n (- end start))
+           (e (+ (if exponent-zero (- k exponent-zero) k) (or scale 0))))
+      (declare (type index n))
+      (multiple-value-bind (left-end left-zeros right-zeros right-start
+                            right-end trailing-zeros)
+          (flonum-layout e n nil nil exponent-zero)
+        (let* ((point (+ left-end left-zeros))
+               (length (+ point 1 right-zeros (- right-end right-start)
+                          trailing-zeros)))
+          (when (> length (length buffer))
+            (return-from flonum-shortest-to-buffer nil))
+          (flet ((copy (from to at)
+                   (loop for i of-type index from from below to
+                         for j of-type index from at
+                         do (setf (schar buffer j) (schar digits (+ start i)))))
+                 (zeros (from count)
+                   (fill buffer #\0 :start from :end (+ from count))))
+            (copy 0 left-end 0)
+            (zeros left-end left-zeros)
+            (setf (schar buffer point) #\.)
+            (zeros (+ point 1) right-zeros)
+            (copy right-start right-end (+ point 1 right-zeros))
+            (zeros (+ point 1 right-zeros (- right-end right-start))
+                   trailing-zeros))
+          (values length (= point 0) (= point (1- length)) point)))))
+  #-64-bit nil)
+
 ;;; Like (FLONUM-TO-STRING X NIL FDIGITS SCALE FMIN EXPONENT-ZERO), but
 ;;; write the characters into BUFFER instead of a fresh string and return
 ;;; (values LENGTH LPOINT TPOINT POINT), the second to fifth values of
 ;;; FLONUM-TO-STRING. Return NIL, writing nothing useful, unless X is a
 ;;; nonzero single or double float on the exact fast path of
-;;; FLONUM-POSITION-DECIMAL and the result fits in BUFFER; the caller
+;;; FLONUM-POSITION-DECIMAL (or FDIGITS is NIL, meaning all the shortest
+;;; digits, on 64-bit platforms) and the result fits in BUFFER; the caller
 ;;; then uses FLONUM-TO-STRING.
 (defun flonum-to-buffer (buffer x fdigits scale fmin exponent-zero)
   (declare (type simple-base-string buffer)
            (type float x)
-           (type (and fixnum unsigned-byte) fdigits)
+           (type (or null (and fixnum unsigned-byte)) fdigits)
            (type (or null fixnum) scale fmin exponent-zero))
   (unless (and (typep x '(or single-float double-float))
                (not (zerop x)))
     (return-from flonum-to-buffer nil))
+  (unless fdigits
+    (return-from flonum-to-buffer
+      (flonum-shortest-to-buffer buffer x scale exponent-zero)))
   (multiple-value-bind (k g n)
       (flonum-position-decimal x (+ (min (- (+ fdigits (or scale 0)))
                                          (- (or fmin 0)))

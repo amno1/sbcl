@@ -299,18 +299,20 @@
         (values (truly-the zmij-significand (+ (* integral 10) digit)) dec-exp)
         (values integral (1+ dec-exp)))))
 
-;;; Number of decimal digits of M, 1 <= M < 10^19. The integer length gives
+;;; Number of decimal digits of M, 1 <= M < 2^62. The integer length gives
 ;;; the count to within one (log10 2 is about 1233/4096); one table
-;;; comparison corrects it.
+;;; comparison corrects it. The table is a simple-vector: this function is
+;;; inlined into code compiled for the cold core, which cannot dump
+;;; specialized arrays.
 (declaim (inline decimal-digit-count))
 (defun decimal-digit-count (m)
-  (declare (type (integer 1 #.(1- (expt 10 19))) m))
+  (declare (type (unsigned-byte 62) m))
   (let ((guess (1+ (ash (* (integer-length m) 1233) -12))))
-    (declare (type (integer 1 20) guess))
-    (if (< m (the (unsigned-byte 64)
-                  (aref #.(coerce (loop for i from 0 to 19 collect (expt 10 i))
-                                  '(simple-array (unsigned-byte 64) (*)))
-                        (1- guess))))
+    (declare (type (integer 1 19) guess))
+    (if (< m (the (unsigned-byte 62)
+                  (svref #.(coerce (loop for i from 0 to 18 collect (expt 10 i))
+                                   'simple-vector)
+                         (1- guess))))
         (1- guess)
         guess)))
 

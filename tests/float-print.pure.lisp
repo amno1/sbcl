@@ -1432,6 +1432,42 @@
           (unless (or (sb-ext:float-nan-p x) (sb-ext:float-infinity-p x) (zerop x))
             (check x))))))
   (loop for m in '(1 9 10 99 100 999999999999999999 1000000000000000000
-                   9999999999999999999)
+                   4611686018427387903)
         do (assert (= (sb-impl::decimal-digit-count m)
                       (length (princ-to-string m))))))
+
+;;; ~F and ~E without width or digits lay the shortest digits out in a stack
+;;; buffer; the result must be what FLONUM-TO-STRING gives.
+(with-test (:name (:float-print format :no-parameters :buffer))
+  (let ((state (sb-ext:seed-random-state 9)))
+    (flet ((expected-f (x)
+             (multiple-value-bind (str len lpoint tpoint)
+                 (sb-impl::flonum-to-string (abs x))
+               (declare (ignore len))
+               (concatenate 'string
+                            (if (minusp (float-sign x)) "-" "")
+                            (if lpoint "0" "")
+                            str
+                            (if tpoint "0" ""))))
+           (check (x)
+             (assert (string= (format nil "~F" x)
+                              (let ((ax (abs x)))
+                                (multiple-value-bind (str len lpoint tpoint)
+                                    (sb-impl::flonum-to-string ax)
+                                  (declare (ignore len))
+                                  (concatenate 'string
+                                               (if (minusp (float-sign x)) "-" "")
+                                               (if lpoint "0" "")
+                                               str
+                                               (if tpoint "0" ""))))))))
+      (declare (ignorable #'expected-f))
+      (dolist (x (list 1d0 -1d0 0.5d0 123.456d0 1d-5 1d21 1.5d300 5d-324
+                       1f0 0.1f0 3.4028235f38 123456789d0 0.001d0 100d0))
+        (check x))
+      (dotimes (i 5000)
+        (let ((x (abs (sb-kernel:make-double-float
+                       (- (random (ash 1 32) state) (ash 1 31))
+                       (random (ash 1 32) state)))))
+          (unless (or (sb-ext:float-nan-p x) (sb-ext:float-infinity-p x) (zerop x))
+            (check x)
+            (check (- x))))))))
