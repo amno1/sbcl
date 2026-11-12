@@ -176,3 +176,49 @@
     (let ((s " how are you?
 "))
       (assert (or (string= (car c) s) (string= (cadr c) s))))))
+
+;;; Control strings without a tilde are returned (or written) as they are.
+(with-test (:name (:format :no-directives))
+  (let ((control (copy-seq "plain text")))      ; not a literal: runtime path
+    (let ((a (format nil control)) (b (format nil control)))
+      (assert (string= a "plain text"))
+      (assert (not (eq a b)))                   ; always a fresh string
+      (assert (not (eq a control)))
+      ;; same type the string stream would give: base when all chars are base
+      (assert (typep a 'simple-base-string))
+      (setf (char a 0) #\X)                     ; mutating it is harmless
+      (assert (string= (format nil control) "plain text")))
+    (assert (string= (format nil control 1 2 3) "plain text")) ; extra args ignored
+    (assert (string= (with-output-to-string (s) (assert (null (format s control))))
+                     "plain text"))
+    (assert (string= (with-output-to-string (*standard-output*)
+                       (assert (null (format t control))))
+                     "plain text"))
+    (let ((s (make-array 0 :element-type 'character :adjustable t :fill-pointer 0)))
+      (assert (null (format s control)))
+      (assert (string= s "plain text"))))
+  (assert (string= (format nil (coerce "base" 'simple-base-string)) "base"))
+  (assert (typep (format nil (coerce "base" 'simple-base-string)) 'simple-base-string))
+  ;; a non-base character gives a character string
+  (let ((wide (concatenate '(simple-array character (*)) "ab" (string (code-char 955)))))
+    (assert (typep (format nil wide) '(and (simple-array character (*)) (not simple-base-string))))
+    (assert (string= (format nil wide) wide))
+    (assert (not (eq (format nil wide) wide))))
+  (assert (string= (format nil "") ""))
+  (assert (string= (format nil (copy-seq "")) ""))
+  (assert (string= (format nil "a~~b") "a~b"))
+  (assert (string= (format nil (copy-seq "a~~b")) "a~b"))
+  (assert-error (funcall 'format (opaque-identity 42) (copy-seq "plain")) type-error))
+
+;;; The compile-time path (constant control string) also returns fresh strings.
+(with-test (:name (:format :no-directives :constant))
+  (let ((f (compile nil '(lambda () (format nil "plain")))))
+    (assert (string= (funcall f) "plain"))
+    (assert (not (eq (funcall f) (funcall f))))
+    (assert (typep (funcall f) 'simple-base-string)))
+  (let ((f (compile nil `(lambda () (format nil ,(concatenate '(simple-array character (*))
+                                                               "a" (string (code-char 955))))))))
+    (assert (typep (funcall f) '(and (simple-array character (*)) (not simple-base-string)))))
+  (let ((f (handler-bind ((style-warning #'muffle-warning)) ; too many arguments
+             (compile nil '(lambda (x) (format nil "plain" (incf x)))))))
+    (assert (string= (funcall f 1) "plain"))))
