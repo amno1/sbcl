@@ -680,7 +680,9 @@
       (decf spaceleft))
     (multiple-value-bind (str len lpoint tpoint)
         (multiple-value-bind (len lpoint tpoint)
-            (and (typep d '(and fixnum unsigned-byte))
+            (and (or (typep d '(and fixnum unsigned-byte))
+                     ;; Neither width nor digits: the shortest digits.
+                     (and (null d) (null w)))
                  (typep k '(or null fixnum))
                  (sb-impl::flonum-to-buffer buffer (abs number) d k nil nil))
           (if len
@@ -881,7 +883,9 @@
                (fmin (if (minusp k) 1 fdig)))
           (multiple-value-bind (fstr flen lpoint tpoint)
               (multiple-value-bind (len lpoint tpoint)
-                  (and (typep fdig '(and fixnum unsigned-byte))
+                  (and (or (typep fdig '(and fixnum unsigned-byte))
+                           ;; Neither width nor digits: the shortest digits.
+                           (and (null fdig) (null w)))
                        (typep k 'fixnum)
                        (typep fmin '(or null fixnum))
                        (typep num-expt 'fixnum)
