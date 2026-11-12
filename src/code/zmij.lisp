@@ -299,6 +299,39 @@
         (values (truly-the zmij-significand (+ (* integral 10) digit)) dec-exp)
         (values integral (1+ dec-exp)))))
 
+;;; Number of decimal digits of M, 1 <= M < 10^19. The integer length gives
+;;; the count to within one (log10 2 is about 1233/4096); one table
+;;; comparison corrects it.
+(declaim (inline decimal-digit-count))
+(defun decimal-digit-count (m)
+  (declare (type (integer 1 #.(1- (expt 10 19))) m))
+  (let ((guess (1+ (ash (* (integer-length m) 1233) -12))))
+    (declare (type (integer 1 20) guess))
+    (if (< m (the (unsigned-byte 64)
+                  (aref #.(coerce (loop for i from 0 to 19 collect (expt 10 i))
+                                  '(simple-array (unsigned-byte 64) (*)))
+                        (1- guess))))
+        (1- guess)
+        guess)))
+
+(declaim (inline zmij-decimal-trimmed))
+;;; Return (values M K): M is the shortest significand of FLOAT as an
+;;; integer without trailing zeros, and K is the position of the decimal
+;;; point (value = 0.M * 10^K), the same digits and K as FLONUM-TO-DIGITS
+;;; gives (as a string) without building that string. FLOAT must be finite
+;;; and nonzero.
+(defun zmij-decimal-trimmed (float)
+  (declare (type (or single-float double-float) float))
+  (multiple-value-bind (m e) (zmij-decimal float)
+    (let ((k (+ e (decimal-digit-count m))))
+      (loop (multiple-value-bind (q r) (truncate m 10)
+              (unless (zerop r) (return (values m k)))
+              (setf m q))))))
+
+;;; Nothing in the core calls these, so protect them from the tree shaker;
+;;; libraries that format floats (and need the digits as an integer) do.
+(export '(decimal-digit-count zmij-decimal-trimmed))
+
 ;;;; Digit output
 
 ;;; Convert X < 10^8 to eight BCD digits, one per byte, most significant
