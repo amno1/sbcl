@@ -9136,18 +9136,30 @@
                                        `',(lvar-value arg)
                                        arg-name))))
                            tokenized))))
-      (if (= (length args) 1)
+      (cond
+        ((and (null arg-names) (= (length args) 1) (stringp (car args)))
+         ;; A control string with no directives: return a fresh copy.
+         (let ((string (car args)))
+           `(lambda (stream control)
+              (declare (ignore stream control))
+              (replace (make-string ,(length string)
+                                    :element-type ',(if (every #'base-char-p string)
+                                                        'base-char
+                                                        'character))
+                       ,string))))
+        ((= (length args) 1)
           `(lambda (stream control ,@arg-names)
              (declare (ignore stream control)
                       (ignorable ,@arg-names))
-             (princ-to-string ,@args))
+             (princ-to-string ,@args)))
+        (t
           `(lambda (stream control ,@arg-names)
              (declare (ignore stream control)
                       (ignorable ,@arg-names))
              (,@(if stringsp
                     `(concatenate 'string)
                     `(sb-format::princ-multiple-to-string))
-              ,@args))))))
+              ,@args)))))))
 
 (deftransform sb-format::princ-multiple-to-string ((&rest args) (&rest string) * :important nil)
   (let ((arg-names (make-gensym-list (length args))))
