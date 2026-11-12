@@ -222,3 +222,28 @@
   (let ((f (handler-bind ((style-warning #'muffle-warning)) ; too many arguments
              (compile nil '(lambda (x) (format nil "plain" (incf x)))))))
     (assert (string= (funcall f 1) "plain"))))
+
+;;; Padding: ~A and friends with a minimum column width.
+(with-test (:name (:format :padding))
+  (assert (string= (format nil "~10A|" "hi") "hi        |"))
+  (assert (string= (format nil "~10@A|" "hi") "        hi|"))
+  (assert (string= (format nil "~5,,,'xA|" "hi") "hixxx|"))
+  (assert (string= (format nil "~,,3A|" "hi") "hi   |"))
+  (assert (string= (format nil "~5,3A|" "hi") "hi   |"))
+  (assert (string= (format nil "~40A|" "hi") (concatenate 'string "hi" (make-string 38 :initial-element #\Space) "|")))
+  (assert (string= (format nil "~250A|" "hi") (concatenate 'string "hi" (make-string 248 :initial-element #\Space) "|")))
+  (assert (string= (format nil "~12,,,'*@A|" "hi") "**********hi|"))
+  (assert (string= (format nil "~12,,,'*A|" "hi") "hi**********|"))
+  (assert (string= (format nil "~10:A|" nil) "()        |"))
+  (assert (string= (format nil "~10A|" 42) "42        |"))
+  (assert (string= (format nil "~10A|" :key) "KEY       |"))
+  (assert (string= (format nil "~10S|" "hi") "\"hi\"      |"))
+  (assert (string= (format nil "~5D|" 42) "   42|"))
+  (assert (string= (format nil "~10A|" (make-array 2 :element-type 'character
+                                                     :initial-contents "hi" :fill-pointer 2
+                                                     :adjustable t))
+                   "hi        |"))
+  ;; the string argument is not modified or retained
+  (let ((s (copy-seq "abc")))
+    (assert (string= (format nil "~10A" s) "abc       "))
+    (assert (string= s "abc"))))
