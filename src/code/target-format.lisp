@@ -106,6 +106,32 @@
   ANSI specification."
   (declare (explicit-check)
            (dynamic-extent format-arguments))
+  ;; A control string without a tilde just outputs itself: skip parsing and
+  ;; the string stream. The result for NIL must still be a fresh string, of
+  ;; the type the string stream would have produced (a base string when every
+  ;; character is a base character).
+  (when (and (simple-string-p control-string)
+             (not (position #\~ (the simple-string control-string))))
+    (typecase destination
+      (null
+       (let* ((string (the simple-string control-string))
+              (length (length string))
+              (result (if (typecase string
+                            (simple-base-string t)
+                            ((simple-array character (*))
+                             (dotimes (i length t)
+                               (unless (base-char-p (schar string i))
+                                 (return nil)))))
+                          (make-string length :element-type 'base-char)
+                          (make-string length))))
+         (replace result string)
+         (return-from format result)))
+      ((member t)
+       (write-string control-string *standard-output*)
+       (return-from format nil))
+      (stream
+       (write-string control-string destination)
+       (return-from format nil))))
   (etypecase destination
     (null
      (%with-output-to-string (stream)
