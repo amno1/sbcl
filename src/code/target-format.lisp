@@ -110,42 +110,48 @@
   ;; the string stream. The result for NIL must still be a fresh string, of
   ;; the type the string stream would have produced (a base string when every
   ;; character is a base character).
-  (when (and (simple-string-p control-string)
-             (not (position #\~ (the simple-string control-string))))
-    (typecase destination
+  (macrolet ((plain-control-p ()
+               ;; Inline loops: a full call to POSITION costs more than the scan.
+               `(and (simple-string-p control-string)
+                     (macrolet ((no-tilde-p (type)
+                                  `(let ((string (truly-the ,type control-string)))
+                                     (dotimes (i (length string) t)
+                                       (when (char= (schar string i) #\~)
+                                         (return nil))))))
+                       (typecase control-string
+                         (simple-base-string (no-tilde-p simple-base-string))
+                         (t (no-tilde-p (simple-array character (*)))))))))
+    (etypecase destination
       (null
-       (let* ((string (the simple-string control-string))
-              (length (length string))
-              (result (if (typecase string
-                            (simple-base-string t)
-                            ((simple-array character (*))
-                             (dotimes (i length t)
-                               (unless (base-char-p (schar string i))
-                                 (return nil)))))
-                          (make-string length :element-type 'base-char)
-                          (make-string length))))
-         (replace result string)
-         (return-from format result)))
+       (if (plain-control-p)
+           (let* ((string (truly-the simple-string control-string))
+                  (length (length string))
+                  (result (if (typecase string
+                                (simple-base-string t)
+                                ((simple-array character (*))
+                                 (dotimes (i length t)
+                                   (unless (base-char-p (schar string i))
+                                     (return nil)))))
+                              (make-string length :element-type 'base-char)
+                              (make-string length))))
+             (replace result string)
+             result)
+           (%with-output-to-string (stream)
+             (%format stream control-string format-arguments))))
+      (string
+       (with-output-to-string (stream destination)
+         (%format stream control-string format-arguments))
+       nil)
       ((member t)
-       (write-string control-string *standard-output*)
-       (return-from format nil))
+       (if (plain-control-p)
+           (write-string control-string *standard-output*)
+           (%format *standard-output* control-string format-arguments))
+       nil)
       (stream
-       (write-string control-string destination)
-       (return-from format nil))))
-  (etypecase destination
-    (null
-     (%with-output-to-string (stream)
-       (%format stream control-string format-arguments)))
-    (string
-     (with-output-to-string (stream destination)
-       (%format stream control-string format-arguments))
-     nil)
-    ((member t)
-     (%format *standard-output* control-string format-arguments)
-     nil)
-    (stream
-     (%format destination control-string format-arguments)
-     nil)))
+       (if (plain-control-p)
+           (write-string control-string destination)
+           (%format destination control-string format-arguments))
+       nil))))
 
 (defun %format (stream string-or-fun orig-args &optional (args orig-args))
   (if (and (functionp string-or-fun) (not (typep string-or-fun 'fmt-control)))
