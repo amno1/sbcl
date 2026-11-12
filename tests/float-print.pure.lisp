@@ -1413,3 +1413,25 @@
                   (read-from-string (format nil "~,6F" x)))))
         ;; Half a unit at 6 decimals, plus the error of reading back.
         (assert (<= (abs (- (rational f) (rational x))) 1/1000000))))))
+
+(with-test (:name (:float-print zmij-decimal-trimmed))
+  ;; The integer form agrees with the digit string of FLONUM-TO-DIGITS.
+  (let ((state (sb-ext:seed-random-state 5)))
+    (flet ((check (x)
+             (multiple-value-bind (k digits) (sb-impl::flonum-to-digits x)
+               (multiple-value-bind (m k2) (sb-impl::zmij-decimal-trimmed x)
+                 (assert (= k k2))
+                 (assert (string= digits (princ-to-string m)))))))
+      (dolist (x (list 1d0 0.1d0 1d23 5d-324 1.7976931348623157d308
+                       1f0 1f-45 3.4028235f38 123456789d0 1d100 9.5d0))
+        (check x))
+      (dotimes (i 20000)
+        (let ((x (abs (sb-kernel:make-double-float
+                       (- (random (ash 1 32) state) (ash 1 31))
+                       (random (ash 1 32) state)))))
+          (unless (or (sb-ext:float-nan-p x) (sb-ext:float-infinity-p x) (zerop x))
+            (check x))))))
+  (loop for m in '(1 9 10 99 100 999999999999999999 1000000000000000000
+                   9999999999999999999)
+        do (assert (= (sb-impl::decimal-digit-count m)
+                      (length (princ-to-string m))))))
