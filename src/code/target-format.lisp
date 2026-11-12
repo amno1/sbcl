@@ -273,6 +273,15 @@
 
 ;;;; format interpreters and support functions for simple output
 
+;;; N copies of PADCHAR; spaces in blocks.
+(defun output-padding (stream padchar n)
+  (declare (type fixnum n))
+  (cond ((<= n 0))
+        ((and (char= padchar #\space) (>= n 8))
+         (output-spaces stream n))
+        (t (dotimes (i n)
+             (write-char padchar stream)))))
+
 (defun format-write-field (stream string mincol colinc minpad padchar padleft)
   (when (and colinc (<= colinc 0))
     (format-error "The value of colinc is ~A, should be a positive integer"
@@ -282,8 +291,7 @@
                   mincol))
   (unless padleft
     (write-string string stream))
-  (dotimes (i minpad)
-    (write-char padchar stream))
+  (output-padding stream padchar minpad)
   ;; As of sbcl-0.6.12.34, we could end up here when someone tries to
   ;; print e.g. (FORMAT T "~F" "NOTFLOAT"), in which case ANSI says
   ;; we're supposed to soldier on bravely, and so we have to deal with
@@ -291,16 +299,16 @@
   (when (and mincol colinc)
     (do ((chars (+ (length string) (max minpad 0)) (+ chars colinc)))
         ((>= chars mincol))
-      (dotimes (i colinc)
-        (write-char padchar stream))))
+      (output-padding stream padchar colinc)))
   (when padleft
     (write-string string stream)))
 
 (defun format-princ (stream arg colonp atsignp mincol colinc minpad padchar)
   (format-write-field stream
-                      (if (or arg (not colonp))
-                          (princ-to-string arg)
-                          "()")
+                      (cond ((stringp arg) arg) ; no copy needed
+                            ((or arg (not colonp))
+                             (princ-to-string arg))
+                            (t "()"))
                       mincol colinc minpad padchar atsignp))
 
 (def-format-interpreter #\A (colonp atsignp params)
