@@ -798,3 +798,38 @@
     (assert (eq (funcall fch-fn #'car) (sb-kernel:fun-code-header #'car)))
     (assert (eq (funcall fch-fn fch-fn) (sb-kernel:fun-code-header fch-fn))))
   (verify-nil-intact))
+
+;;; The VOPs that were converted to use the constant-pool NIL must really be
+;;; the ones that run: the names of the VOPs that asked for NIL-OPERAND while
+;;; unpinned.
+(defun vops-using-nil-operand (lambda-form)
+  (let ((vops nil))
+    (sb-int:encapsulate
+     'sb-vm::nil-operand 'record
+     (lambda (f &rest args)
+       (when sb-c::*unpin-nil-trap-active*
+         (pushnew (sb-c::vop-info-name (sb-c::vop-info sb-assem::*current-vop*)) vops))
+       (apply f args)))
+    (unwind-protect
+         (handler-bind ((warning #'muffle-warning)
+                        (sb-ext:compiler-note #'muffle-warning))
+           (compile nil lambda-form))
+      (sb-int:unencapsulate 'sb-vm::nil-operand 'record))
+    vops))
+
+(with-test (:name :unpin-nil-nil-operand-reached)
+  (assert (member 'sb-vm::return
+                  (vops-using-nil-operand
+                   '(lambda (x) (declare (sb-ext:unpin-nil) (ignore x)
+                                        (optimize (speed 3)))
+                     (values)))))
+  (assert (member 'sb-kernel:fun-code-header
+                  (vops-using-nil-operand
+                   '(lambda (f) (declare (sb-ext:unpin-nil) (function f)
+                                        (optimize (speed 3)))
+                     (sb-kernel:fun-code-header f)))))
+  (assert (member 'sb-vm::length/list
+                  (vops-using-nil-operand
+                   '(lambda (l) (declare (sb-ext:unpin-nil) (list l)
+                                        (optimize (speed 3)))
+                     (length l))))))
