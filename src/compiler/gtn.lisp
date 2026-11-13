@@ -14,18 +14,27 @@
 
 (in-package "SB-C")
 
-;;; Return true if any node in COMPONENT was compiled under (DECLARE (SB-EXT:UNPIN-NIL)).
+;;; Return true if any lambda in COMPONENT has (DECLARE (SB-EXT:UNPIN-NIL)).
 (defun component-unpin-nil-p (component)
-  (do-blocks (block component)
-    (do-nodes (node nil block)
-      (let ((lexenv (node-lexenv node)))
-        (when (and lexenv (assoc 'unpin-nil (lexenv-user-data lexenv)))
-          (return-from component-unpin-nil-p t))))))
+  #+x86-64
+  (flet ((unpin-decl-p (lexenv)
+           (and lexenv
+                (lexenv-user-data lexenv)
+                (assoc 'unpin-nil (lexenv-user-data lexenv)))))
+    (dolist (fun (component-lambdas component))
+      (when (or (unpin-decl-p (lambda-lexenv fun))
+                (let ((bind (lambda-bind fun)))
+                  (and bind (unpin-decl-p (node-lexenv bind)))))
+        (return-from component-unpin-nil-p t))))
+  #-x86-64
+  (declare (ignore component))
+  nil)
 
 ;;; We make a pass over the component's environments, assigning argument
 ;;; passing locations and return conventions and TNs for local variables.
 (defun gtn-analyze (component)
   (let ((2comp (make-ir2-component)))
+    #+x86-64
     (setf (ir2-component-unpin-nil-p 2comp)
           (and (not *force-pin-nil*) (component-unpin-nil-p component)))
     (setf (component-info component) 2comp))
