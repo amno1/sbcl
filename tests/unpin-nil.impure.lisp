@@ -562,3 +562,63 @@
                                   (values h (svref box 0)))))))
     (assert (equal (multiple-value-list (funcall ph-fn 12 box :ok))
                    '(65523 :ok)))))
+
+;;; The values COMPILE returns, and the diagnostics, are those of a compile
+;;; without the declaration, whether or not the component falls back.
+(with-test (:name :unpin-nil-diagnostics-match-pinned)
+  (flet ((run (declare-p form-body)
+           (let ((messages nil))
+             (multiple-value-bind (fn warnings-p failure-p)
+                 (handler-bind ((warning (lambda (c)
+                                           (push (princ-to-string c) messages)
+                                           (muffle-warning c))))
+                   (compile nil `(lambda (x)
+                                   ,@(when declare-p '((declare (sb-ext:unpin-nil))))
+                                   ,form-body)))
+               (declare (ignore fn))
+               (list warnings-p failure-p (sort messages #'string<))))))
+    ;; A compile-time type error, in a component that falls back (it conses).
+    (let ((body '(list x (+ 1 "a"))))
+      (assert (equal (run nil body) (run t body))))
+    ;; A full warning in one that doesn't.
+    (let ((body '(+ (the fixnum x) "a")))
+      (assert (equal (run nil body) (run t body))))))
+
+;;; An operand that lives on the stack can't be compared to the NIL in the
+;;; constant pool; the component then keeps R12 pinned and stays correct.
+(with-test (:name :unpin-nil-stack-operand-falls-back)
+  (let* ((vars '(a b c d e f g h i j k l m n o p q r s u v w))
+         (fn (compile nil
+                      `(lambda (x ,@vars)
+                         (declare (sb-ext:unpin-nil) (fixnum ,@vars)
+                                  (optimize (speed 1) (safety 1)))
+                         (let ((r1 (typep x '(or null simple-string)))
+                               (r2 (symbolp x))
+                               (r3 (consp x)))
+                           (list r1 r2 r3 (+ ,@vars)))))))
+    (assert (equal (apply fn nil (loop for i below 22 collect i))
+                   (list t t nil (reduce #'+ (loop for i below 22 collect i)))))
+    (assert (equal (apply fn "s" (loop for i below 22 collect i))
+                   (list t nil nil (reduce #'+ (loop for i below 22 collect i)))))
+    (assert (equal (apply fn '(1) (loop for i below 22 collect i))
+                   (list nil nil t (reduce #'+ (loop for i below 22 collect i)))))))
+
+;;; A fallback leaves the flow graph as it found it: the retry still merges the
+;;; two float-to-pointer coercions, as an undeclared compile does.
+(with-test (:name :unpin-nil-retry-keeps-reused-coercion)
+  (flet ((coercion-notes (declare-p)
+           (let ((notes nil))
+             (handler-bind ((sb-ext:compiler-note
+                              (lambda (c)
+                                (let ((m (princ-to-string c)))
+                                  (when (search "float to pointer" m) (push m notes)))
+                                (muffle-warning c))))
+               (compile nil `(lambda (x d)
+                               (declare (double-float d) (fixnum x) (optimize speed)
+                                        ,@(when declare-p '((sb-ext:unpin-nil))))
+                               (cond ((= x 1) (+ d 1))
+                                     ((= x 2) (+ d 2))
+                                     ((= x 3) (+ d 3))))))
+             (length notes))))
+    (assert (= (coercion-notes nil) 1))
+    (assert (= (coercion-notes t) 1))))
