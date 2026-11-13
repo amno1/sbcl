@@ -1763,6 +1763,35 @@
 
 (declaim (ftype function pack-greedy pack-iterative))
 
+#+x86-64
+(defun component-uses-gpr-p (component 2comp offset)
+  (labels ((tn-uses-offset-p (tn)
+             (and tn
+                  (tn-offset tn)
+                  (eq (sb-name (sc-sb (tn-sc tn))) 'sb-vm::registers)
+                  (= (tn-offset tn) offset)))
+           (any-tn-list-uses-p (head)
+             (do ((tn head (tn-next tn)))
+                 ((null tn) nil)
+               (when (tn-uses-offset-p tn)
+                 (return t)))))
+    (or (any-tn-list-uses-p (ir2-component-normal-tns 2comp))
+        (any-tn-list-uses-p (ir2-component-restricted-tns 2comp))
+        (any-tn-list-uses-p (ir2-component-wired-tns 2comp))
+        (do-ir2-blocks (block component)
+          (do ((vop (ir2-block-start-vop block) (vop-next vop)))
+              ((null vop))
+            (flet ((refs-use-p (refs)
+                     (do ((ref refs (tn-ref-across ref)))
+                         ((null ref) nil)
+                       (when (or (tn-uses-offset-p (tn-ref-tn ref))
+                                 (tn-uses-offset-p (tn-ref-load-tn ref)))
+                         (return t)))))
+              (when (or (refs-use-p (vop-args vop))
+                        (refs-use-p (vop-results vop))
+                        (refs-use-p (vop-temps vop)))
+                (return-from component-uses-gpr-p t))))))))
+
 (defun pack (component)
   (unwind-protect
        (let ((optimize nil)
@@ -1868,6 +1897,15 @@
                 (dolist (block orpb)
                   (event repack-block)
                   (pack-load-tns block)))))
+
+         #+x86-64
+         (when (and (ir2-component-unpin-nil-p 2comp)
+                    (component-uses-gpr-p component 2comp sb-vm:card-table-reg))
+           (let ((save-tn (make-representation-tn *backend-t-primitive-type*
+                                                  sb-vm:control-stack-sc-number)))
+             (component-live-tn save-tn)
+             (pack-tn save-tn nil)
+             (setf (ir2-component-unpin-nil-save-tn 2comp) save-tn)))
 
          (values))
     (clean-up-pack-structures)))

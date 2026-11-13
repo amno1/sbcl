@@ -202,7 +202,10 @@
   (:generator 1
     (emit-lea rsp-tn rbp-tn     (- (* n-word-bytes
                                       (- (sb-allocated-size 'stack)
-                                         sp->fp-offset))))))
+                                         sp->fp-offset))))
+    (awhen (ir2-component-unpin-nil-save-tn
+            (component-info *component-being-compiled*))
+      (inst mov (ea (frame-byte-offset (tn-offset it)) rbp-tn) r12-tn))))
 
 ;;; This is emitted directly before either a known-call-local, call-local,
 ;;; or a multiple-call-local. All it does is allocate stack space for the
@@ -1264,6 +1267,11 @@
 ;;; optimizations on modern CPUs quite handily. Second, we can do all
 ;;; this without needing a temp register. Fixed the latter, at least.
 ;;; -- AB 2006/Feb/04
+(defun maybe-restore-unpin-nil ()
+  (awhen (ir2-component-unpin-nil-save-tn
+          (component-info *component-being-compiled*))
+    (inst mov r12-tn (ea (frame-byte-offset (tn-offset it)) rbp-tn))))
+
 (define-vop (return-single)
   (:args (old-fp)
          (return-pc)
@@ -1271,6 +1279,7 @@
   (:ignore value)
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
+    (maybe-restore-unpin-nil)
     ;; Drop stack above old-fp and restore old frame pointer
     (inst leave)
     ;; Clear the multiple-value return flag
@@ -1283,6 +1292,7 @@
          (return-pc))
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
+    (maybe-restore-unpin-nil)
     (inst leave)
     (inst ret)))
 
@@ -1339,6 +1349,7 @@
         ;; And away we go. Except that return-pc is still on the
         ;; stack and we've changed the stack pointer. So we might have to
         ;; tell it to index off of RBX instead of RBP, depending on nvals.
+        (maybe-restore-unpin-nil)
         (cond ((<= nvals register-arg-count)
                (inst leave)
                (inst ret))
@@ -1389,6 +1400,7 @@
                (set-rcx))
               (t
                (set-rcx)))
+        (maybe-restore-unpin-nil)
         (inst stc)                      ; multiple value return flag
         (inst leave) (inst ret))))))
 
@@ -1421,6 +1433,7 @@
         (inst jmp :ne not-single)
         ;; Return with one value.
         (loadw a0 vals -1)
+        (maybe-restore-unpin-nil)
         ;; Clear the stack until ocfp.
         (inst leave)
         ;; clear the multiple-value return flag

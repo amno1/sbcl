@@ -107,8 +107,14 @@
 (declaim (freeze-type fixup fixup-note))
 
 (defun make-fixup (name flavor &optional (offset 0))
+  #+x86-64
   (when (and *unpin-nil-trap-active*
-             (member flavor '(:assembly-routine :card-table-index-mask)))
+             (member flavor '(:assembly-routine
+                              :card-table-index-mask
+                              :linkage-cell
+                              :fdefn-call
+                              :static-call
+                              :named-call)))
     (unpin-nil-fallback flavor))
   (%make-fixup name flavor offset))
 
