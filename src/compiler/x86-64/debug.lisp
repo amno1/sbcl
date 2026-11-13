@@ -76,7 +76,7 @@
     (inst lea code (ea (- other-pointer-lowtag fun-pointer-lowtag)
                        thing temp n-word-bytes))
     ;; note that LEA does not affect any flags
-    (inst cmov :z code null-tn))) ; put NIL into CODE if ZF
+    (inst cmov :z code (nil-operand)))) ; put NIL into CODE if ZF
 
 (define-vop (%make-lisp-obj)
   (:translate %make-lisp-obj)
