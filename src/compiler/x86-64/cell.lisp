@@ -239,7 +239,7 @@
   (:result-types positive-fixnum)
   (:generator 2
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst xor res null-tn)
+    (inst xor res (nil-cmp-operand))
     (inst shr res n-symbol-hash-discard-bits)))
 
 (eval-when (:compile-toplevel)
@@ -329,7 +329,7 @@
   (:generator 2
     (loadw result fdefn fdefn-fun-slot other-pointer-lowtag)
     (inst test :dword result result)
-    (inst cmov :z result null-tn)))
+    (inst cmov :z result (nil-cmp-operand))))
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
