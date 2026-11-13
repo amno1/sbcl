@@ -503,6 +503,12 @@
       (boxed-constant-tn nil)
       null-tn))
 
+;;; A memory operand can't be compared to the memory operand NIL-OPERAND is
+;;; when NIL is unpinned: compile the component with NIL pinned instead.
+(defun nil-operand-needs-gpr (tn)
+  (when (and sb-c::*unpin-nil-trap-active* (not (gpr-tn-p tn)))
+    (sb-c::unpin-nil-fallback :memory-operand)))
+
 ;;; Return true if THING is a general-purpose register TN.
 (defun gpr-tn-p (thing)
   (and (tn-p thing)
