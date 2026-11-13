@@ -642,6 +642,27 @@ necessary, since type inference may take arbitrarily long to converge.")
                    (vop-node sb-assem::*current-vop*))))
     (throw 'unpin-nil-fallback (cons reason node))))
 
+;;; SELECT-REPRESENTATIONS can split blocks and relink their successors
+;;; (see REUSE-MOVE-COERCION), which changes the IR1 flow graph. Remember it
+;;; before an optimistic pass so that a pinned retry starts from the same one.
+(defun snapshot-ir1-cfg (component)
+  (let ((blocks (list (component-head component) (component-tail component))))
+    (do-blocks (block component)
+      (push block blocks))
+    (mapcar (lambda (block)
+              (list block (copy-list (block-succ block)) (copy-list (block-pred block))))
+            blocks)))
+
+(defun restore-ir1-cfg (component snapshot)
+  ;; Blocks made since are dropped by FIND-DFO; they must not link to anything.
+  (do-blocks (block component)
+    (unless (assoc block snapshot :test #'eq)
+      (setf (block-succ block) nil
+            (block-pred block) nil)))
+  (loop for (block succ pred) in snapshot
+        do (setf (block-succ block) succ
+                 (block-pred block) pred)))
+
 (defun reset-component-for-pinned-retry (component)
   (clear-constant-info)
   (labels ((clear-loops (cloop)
@@ -806,6 +827,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (if (and (not *force-pin-nil*)
            (component-unpin-nil-p component))
       (let* ((*unpin-nil-retry-state* (vector nil nil))
+             (cfg (snapshot-ir1-cfg component))
              (deferred-diagnostics nil)
              (fallback
               (catch 'unpin-nil-fallback
@@ -817,9 +839,12 @@ necessary, since type inference may take arbitrarily long to converge.")
                          (muffle-warning c)))
                      (warning
                        (lambda (c)
-                         (push (list :warning c *compiler-error-context*)
-                               deferred-diagnostics)
-                         (muffle-warning c))))
+                         ;; Only defer what can be replayed with WARN.
+                         (let ((restart (find-restart 'muffle-warning c)))
+                           (when restart
+                             (push (list :warning c *compiler-error-context*)
+                                   deferred-diagnostics)
+                             (invoke-restart restart))))))
                   (%%compile-component component))
                 nil)))
         (cond (fallback
@@ -827,6 +852,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (setf (node-source-path (car pair)) (cdr pair)))
                (dolist (annot (svref *unpin-nil-retry-state* 1))
                  (setf (lvar-annotation-fired annot) nil))
+               (restore-ir1-cfg component cfg)
                (emit-unpin-nil-fallback-note component (car fallback) (cdr fallback))
                (reset-component-for-pinned-retry component)
                (let ((*force-pin-nil* t))
@@ -836,6 +862,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (destructuring-bind (kind condition context) entry
                    (let ((*compiler-error-context* context))
                      (ecase kind
+                       ;; COMPILER-NOTIFY doesn't take a condition object, and
+                       ;; the note's class matters to handlers, so signal it
+                       ;; and report it as COMPILER-NOTIFY does.
                        (:note
                         (block replay-note
                           (restart-case
