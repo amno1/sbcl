@@ -387,3 +387,178 @@
   (assert (eql (sb-vm::immediate-constant-sc nil) sb-vm:immediate-sc-number))
   (assert (eql (sb-vm::immediate-constant-sc t) sb-vm:immediate-sc-number))
   (assert (eql (sb-vm::immediate-constant-sc 42) sb-vm:immediate-sc-number)))
+
+;;; Verify converted VOPs actually stay unpinned (NULL notes) under register
+;;; pressure that allocates R12, and handle stack spills cleanly.
+(with-test (:name :unpin-nil-converted-vops-allocate-r12)
+  (let* ((vars '(s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16 s17 s18 s19))
+         (inits (loop for v in vars
+                      for i from 1
+                      collect `(,v (logand (+ k ,i) #xffffff))))
+         (step (loop for v in vars
+                     for i from 1
+                     collect `(setf ,v (logand (+ ,v (* k ,i)) #xffffff))))
+         (sum `(logand (+ ,@vars) most-positive-fixnum)))
+    (flet ((check-pressured (form expected-fn)
+             (multiple-value-bind (fn notes) (compile-capturing-unpin-notes form)
+               (assert (null notes))
+               (assert (disassembly-contains-p fn "R12"))
+               (funcall expected-fn fn))))
+      ;; compute-from-flags under R12 register pressure
+      (check-pressured
+       `(lambda (k x y)
+          (declare (sb-ext:unpin-nil)
+                   (type (unsigned-byte 24) k y)
+                   (optimize (speed 3) (safety 0) (debug 0)))
+          (let* ,inits
+            (declare (type (unsigned-byte 24) ,@vars))
+            ,@step
+            (let ((b0 (null x))
+                  (b1 (< k y)))
+              (values b0 b1 ,sum))))
+       (lambda (fn)
+         (assert (equal (multiple-value-list (funcall fn 3 nil 5))
+                        (list t t (nth-value 2 (funcall fn 3 nil 5)))))
+         (assert (equal (multiple-value-list (funcall fn 5 'a 3))
+                        (list nil nil (nth-value 2 (funcall fn 5 'a 3)))))))
+      ;; type-vops under high register pressure (many variables spilled to stack)
+      (check-pressured
+       `(lambda (k x0 x1 x2)
+          (declare (sb-ext:unpin-nil)
+                   (type (unsigned-byte 24) k)
+                   (optimize (speed 3) (safety 0) (debug 0)))
+          (let* ,inits
+            (declare (type (unsigned-byte 24) ,@vars))
+            ,@step
+            (let ((r-sym (symbolp x0))
+                  (r-cons (consp x1))
+                  (r-str (let ((v (the (or simple-string null) x2)))
+                           (simple-string-p v))))
+              (values r-sym r-cons r-str ,sum))))
+       (lambda (fn)
+         (assert (eq (nth-value 0 (funcall fn 7 'sym nil nil)) t))
+         (assert (eq (nth-value 0 (funcall fn 7 nil nil nil)) t))
+         (assert (eq (nth-value 0 (funcall fn 7 42 nil nil)) nil))
+         (assert (eq (nth-value 1 (funcall fn 7 nil '(1 . 2) nil)) t))
+         (assert (eq (nth-value 1 (funcall fn 7 nil nil nil)) nil))
+         (assert (eq (nth-value 2 (funcall fn 7 nil nil "ok")) t))
+         (assert (eq (nth-value 2 (funcall fn 7 nil nil nil)) nil))))
+      ;; list length + symbol-hash + fdefn-fun under R12 register pressure
+      (let ((fd (sb-kernel:make-fdefn 'unpin-nil-pressured-unbound-sym))
+            (pinned-hash (sb-kernel:symbol-hash 'unpin-nil-pressured-sym)))
+        (check-pressured
+         `(lambda (k xs sym fd)
+            (declare (sb-ext:unpin-nil)
+                     (type (unsigned-byte 24) k)
+                     (type list xs)
+                     (type symbol sym)
+                     (type sb-kernel:fdefn fd)
+                     (optimize (speed 3) (safety 0) (debug 0)))
+            (let* ,inits
+              (declare (type (unsigned-byte 24) ,@vars))
+              ,@step
+              (values (length xs)
+                      (sb-kernel:symbol-hash sym)
+                      (sb-kernel:fdefn-fun fd)
+                      ,sum)))
+         (lambda (fn)
+           (multiple-value-bind (len hash fdfun)
+               (funcall fn 9 '(a b c) 'unpin-nil-pressured-sym fd)
+             (assert (= len 3))
+             (assert (= hash pinned-hash))
+             (assert (null fdfun)))
+           (assert (= (funcall fn 9 nil 'nil fd) 0))))))))
+
+;;; Adding NIL to the constant pool during codegen via BOXED-CONSTANT-TN must not
+;;; perturb RIP-relative offsets of earlier constants in the same component.
+(with-test (:name :unpin-nil-late-constant-pool-append)
+  (let* ((c1 (list 'early-1 101))
+         (c2 (vector 10 20 30))
+         (c3 "early-string-3")
+         (c4 'early-symbol-4)
+         (c5 (list 'early-5 505))
+         (vars '(r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 r10 r11 r12 r13))
+         (inits (loop for v in vars
+                      for i from 1
+                      collect `(,v (logand (+ k ,i) #xffffff))))
+         (step (loop for v in vars
+                     for i from 1
+                     collect `(setf ,v (logand (logxor ,v (+ k ,i)) #xffffff)))))
+    (multiple-value-bind (fn notes)
+        (compile-capturing-unpin-notes
+         `(lambda (k sym)
+            (declare (sb-ext:unpin-nil)
+                     (type (unsigned-byte 24) k)
+                     (optimize (speed 3) (safety 0) (debug 0)))
+            (let* (,@inits
+                   (e1 ',c1)
+                   (e2 ',c2)
+                   (e3 ,c3)
+                   (e4 ',c4)
+                   (e5 ',c5))
+              (declare (type (unsigned-byte 24) ,@vars))
+              ,@step
+              ;; SYMBOLP appends NIL via BOXED-CONSTANT-TN during codegen,
+              ;; after the earlier constants above have already been packed.
+              (let ((is-sym (symbolp sym)))
+                (values e1 e2 e3 e4 e5 is-sym
+                        (logand (+ ,@vars) most-positive-fixnum))))))
+      (assert (null notes))
+      (assert (disassembly-contains-p fn "R12"))
+      (multiple-value-bind (o1 o2 o3 o4 o5 is-sym)
+          (funcall fn 17 'foo)
+        (assert (eq o1 c1))
+        (assert (eq o2 c2))
+        (assert (string= o3 c3))
+        (assert (eq o4 c4))
+        (assert (eq o5 c5))
+        (assert (eq is-sym t)))
+      (assert (eq (nth-value 5 (funcall fn 17 123)) nil)))))
+
+;;; Regression tests for fallback/retry idempotence in RESET-COMPONENT-FOR-PINNED-RETRY.
+(with-test (:name :unpin-nil-retry-safety)
+  ;; MAKE-ARRAY-HEADER* must not destructively pop combination args before retry.
+  (multiple-value-bind (arr-fn notes)
+      (compile-capturing-unpin-notes
+       '(lambda ()
+          (declare (sb-ext:unpin-nil)
+                   (optimize (speed 0) (safety 0) (debug 0)))
+          (let ((a (the (satisfies eval) (make-array 4 :fill-pointer 0))))
+            (and (array-in-bounds-p a 0)
+                 (array-in-bounds-p a 1)))))
+    (declare (ignore notes))
+    (assert (eq (funcall arr-fn) t)))
+  ;; Fallback after IR2-CONVERT must not emit duplicate compiler warnings.
+  (let ((warnings nil))
+    (multiple-value-bind (fn failurep)
+        (handler-bind ((warning (lambda (c) (push c warnings))))
+          (compile nil '(lambda (v)
+                          (declare (sb-ext:unpin-nil))
+                          (values (svref v 0) (vector-pop v)))))
+      (declare (ignore fn failurep))
+      (assert (= (length warnings) 1))))
+  ;; Fallback after IR2-CONVERT must not drop LVAR-annotation warnings or
+  ;; duplicate warnings.
+  (let ((warnings nil))
+    (multiple-value-bind (fn failurep)
+        (handler-bind ((warning (lambda (c) (push c warnings))))
+          (compile nil '(lambda (x)
+                          (declare (sb-ext:unpin-nil))
+                          (setf (svref #(a b c) 1) x))))
+      (declare (ignore fn failurep))
+      (assert (= (length warnings) 1))
+      (assert (typep (first warnings) 'sb-int:constant-modified))))
+  ;; CALC-PHASH followed by a codegen trap (vector write barrier) must not crash on retry.
+  (let* ((box (vector nil))
+         (ph-fn (compile nil '(lambda (val box x)
+                                (declare (sb-ext:unpin-nil)
+                                         (type (unsigned-byte 32) val)
+                                         (type simple-vector box)
+                                         (optimize (speed 3) (safety 0)))
+                                (let ((h (sb-vm::calc-phash
+                                          val 2 #((sb-c::shr sb-c::t0 1)
+                                                  (sb-c::xor sb-c::t0 #xffff)))))
+                                  (setf (svref box 0) x)
+                                  (values h (svref box 0)))))))
+    (assert (equal (multiple-value-list (funcall ph-fn 12 box :ok))
+                   '(65523 :ok)))))
