@@ -102,8 +102,9 @@
     (when (and (policy node (> safety 0))
                (not (csubtypep (tn-ref-type arg-ref) (specifier-type 'list))))
       (inst jmp type-check))
+    (nil-operand-needs-gpr list)
     LOOP
-    (inst cmp list null-tn)
+    (inst cmp list (nil-operand))
     (inst jmp :e DONE)
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)

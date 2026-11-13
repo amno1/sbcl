@@ -1336,7 +1336,7 @@
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (dolist (tn (nthcdr nvals (list a0 a1 a2)))
-        (move tn null-tn)))
+        (move tn (nil-operand))))
     (flet ((set-rcx ()
              (if (zerop nvals)
                  (zeroize rcx)          ; smaller
@@ -1634,7 +1634,7 @@
   (:results (value :scs (descriptor-reg any-reg)))
   (:result-types *)
   (:generator 3
-    (inst mov value null-tn)
+    (inst mov value (nil-operand))
     (inst cmp count (fixnumize index))
     (inst jmp :be done)
     (inst mov value (ea (- (* index n-word-bytes)) object))
