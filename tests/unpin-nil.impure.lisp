@@ -160,14 +160,15 @@
                      "(:FULL)"
                      (list #'1+ 41)
                      42)
-    ;; :CLOSURE (non-tail local function needing closure/env link)
+    ;; :LOCAL-CALL (a non-tail call of a recursive local function; it used to
+    ;; be reported as :CLOSURE, but it makes no closure)
     (expect-fallback '(lambda (x)
                        (declare (type (signed-byte 32) x))
                        (labels ((h (z)
                                   (declare (type (signed-byte 32) z))
                                   (if (<= z 0) 0 (the fixnum (+ z (h (1- z)))))))
                          (+ (h x) 1)))
-                     "(:CLOSURE)"
+                     "(:LOCAL-CALL)"
                      '(5)
                      16)
     ;; :NULL-TN (foreign callout via ALIEN-LINKAGE-TABLE)
@@ -833,3 +834,21 @@
                    '(lambda (l) (declare (sb-ext:unpin-nil) (list l)
                                         (optimize (speed 3)))
                      (length l))))))
+
+;;; MOD and REM leave an ENCLOSE node behind that makes no closure; it must not
+;;; keep the component from being unpinned. A real closure still does.
+(with-test (:name :unpin-nil-mod-rem-stay-unpinned)
+  (flet ((notes-of (form)
+           (nth-value 1 (compile-capturing-unpin-notes form))))
+    (dolist (op '(mod rem))
+      (let ((form `(lambda (a)
+                     (declare (sb-ext:unpin-nil) (type (unsigned-byte 32) a)
+                              (optimize (speed 3) (safety 0)))
+                     (,op a 65521))))
+        (assert (null (notes-of form)))
+        (assert (= (funcall (compile nil form) 1000003) (funcall op 1000003 65521)))))
+    (assert (= 1 (length (notes-of
+                          '(lambda (n)
+                            (declare (sb-ext:unpin-nil) (fixnum n)
+                                     (optimize (speed 3) (safety 0)))
+                            (lambda (x) (+ x n)))))))))
