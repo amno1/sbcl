@@ -30,7 +30,7 @@
          (body
           '((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                      (type fixnum n)
-                     (optimize (speed 3) (safety 0) (debug 0)))
+                     (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
             (let ((s0 1) (s1 2) (s2 3) (s3 4) (s4 5) (s5 6) (s6 7)
                   (s7 8) (s8 9) (s9 10) (s10 11) (s11 12) (s12 13) (s13 14))
               (declare (type (unsigned-byte 64)
@@ -77,7 +77,7 @@
                 collect `(,v (logand (+ (* x ,i) ,(* i 13)) #xffffffff))))
          (body
           `((declare (type (unsigned-byte 32) x)
-                     (optimize (speed 3) (safety 0) (debug 0)))
+                     (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
             (let* ,bindings
               (declare (type (unsigned-byte 32) ,@vars))
               (dotimes (k 4)
@@ -104,7 +104,7 @@
       (compile-capturing-unpin-notes
        '(lambda (x)
          (declare (sb-ext:unpin-nil)
-                  (optimize (speed 3) (safety 0)))
+                  (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
          (if (eq x nil) 11 22)))
     (assert (null notes))
     (assert (= (funcall eq-nil-fn nil) 11))
@@ -114,7 +114,7 @@
       (compile-capturing-unpin-notes
        '(lambda (flag)
          (declare (sb-ext:unpin-nil)
-                  (optimize (speed 3) (safety 0)))
+                  (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
          (if flag "" "nonempty")))
     (assert (null notes))
     (assert (string= (funcall empty-str-fn t) ""))
@@ -125,7 +125,7 @@
        '(lambda (x)
          (declare (sb-ext:unpin-nil)
                   (type (signed-byte 60) x)
-                  (optimize (speed 3) (safety 0)))
+                  (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
          (let* ((a (+ x 1))
                 (b (+ a 2)))
            (+ a b))))
@@ -139,7 +139,7 @@
                  (compile-capturing-unpin-notes
                   `(lambda ,(second form)
                      (declare (sb-ext:unpin-nil)
-                              (optimize (speed 3) (safety 0)))
+                              (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      ,@(cddr form)))
                (assert (= (length notes) 1))
                (assert (search expected-fragment (first notes)))
@@ -150,7 +150,7 @@
                  (compile-capturing-unpin-notes
                   `(lambda ,(second form)
                      (declare (sb-ext:unpin-nil)
-                              (optimize (speed 2) (safety 0)))
+                              (optimize (speed 2) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      ,@(cddr form)))
                (assert (null notes))
                (assert (equal (apply fn args) expected-result))
@@ -193,14 +193,14 @@
                      123)))
 
 (with-test (:name :unpin-nil-compute-from-flags)
-  (dolist (form '(((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0))) (null x))
+  (dolist (form '(((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0))) (null x))
                    ((nil) t) ((t) nil) ((0) nil))
                   ((lambda (a b)
-                     (declare (sb-ext:unpin-nil) (type fixnum a b) (optimize (speed 3) (safety 0)))
+                     (declare (sb-ext:unpin-nil) (type fixnum a b) (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (< a b))
                    ((1 2) t) ((2 1) nil) ((5 5) nil))
                   ((lambda (a b)
-                     (declare (sb-ext:unpin-nil) (type fixnum a b) (optimize (speed 3) (safety 0)))
+                     (declare (sb-ext:unpin-nil) (type fixnum a b) (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (not (< a b)))
                    ((1 2) nil) ((2 1) t) ((5 5) t))))
     (destructuring-bind (lambda-form &rest cases) form
@@ -213,22 +213,22 @@
   (verify-nil-intact))
 
 (with-test (:name :unpin-nil-type-vops)
-  (dolist (form '(((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0))) (consp x))
+  (dolist (form '(((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0))) (consp x))
                    (((1 . 2)) t) ((nil) nil) ((t) nil) ((42) nil))
-                  ((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0))) (symbolp x))
+                  ((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0))) (symbolp x))
                    ((nil) t) ((t) t) ((foo) t) ((42) nil) (((1)) nil))
-                  ((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0))) (listp x))
+                  ((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0))) (listp x))
                    ((nil) t) (((1)) t) ((t) nil) ((42) nil))
                   ((lambda (x)
                      (declare (sb-ext:unpin-nil)
                               (type (or simple-string null) x)
-                              (optimize (speed 3) (safety 0)))
+                              (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (simple-string-p x))
                    (("abc") t) ((nil) nil))
                   ((lambda (x)
                      (declare (sb-ext:unpin-nil)
                               (type (or simple-vector null) x)
-                              (optimize (speed 3) (safety 0)))
+                              (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (arrayp x))
                    ((#(1 2)) t) ((nil) nil))))
     (destructuring-bind (lambda-form &rest cases) form
@@ -248,7 +248,7 @@
          `(lambda (xs)
             (declare (sb-ext:unpin-nil)
                      (type list xs)
-                     (optimize (speed 3) (safety ,safety)))
+                     (optimize (speed 3) (safety ,safety) #+sb-safepoint (sb-c:insert-safepoints 0)))
             (length xs)))
       (assert (null notes))
       (assert (= (funcall len-fn nil) 0))
@@ -259,21 +259,21 @@
        '(lambda (fd)
           (declare (sb-ext:unpin-nil)
                    (type sb-kernel:fdefn fd)
-                   (optimize (speed 3) (safety 0)))
+                   (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
           (sb-kernel:fdefn-fun fd)))
     (assert (null notes))
     (assert (null (funcall fd-fn (sb-kernel:make-fdefn 'unpin-nil-unbound-sym)))))
   ;; SYMBOL-HASH matches pinned hash
   (let ((pinned-hash (compile nil '(lambda (s)
                                      (declare (type symbol s)
-                                              (optimize (speed 3) (safety 0)))
+                                              (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                                      (sb-kernel:symbol-hash s)))))
     (multiple-value-bind (unpinned-hash notes)
         (compile-capturing-unpin-notes
          '(lambda (s)
             (declare (sb-ext:unpin-nil)
                      (type symbol s)
-                     (optimize (speed 3) (safety 0)))
+                     (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
             (sb-kernel:symbol-hash s)))
       (assert (null notes))
       (dolist (sym '(nil t foo car +))
@@ -286,7 +286,7 @@
        '(lambda (a b)
          (declare (sb-ext:unpin-nil)
                   (type (signed-byte 32) a b)
-                  (optimize (speed 3) (safety 1)))
+                  (optimize (speed 3) (safety 1) #+sb-safepoint (sb-c:insert-safepoints 0)))
          (let ((x0 (+ a 1)) (x1 (+ a 2)) (x2 (+ a 3)) (x3 (+ a 4))
                (x4 (+ a 5)) (x5 (+ a 6)) (x6 (+ a 7)) (x7 (+ a 8))
                (x8 (+ a 9)) (x9 (+ a 10)) (x10 (+ a 11)) (x11 (+ a 12))
@@ -312,7 +312,7 @@
              (declare (sb-ext:unpin-nil)
                       (type (simple-array (unsigned-byte 64) (*)) buf)
                       (type fixnum n)
-                      (optimize (speed 3) (safety 0) (debug 0)))
+                      (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
              (let ((s0 1) (s1 2) (s2 3) (s3 4) (s4 5) (s5 6) (s6 7)
                    (s7 8) (s8 9) (s9 10) (s10 11) (s11 12) (s12 13))
                (declare (type (unsigned-byte 64)
@@ -411,7 +411,7 @@
        `(lambda (k x y)
           (declare (sb-ext:unpin-nil)
                    (type (unsigned-byte 24) k y)
-                   (optimize (speed 3) (safety 0) (debug 0)))
+                   (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
           (let* ,inits
             (declare (type (unsigned-byte 24) ,@vars))
             ,@step
@@ -428,7 +428,7 @@
        `(lambda (k x0 x1 x2)
           (declare (sb-ext:unpin-nil)
                    (type (unsigned-byte 24) k)
-                   (optimize (speed 3) (safety 0) (debug 0)))
+                   (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
           (let* ,inits
             (declare (type (unsigned-byte 24) ,@vars))
             ,@step
@@ -455,7 +455,7 @@
                      (type list xs)
                      (type symbol sym)
                      (type sb-kernel:fdefn fd)
-                     (optimize (speed 3) (safety 0) (debug 0)))
+                     (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
             (let* ,inits
               (declare (type (unsigned-byte 24) ,@vars))
               ,@step
@@ -491,7 +491,7 @@
          `(lambda (k sym)
             (declare (sb-ext:unpin-nil)
                      (type (unsigned-byte 24) k)
-                     (optimize (speed 3) (safety 0) (debug 0)))
+                     (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
             (let* (,@inits
                    (e1 ',c1)
                    (e2 ',c2)
@@ -524,7 +524,7 @@
       (compile-capturing-unpin-notes
        '(lambda ()
           (declare (sb-ext:unpin-nil)
-                   (optimize (speed 0) (safety 0) (debug 0)))
+                   (optimize (speed 0) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
           (let ((a (the (satisfies eval) (make-array 4 :fill-pointer 0))))
             (and (array-in-bounds-p a 0)
                  (array-in-bounds-p a 1)))))
@@ -556,7 +556,7 @@
                                 (declare (sb-ext:unpin-nil)
                                          (type (unsigned-byte 32) val)
                                          (type simple-vector box)
-                                         (optimize (speed 3) (safety 0)))
+                                         (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                                 (let ((h (sb-vm::calc-phash
                                           val 2 #((sb-c::shr sb-c::t0 1)
                                                   (sb-c::xor sb-c::t0 #xffff)))))
@@ -593,7 +593,7 @@
          (fn (compile nil
                       `(lambda (x ,@vars)
                          (declare (sb-ext:unpin-nil) (fixnum ,@vars)
-                                  (optimize (speed 1) (safety 1)))
+                                  (optimize (speed 1) (safety 1) #+sb-safepoint (sb-c:insert-safepoints 0)))
                          (let ((r1 (typep x '(or null simple-string)))
                                (r2 (symbolp x))
                                (r3 (consp x)))
@@ -616,7 +616,8 @@
                                   (when (search "float to pointer" m) (push m notes)))
                                 (muffle-warning c))))
                (compile nil `(lambda (x d)
-                               (declare (double-float d) (fixnum x) (optimize speed)
+                               (declare (double-float d) (fixnum x)
+                                        (optimize speed #+sb-safepoint (sb-c:insert-safepoints 0))
                                         ,@(when declare-p '((sb-ext:unpin-nil))))
                                (cond ((= x 1) (+ d 1))
                                      ((= x 2) (+ d 2))
@@ -635,7 +636,7 @@
          (declare (type (simple-array (unsigned-byte 64) (*)) buf)
                   (type fixnum n)
                   (type (or null fixnum) y)
-                  (optimize (speed 3) (safety 0) (debug 0))
+                  (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0))
                   (sb-ext:unpin-nil))
          (let ((s0 1) (s1 2) (s2 3) (s3 4) (s4 5) (s5 6) (s6 7)
                (s7 8) (s8 9) (s9 10) (s10 11) (s11 12) (s12 13)
@@ -701,7 +702,7 @@
          (fn (compile nil
                       `(lambda (x ,@vars)
                          (declare (sb-ext:unpin-nil) (fixnum ,@vars)
-                                  (optimize (speed 1) (safety 1)))
+                                  (optimize (speed 1) (safety 1) #+sb-safepoint (sb-c:insert-safepoints 0)))
                          (let ((is-nil (if (eq x nil) 1 0)))
                            (+ is-nil ,@vars))))))
     (assert (= (apply fn nil (loop for i below 22 collect i))
@@ -714,7 +715,7 @@
        '(lambda (sap off n)
          (declare (type sb-sys:system-area-pointer sap)
                   (type fixnum off n)
-                  (optimize (speed 3) (safety 0) (debug 0))
+                  (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0))
                   (sb-ext:unpin-nil))
          (let ((s0 1) (s1 2) (s2 3) (s3 4) (s4 5) (s5 6) (s6 7)
                (s7 8) (s8 9) (s9 10) (s10 11) (s11 12) (s12 13))
@@ -753,7 +754,7 @@
   (multiple-value-bind (mv0 notes0)
       (compile-capturing-unpin-notes
        '(lambda ()
-         (declare (optimize (speed 3) (safety 0)) (sb-ext:unpin-nil))
+         (declare (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)) (sb-ext:unpin-nil))
          (values)))
     (assert (null notes0))
     (assert (null (multiple-value-list (funcall mv0)))))
@@ -762,7 +763,7 @@
        '(lambda (buf n)
          (declare (type (simple-array (unsigned-byte 64) (*)) buf)
                   (type fixnum n)
-                  (optimize (speed 3) (safety 0) (debug 0))
+                  (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0))
                   (sb-ext:unpin-nil))
          (let ((s0 1) (s1 2) (s2 3) (s3 4) (s4 5) (s5 6) (s6 7)
                (s7 8) (s8 9) (s9 10) (s10 11) (s11 12) (s12 13))
@@ -794,7 +795,7 @@
   (multiple-value-bind (fch-fn notes)
       (compile-capturing-unpin-notes
        '(lambda (f)
-         (declare (function f) (optimize (speed 3) (safety 0)) (sb-ext:unpin-nil))
+         (declare (function f) (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)) (sb-ext:unpin-nil))
          (sb-kernel:fun-code-header f)))
     (assert (null notes))
     (assert (eq (funcall fch-fn #'car) (sb-kernel:fun-code-header #'car)))
@@ -823,17 +824,17 @@
   (assert (member 'sb-vm::return
                   (vops-using-nil-operand
                    '(lambda (x) (declare (sb-ext:unpin-nil) (ignore x)
-                                        (optimize (speed 3)))
+                                        (optimize (speed 3) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (values)))))
   (assert (member 'sb-kernel:fun-code-header
                   (vops-using-nil-operand
                    '(lambda (f) (declare (sb-ext:unpin-nil) (function f)
-                                        (optimize (speed 3)))
+                                        (optimize (speed 3) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (sb-kernel:fun-code-header f)))))
   (assert (member 'sb-vm::length/list
                   (vops-using-nil-operand
                    '(lambda (l) (declare (sb-ext:unpin-nil) (list l)
-                                        (optimize (speed 3)))
+                                        (optimize (speed 3) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (length l))))))
 
 ;;; MOD and REM leave an ENCLOSE node behind that makes no closure; it must not
@@ -844,14 +845,14 @@
     (dolist (op '(mod rem))
       (let ((form `(lambda (a)
                      (declare (sb-ext:unpin-nil) (type (unsigned-byte 32) a)
-                              (optimize (speed 3) (safety 0)))
+                              (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                      (,op a 65521))))
         (assert (null (notes-of form)))
         (assert (= (funcall (compile nil form) 1000003) (funcall op 1000003 65521)))))
     (assert (= 1 (length (notes-of
                           '(lambda (n)
                             (declare (sb-ext:unpin-nil) (fixnum n)
-                                     (optimize (speed 3) (safety 0)))
+                                     (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                             (lambda (x) (+ x n)))))))))
 
 ;;; A full call sets R12 to NIL for the callee, and the values that live across
@@ -862,7 +863,7 @@
     `(lambda (x callee-1 callee-2)
        (declare ,@(when unpin '((sb-ext:unpin-nil)))
                 (type (unsigned-byte 32) x) (type function callee-1 callee-2)
-                (optimize (speed 3) (safety 0)))
+                (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
        (let ,(loop for v in vars for k from 1 collect `(,v (+ x ,k)))
          (declare (type (unsigned-byte 32) ,@vars))
          (dotimes (iter 5)
@@ -888,7 +889,7 @@
   ;; An error signalled by a called function, handled by the caller's caller.
   (let ((fn (compile nil '(lambda (x f)
                            (declare (sb-ext:unpin-nil) (type fixnum x) (type function f)
-                                    (optimize (speed 3) (safety 0)))
+                                    (optimize (speed 3) (safety 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
                            (let ((a (+ x 1)) (b (+ x 2)) (c (+ x 3)) (d (+ x 4)))
                              (declare (type fixnum a b c d))
                              (when (> x 5) (funcall f x))
@@ -910,7 +911,8 @@
   #+sb-safepoint
   (progn
     (let ((notes (nth-value 1 (compile-capturing-unpin-notes
-                               '(lambda (x) (declare (sb-ext:unpin-nil) (fixnum x))
+                               '(lambda (x) (declare (sb-ext:unpin-nil) (fixnum x)
+                                            (optimize (speed 3)))
                                  (+ x 1))))))
       (assert (= 1 (length notes)))
       (assert (search "(:SAFEPOINT)" (first notes))))
