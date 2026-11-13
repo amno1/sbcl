@@ -596,6 +596,20 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((2comp (component-info component)))
     (cond ((ir2-component-values-receivers 2comp) :values-receivers)
           ((ir2-component-stack-allocates-p 2comp) :stack-allocates)
+          ;; A safepoint, inserted by default at a function's entry and at
+          ;; loop edges on #+sb-safepoint targets (always on :win32), reads
+          ;; NIL directly (EMIT-SAFEPOINT), not through NULL-TN's trap, so a
+          ;; component that gets one can never unpin. The function's own
+          ;; declarations control this (SB-C:INSERT-SAFEPOINTS), so check it
+          ;; here instead of leaving it to the NULL-TN trap, which would
+          ;; catch it anyway but only after codegen has begun and with a
+          ;; less useful reason.
+          #+sb-safepoint
+          ((some (lambda (fun)
+                   (let ((bind (lambda-bind fun)))
+                     (and bind (policy bind (/= sb-c:insert-safepoints 0)))))
+                 (component-lambdas component))
+           :safepoint)
           ((let ((xeps (remove-if-not #'xep-p (component-lambdas component))))
              (cond ((null xeps) :no-xep)
                    ((cdr xeps) :multiple-xeps)

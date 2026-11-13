@@ -897,3 +897,29 @@
     (assert (eq :caught (handler-case (funcall fn 10 (lambda (x) (error "x ~a" x)))
                           (error () :caught))))
     (verify-nil-intact)))
+
+;;; On #+sb-safepoint targets (always on :win32), a safepoint at the
+;;; function's entry reads NIL directly, so the component falls back
+;;; unless the function also turns safepoint insertion off.
+(with-test (:name :unpin-nil-safepoint)
+  #-sb-safepoint
+  (let ((notes (nth-value 1 (compile-capturing-unpin-notes
+                             '(lambda (x) (declare (sb-ext:unpin-nil) (fixnum x))
+                               (+ x 1))))))
+    (assert (null notes)))
+  #+sb-safepoint
+  (progn
+    (let ((notes (nth-value 1 (compile-capturing-unpin-notes
+                               '(lambda (x) (declare (sb-ext:unpin-nil) (fixnum x))
+                                 (+ x 1))))))
+      (assert (= 1 (length notes)))
+      (assert (search "(:SAFEPOINT)" (first notes))))
+    (multiple-value-bind (fn notes)
+        (compile-capturing-unpin-notes
+         '(lambda (x)
+           (declare (sb-ext:unpin-nil) (fixnum x)
+                    (optimize (sb-c:insert-safepoints 0)))
+           (+ x 1)))
+      (assert (null notes))
+      (assert (= (funcall fn 1) 2))
+      (verify-nil-intact))))

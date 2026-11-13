@@ -1739,6 +1739,15 @@
        ;; Only a declaration in the declarations of a function (a lambda or
        ;; DEFUN body) is looked at, by COMPONENT-UNPIN-NIL-P; one in an inner
        ;; LOCALLY or LET has no effect.
+       ;;
+       ;; On a target where safepoints are always inserted (#+sb-safepoint,
+       ;; which is unconditional on :win32), this declaration has no effect
+       ;; unless paired with (optimize (sb-c:insert-safepoints 0)): a
+       ;; safepoint reads NIL directly at the function's entry and at every
+       ;; loop edge, so the component falls back to pinned (reason
+       ;; :SAFEPOINT). Turning off safepoint insertion for a long-running
+       ;; unpinned loop means GC and thread-stop requests wait for it to
+       ;; return or call out, instead of being serviced at the loop's top.
        (unpin-nil
         (when (cdr spec)
           (compiler-warn "ignoring extra arguments in ~S" spec))
