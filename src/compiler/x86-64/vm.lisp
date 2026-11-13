@@ -479,6 +479,30 @@
   r12-tn)
 (define-symbol-macro null-tn (null-tn))
 
+;;; Return a constant-SC TN for VALUE from the current component's constant pool
+;;; during code generation.
+(defun boxed-constant-tn (value)
+  (let* ((2comp (component-info *component-being-compiled*))
+         (constants (ir2-component-constants 2comp))
+         (offset (or (position-if (lambda (c)
+                                    (and (sb-c::constant-p c)
+                                         (eql (sb-c::constant-value c) value)))
+                                  constants :start 1)
+                     (vector-push-extend (sb-c::make-constant value) constants)))
+         (res (sb-c::make-tn 0 :constant (primitive-type-or-lose t)
+                             (sc-or-lose 'constant))))
+    (setf (tn-offset res) offset
+          (sb-c::tn-type res) sb-c::*universal-type*
+          (sb-c::tn-leaf res) (aref constants offset))
+    res))
+
+;;; Return an operand holding NIL for instructions like CMP reg, op without
+;;; reading R12 when NIL is unpinned.
+(defun nil-cmp-operand ()
+  (if sb-c::*unpin-nil-trap-active*
+      (boxed-constant-tn nil)
+      null-tn))
+
 ;;; Return true if THING is a general-purpose register TN.
 (defun gpr-tn-p (thing)
   (and (tn-p thing)
