@@ -29,7 +29,8 @@
     ;; having this wrapper function nonetheless.
     #+nil (let ((c (assoc x *raw-const-histogram*)))
             (if c (incf (cdr c)) (push (cons x 1) *raw-const-histogram*)))
-    (acond ((position x +popular-raw-constants+)
+    (acond ((and (not sb-c::*unpin-nil-trap-active*)
+                 (position x +popular-raw-constants+))
             (ea (- (* (+ symbol-size it) n-word-bytes) t-nil-offset other-pointer-lowtag)
                 null-tn))
            (t
