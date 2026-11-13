@@ -511,43 +511,49 @@
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (declare (notinline sb-c::producing-fasl-file))
-  (typecase value
-    ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
-         character)
-     immediate-sc-number)
-    (symbol ; Symbols in static and immobile space are immediate
-     (when (or (static-symbol-p value)
-               ;; The cross-compiler always uses immobile-space if it exists.
-               #+(and immobile-space sb-xc-host) t
-               ;; With either of these two features, all interned symbols are
-               ;; as-if static
-               #+(or permgen immobile-symbols) (sb-xc:symbol-package value)
-               #-sb-xc-host
-               (if (immobile-space-obj-p value)
-                   (or (= (generation-of value) +pseudo-static-generation+)
-                       ;; If compiling to memory, the symbol's address alone suffices.
-                       (not (sb-c::producing-fasl-file)))))
-       immediate-sc-number))
-    #+compact-instance-header (layout immediate-sc-number)
-    ((or float (complex float)
-         #+(and sb-simd-pack (not sb-xc-host)) simd-pack
-         #+(and sb-simd-pack-256 (not sb-xc-host)) simd-pack-256
-         #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512
-         #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512-mask)
-     fp-immediate-sc-number)
-    ;; This case has to follow the numeric cases because proxy floating-point numbers
-    ;; are host structs. Or we could implement and use something like SB-XC:TYPECASE
-    (structure-object
-     (when (eq value sb-lockless:+tail+)
-       immediate-sc-number))
-    ((simple-string 0) ; Reference static empty string only when compiling to file
-     ;; or, if compiling to memory, the string is EQ to a baked-in static string,
-     ;; otherwise CLHS 3.2.4 is potentially violated
-     (when (or (sb-c::producing-fasl-file)
-               #-sb-xc-host (and (eq (heap-allocated-p value) :static)
-                                 (< (get-lisp-obj-address value)
-                                    (get-lisp-obj-address sb-lockless:+tail+))))
-       immediate-sc-number))))
+  (let ((unpin-p (and (boundp '*component-being-compiled*)
+                      *component-being-compiled*
+                      (let ((2comp (component-info *component-being-compiled*)))
+                        (and 2comp (ir2-component-unpin-nil-p 2comp))))))
+    (typecase value
+      ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
+           character)
+       immediate-sc-number)
+      (symbol ; Symbols in static and immobile space are immediate
+       (when (and (or (not unpin-p) (not (static-symbol-p value)))
+                  (or (static-symbol-p value)
+                      ;; The cross-compiler always uses immobile-space if it exists.
+                      #+(and immobile-space sb-xc-host) t
+                      ;; With either of these two features, all interned symbols are
+                      ;; as-if static
+                      #+(or permgen immobile-symbols) (sb-xc:symbol-package value)
+                      #-sb-xc-host
+                      (if (immobile-space-obj-p value)
+                          (or (= (generation-of value) +pseudo-static-generation+)
+                              ;; If compiling to memory, the symbol's address alone suffices.
+                              (not (sb-c::producing-fasl-file))))))
+         immediate-sc-number))
+      #+compact-instance-header (layout immediate-sc-number)
+      ((or float (complex float)
+           #+(and sb-simd-pack (not sb-xc-host)) simd-pack
+           #+(and sb-simd-pack-256 (not sb-xc-host)) simd-pack-256
+           #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512
+           #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512-mask)
+       fp-immediate-sc-number)
+      ;; This case has to follow the numeric cases because proxy floating-point numbers
+      ;; are host structs. Or we could implement and use something like SB-XC:TYPECASE
+      (structure-object
+       (when (and (not unpin-p) (eq value sb-lockless:+tail+))
+         immediate-sc-number))
+      ((simple-string 0) ; Reference static empty string only when compiling to file
+       ;; or, if compiling to memory, the string is EQ to a baked-in static string,
+       ;; otherwise CLHS 3.2.4 is potentially violated
+       (when (and (not unpin-p)
+                  (or (sb-c::producing-fasl-file)
+                      #-sb-xc-host (and (eq (heap-allocated-p value) :static)
+                                        (< (get-lisp-obj-address value)
+                                           (get-lisp-obj-address sb-lockless:+tail+)))))
+         immediate-sc-number)))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))

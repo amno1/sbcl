@@ -61,7 +61,7 @@
   (typep val '(or (signed-byte 32) #+(or immobile-space permgen) fixup)))
 (defun cpu-imm/reg-tn-p (tn)
   (let ((repr (immediate-tn-repr tn)))
-    (or (eq repr null-tn) (is-operand-immediate repr))))
+    (or (eq repr r12-tn) (is-operand-immediate repr))))
 (defun reg-or-legal-imm32-p (tn)
   (cond ((sc-is tn any-reg descriptor-reg) t)
         ((sc-is tn immediate) (cpu-imm/reg-tn-p tn))))
@@ -90,7 +90,7 @@
       (inst lea dst (ea (nil-relative-disp val) null-tn))
       (when (eq dst tmp-tn) (inst mov target tmp-tn)))
     (return-from move-immediate target))
-  (when (eq val null-tn)
+  (when (eq val r12-tn)
     (inst mov target val)
     (return-from move-immediate target))
   ;; Try to emit the smallest immediate operand if the destination word

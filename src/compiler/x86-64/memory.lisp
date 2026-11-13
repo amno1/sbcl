@@ -272,11 +272,11 @@
   (:temporary (:sc complex-double-reg) pattern)
   (:generator 5
    (let ((bits (compute-splat-bits value)))
-     (cond ((and (eq bits null-tn) (eql words 2)) ; don't use XMM register
+     (cond ((and (eq bits r12-tn) (eql words 2)) ; don't use XMM register
             (storew null-tn vector vector-data-offset other-pointer-lowtag)
             (storew null-tn vector (1+ vector-data-offset) other-pointer-lowtag))
            (t
-            (cond ((eq bits null-tn)
+            (cond ((eq bits r12-tn)
                    (inst movaps pattern (ea (- list-pointer-lowtag) null-tn)))
                   ((/= bits 0) (inst movddup pattern (register-inline-constant :qword bits)))
                   (t (inst xorps pattern pattern)))
