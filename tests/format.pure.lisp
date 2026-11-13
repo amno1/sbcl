@@ -200,6 +200,7 @@
   (assert (string= (format nil (coerce "base" 'simple-base-string)) "base"))
   (assert (typep (format nil (coerce "base" 'simple-base-string)) 'simple-base-string))
   ;; a non-base character gives a character string
+  #+sb-unicode
   (let ((wide (concatenate '(simple-array character (*)) "ab" (string (code-char 955)))))
     (assert (typep (format nil wide) '(and (simple-array character (*)) (not simple-base-string))))
     (assert (string= (format nil wide) wide))
@@ -216,6 +217,7 @@
     (assert (string= (funcall f) "plain"))
     (assert (not (eq (funcall f) (funcall f))))
     (assert (typep (funcall f) 'simple-base-string)))
+  #+sb-unicode
   (let ((f (compile nil `(lambda () (format nil ,(concatenate '(simple-array character (*))
                                                                "a" (string (code-char 955))))))))
     (assert (typep (funcall f) '(and (simple-array character (*)) (not simple-base-string)))))
