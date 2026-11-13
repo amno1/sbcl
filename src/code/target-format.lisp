@@ -130,7 +130,7 @@
                                 (simple-base-string t)
                                 ((simple-array character (*))
                                  (dotimes (i length t)
-                                   (unless (base-char-p (schar string i))
+                                   (unless (typep (schar string i) 'base-char)
                                      (return nil)))))
                               (make-string length :element-type 'base-char)
                               (make-string length))))
