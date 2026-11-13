@@ -82,7 +82,6 @@
 
 (export 'card-table-reg)
 (defconstant card-table-reg 12)
-(define-symbol-macro null-tn r12-tn)
 (define-symbol-macro card-index-mask (make-fixup nil :card-table-index-mask))
 
 (defconstant most-positive-fixnum-repr
@@ -473,6 +472,12 @@
   (defconstant-eqx rip-tn
       (make-random-tn (sc-or-lose 'unsigned-reg) nil)
     #'constantly-t))
+
+(defun null-tn ()
+  (when sb-c::*unpin-nil-trap-active*
+    (sb-c::unpin-nil-fallback :null-tn))
+  r12-tn)
+(define-symbol-macro null-tn (null-tn))
 
 ;;; Return true if THING is a general-purpose register TN.
 (defun gpr-tn-p (thing)

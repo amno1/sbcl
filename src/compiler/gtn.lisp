@@ -27,7 +27,7 @@
 (defun gtn-analyze (component)
   (let ((2comp (make-ir2-component)))
     (setf (ir2-component-unpin-nil-p 2comp)
-          (component-unpin-nil-p component))
+          (and (not *force-pin-nil*) (component-unpin-nil-p component)))
     (setf (component-info component) 2comp))
   (let ((funs (component-lambdas component))
         #+fp-and-pc-standard-save

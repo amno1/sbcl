@@ -75,7 +75,7 @@
 
 ;;; a fixup of some kind
 (defstruct (fixup
-            (:constructor make-fixup (name flavor &optional offset))
+            (:constructor %make-fixup (name flavor &optional offset))
             (:copier nil))
   ;; the name and flavor of the fixup. The assembler makes no
   ;; assumptions about the contents of these fields; their semantics
@@ -105,6 +105,12 @@
   (fixup (missing-arg) :type fixup)
   (position 0 :type fixnum))
 (declaim (freeze-type fixup fixup-note))
+
+(defun make-fixup (name flavor &optional (offset 0))
+  (when (and *unpin-nil-trap-active*
+             (member flavor '(:assembly-routine :card-table-index-mask)))
+    (unpin-nil-fallback flavor))
+  (%make-fixup name flavor offset))
 
 ;;; Record a FIXUP of KIND occurring at the current position in SEGMENT
 (defun note-fixup (segment kind fixup)
