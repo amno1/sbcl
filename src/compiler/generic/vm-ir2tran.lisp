@@ -163,8 +163,7 @@
     (setf (vop-codegen-info allocator-vop)
           (append (vop-codegen-info allocator-vop) (list last-init-vop)))))
 
-(defoptimizer ir2-convert-fixed-allocation
-              ((&rest args) node block name words type lowtag inits)
+(defun %ir2-convert-fixed-allocation (node block args name words type lowtag inits)
   (let* ((lvar (the (not null) (node-lvar node)))
          (locs (lvar-result-tns lvar (load-time-value (list *universal-type*))))
          (result (first locs)))
@@ -173,6 +172,10 @@
           (last-init-vop (emit-inits node block result lowtag inits args)))
       (link-allocator-to-inits allocator-vop last-init-vop node))
     (move-lvar-result node block locs lvar)))
+
+(defoptimizer ir2-convert-fixed-allocation
+              ((&rest args) node block name words type lowtag inits)
+  (%ir2-convert-fixed-allocation node block args name words type lowtag inits))
 
 (defoptimizer ir2-convert-variable-allocation
               ((extra &rest args) node block name words type lowtag inits)
@@ -311,10 +314,8 @@
 ;;; WIDETAG may have ORed into it 1 bit for +ARRAY-FILL-POINTER-P+
 (defoptimizer (make-array-header* ir2-convert) ((widetag &rest args) node block)
   (let ((n-args (length args)))
-    ;; Remove the widetag lvar
-    (pop (basic-combination-args node))
-    (ir2-convert-fixed-allocation
-     node block 'make-array
+    (%ir2-convert-fixed-allocation
+     node block args 'make-array
      ;; Each argument fills in one slot of the array header.
      ;; Add one word for the primitive object's header word.
      (1+ n-args)

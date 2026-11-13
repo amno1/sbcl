@@ -803,14 +803,52 @@ necessary, since type inference may take arbitrarily long to converge.")
   #-x86-64
   (%%compile-component component)
   #+x86-64
-  (let ((fallback (catch 'unpin-nil-fallback
-                    (%%compile-component component)
-                    nil)))
-    (when fallback
-      (emit-unpin-nil-fallback-note component (car fallback) (cdr fallback))
-      (reset-component-for-pinned-retry component)
-      (let ((*force-pin-nil* t))
-        (%%compile-component component)))))
+  (if (and (not *force-pin-nil*)
+           (component-unpin-nil-p component))
+      (let* ((*unpin-nil-retry-state* (vector nil nil))
+             (deferred-diagnostics nil)
+             (fallback
+              (catch 'unpin-nil-fallback
+                (handler-bind
+                    ((compiler-note
+                       (lambda (c)
+                         (push (list :note c *compiler-error-context*)
+                               deferred-diagnostics)
+                         (muffle-warning c)))
+                     (warning
+                       (lambda (c)
+                         (push (list :warning c *compiler-error-context*)
+                               deferred-diagnostics)
+                         (muffle-warning c))))
+                  (%%compile-component component))
+                nil)))
+        (cond (fallback
+               (dolist (pair (svref *unpin-nil-retry-state* 0))
+                 (setf (node-source-path (car pair)) (cdr pair)))
+               (dolist (annot (svref *unpin-nil-retry-state* 1))
+                 (setf (lvar-annotation-fired annot) nil))
+               (emit-unpin-nil-fallback-note component (car fallback) (cdr fallback))
+               (reset-component-for-pinned-retry component)
+               (let ((*force-pin-nil* t))
+                 (%%compile-component component)))
+              (t
+               (dolist (entry (nreverse deferred-diagnostics))
+                 (destructuring-bind (kind condition context) entry
+                   (let ((*compiler-error-context* context))
+                     (ecase kind
+                       (:note
+                        (block replay-note
+                          (restart-case
+                              (signal condition)
+                            (muffle-warning ()
+                              (return-from replay-note nil)))
+                          (incf (cu-note-count *compilation-unit*))
+                          (print-compiler-message
+                           *error-output*
+                           "note: ~A"
+                           (list (princ-to-string condition)))))
+                       (:warning (warn condition)))))))))
+      (%%compile-component component)))
 
 ;;; Delete components with no external entry points before we try to
 ;;; generate code. Unreachable closures can cause IR2 conversion to

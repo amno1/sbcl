@@ -4125,6 +4125,8 @@ is :ANY, the function name is not checked."
                      (process-lvar-type-annotation lvar annot))
                     (lvar-sequence-bounds-annotation
                      (process-lvar-sequence-bounds-annotation lvar annot)))
+              (when *unpin-nil-retry-state*
+                (push annot (svref *unpin-nil-retry-state* 1)))
               (setf (lvar-annotation-fired annot) t))))))
 
 (defun add-annotation (lvar annotation)

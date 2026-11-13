@@ -2420,6 +2420,9 @@
 (defoptimizer (%compile-time-type-error ir2-convert)
     ((objects atype dtype detail code-context cast-context) node block)
   ;; Remove %COMPILE-TIME-TYPE-ERROR bits
+  (when *unpin-nil-retry-state*
+    (push (cons node (node-source-path node))
+          (svref *unpin-nil-retry-state* 0)))
   (setf (node-source-path node)
         (cdr (node-source-path node)))
   (%compile-time-type-error-warn node
@@ -2432,6 +2435,9 @@
 (defoptimizer (%compile-time-type-style-warn ir2-convert)
     ((objects atype dtype detail code-context cast-context) node)
   ;; Remove %COMPILE-TIME-TYPE-ERROR bits
+  (when *unpin-nil-retry-state*
+    (push (cons node (node-source-path node))
+          (svref *unpin-nil-retry-state* 0)))
   (setf (node-source-path node)
         (cddr (node-source-path node)))
   (%compile-time-type-error-warn node

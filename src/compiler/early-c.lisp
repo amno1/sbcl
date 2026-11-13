@@ -113,6 +113,10 @@ possible.")
 
 (defvar *unpin-nil-trap-active* nil)
 (defvar *force-pin-nil* nil)
+;;; Bound during an optimistic unpin-nil pass to a 2-element vector
+;;; #(source-paths annotations) so a fallback retry can restore IR1
+;;; diagnostic state mutated before fallback.
+(defvar *unpin-nil-retry-state* nil)
 
 ;;;; miscellaneous utilities
 

@@ -6464,69 +6464,69 @@
     (aver (eq (cadr (svref steps 0)) 'sb-c::t0))
     ;; this should be a null move due to :target on arg
     (move temp0 arg)
-    (flet ((tn-from-metasyntactic-var (var)
-             (ecase var
-               (sb-c::t0 temp0)
-               (sb-c::t1 temp1)
-               (sb-c::t2 temp2)
-               (sb-c::t3 temp3))))
-      ;; Replace placeholder symbols with TNs, and perform a few assembly tricks
-      (do ((i 0 (1+ i))
-           (prev-op))
-          ((= i (length steps)))
-        (destructuring-bind (&whole stmt op arg1 &optional arg2 arg3) (svref steps i)
-          (declare (ignore arg3))
-          (when (eq op 'move) ; MOVE becomes MOV
-            (setf op 'mov (first stmt) op))
-          (when (symbolp arg1)
-            (setf arg1 (tn-from-metasyntactic-var arg1)
-                  (second stmt) arg1))
-          (when (setf arg2 (typecase arg2
-                             ((and symbol (not null)) (tn-from-metasyntactic-var arg2))
-                             (array (emit-constant arg2))
-                             (t arg2)))
-            (setf (third stmt) arg2))
-          ;; ANDing with #xFF or #xFFFF is MOVZX, and might subsume a MOV too,
-          ;; but MOV / AND #xFF is so rare that I couldn't make it occur.
-          (when (and (eq op 'and) (or (eql arg2 #xFF) (eql arg2 #xFFFF)))
-            ;; Emit as MOVZX which avoids using a 4-byte immediate in the AND.
-            ;; (A 1-byte immediate would get sign-extended)
-            (let ((size (if (eql arg2 #xFF) :byte :word)))
-              (setf (svref steps i) `(movzx (,size :dword) ,arg1 ,arg1))))
-          (setq prev-op op))))
-    ;; Emit instructions
-    (dotimes (i (length steps))
-      (destructuring-bind (&whole stmt op dest &optional src arg3) (svref steps i)
-        (cond ((eq op 'sb-c::neg) ; unary op
-               (inst neg :dword dest))
-              ((eq op 'aref)
-               (let* ((disp (- (ash vector-data-offset word-shift)
-                               other-pointer-lowtag)) ; complicated way of computing 1
-                      (scale arg3)
-                      (ea (ea disp dest src scale)))
-                 (ecase scale
-                   (1 (inst movzx '(:byte :dword) dest ea))
-                   (2 (inst movzx '(:word :dword) dest ea))
-                   (4 (inst mov :dword dest ea)))))
-              ((or (eq op 'movzx) (and (eq op 'mov) (constant-tn-p src)))
-               (apply #'inst* stmt)) ; zero-extending or 64-bit move
-              ((eq i 0)
-               (aver (eq op 'sb-c::shr))
-               ;; fixnum-untagging MOV is 64-bit to avoid losing 1 bit,
-               ;; unless I can show that the expression doesn't care about bit 31
-               (inst* op dest src))
-              ((and (eq op 'sb-c::xor) (eql src #xFFFFFFFF))
-               (inst not :dword dest))
-              (t
-               (inst* op :dword dest src)))))
-    ;; Move result and re-tag. Restrict the output to 31 significant bits,
-    ;; totally reasonable considering that you'd probably have to wait for
-    ;; days to produce a perfect hash function of 2 billion keys.
-    (let* ((step (svref steps (1- (length steps))))
-           (tn (second step)))
-      (if (location= res tn)
-          (inst add :dword res tn)
-          (inst lea :dword res (ea tn tn))))))
+    (let ((resolved (make-array (length steps))))
+      (flet ((tn-from-metasyntactic-var (var)
+               (ecase var
+                 (sb-c::t0 temp0)
+                 (sb-c::t1 temp1)
+                 (sb-c::t2 temp2)
+                 (sb-c::t3 temp3))))
+        ;; Replace placeholder symbols with TNs without mutating the constant
+        ;; STEPS vector, and perform a few assembly tricks.
+        (dotimes (i (length steps))
+          (destructuring-bind (op arg1 &optional arg2 arg3) (svref steps i)
+            (when (eq op 'move) ; MOVE becomes MOV
+              (setf op 'mov))
+            (when (symbolp arg1)
+              (setf arg1 (tn-from-metasyntactic-var arg1)))
+            (setf arg2 (typecase arg2
+                         ((and symbol (not null)) (tn-from-metasyntactic-var arg2))
+                         (array (emit-constant arg2))
+                         (t arg2)))
+            ;; ANDing with #xFF or #xFFFF is MOVZX, and might subsume a MOV too,
+            ;; but MOV / AND #xFF is so rare that I couldn't make it occur.
+            (setf (svref resolved i)
+                  (if (and (eq op 'and) (or (eql arg2 #xFF) (eql arg2 #xFFFF)))
+                      ;; Emit as MOVZX which avoids using a 4-byte immediate in the AND.
+                      ;; (A 1-byte immediate would get sign-extended)
+                      (let ((size (if (eql arg2 #xFF) :byte :word)))
+                        `(movzx (,size :dword) ,arg1 ,arg1))
+                      (cond (arg3 (list op arg1 arg2 arg3))
+                            (arg2 (list op arg1 arg2))
+                            (t (list op arg1))))))))
+      ;; Emit instructions
+      (dotimes (i (length resolved))
+        (destructuring-bind (&whole stmt op dest &optional src arg3) (svref resolved i)
+          (cond ((eq op 'sb-c::neg) ; unary op
+                 (inst neg :dword dest))
+                ((eq op 'aref)
+                 (let* ((disp (- (ash vector-data-offset word-shift)
+                                 other-pointer-lowtag)) ; complicated way of computing 1
+                        (scale arg3)
+                        (ea (ea disp dest src scale)))
+                   (ecase scale
+                     (1 (inst movzx '(:byte :dword) dest ea))
+                     (2 (inst movzx '(:word :dword) dest ea))
+                     (4 (inst mov :dword dest ea)))))
+                ((or (eq op 'movzx) (and (eq op 'mov) (constant-tn-p src)))
+                 (apply #'inst* stmt)) ; zero-extending or 64-bit move
+                ((eq i 0)
+                 (aver (eq op 'sb-c::shr))
+                 ;; fixnum-untagging MOV is 64-bit to avoid losing 1 bit,
+                 ;; unless I can show that the expression doesn't care about bit 31
+                 (inst* op dest src))
+                ((and (eq op 'sb-c::xor) (eql src #xFFFFFFFF))
+                 (inst not :dword dest))
+                (t
+                 (inst* op :dword dest src)))))
+      ;; Move result and re-tag. Restrict the output to 31 significant bits,
+      ;; totally reasonable considering that you'd probably have to wait for
+      ;; days to produce a perfect hash function of 2 billion keys.
+      (let* ((step (svref resolved (1- (length resolved))))
+             (tn (second step)))
+        (if (location= res tn)
+            (inst add :dword res tn)
+            (inst lea :dword res (ea tn tn)))))))
 
 (defknown zero-or-one ((unsigned-byte 32))
     (integer 0 1)
