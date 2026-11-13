@@ -155,9 +155,10 @@
                (assert (null notes))
                (assert (equal (apply fn args) expected-result))
                (verify-nil-intact))))
-    ;; :FULL call (non-tail single-value so it hits :FULL rather than :VALUES-RECEIVERS)
-    (expect-fallback '(lambda (f x) (let ((y (funcall f x))) (the fixnum y)))
-                     "(:FULL)"
+    ;; :VALUES-RECEIVERS (a full tail call returns unknown values; non-tail full
+    ;; calls are fine)
+    (expect-fallback '(lambda (f x) (funcall f x))
+                     "(:VALUES-RECEIVERS)"
                      (list #'1+ 41)
                      42)
     ;; :LOCAL-CALL (a non-tail call of a recursive local function; it used to
@@ -852,3 +853,47 @@
                             (declare (sb-ext:unpin-nil) (fixnum n)
                                      (optimize (speed 3) (safety 0)))
                             (lambda (x) (+ x n)))))))))
+
+;;; A full call sets R12 to NIL for the callee, and the values that live across
+;;; it come back: many accumulators stay live over calls to a function that
+;;; looks at NIL, and over one that signals an error that is handled outside.
+(defun full-call-lambda (unpin)
+  (let ((vars '(a b c d e f g h i j k l m n)))
+    `(lambda (x callee-1 callee-2)
+       (declare ,@(when unpin '((sb-ext:unpin-nil)))
+                (type (unsigned-byte 32) x) (type function callee-1 callee-2)
+                (optimize (speed 3) (safety 0)))
+       (let ,(loop for v in vars for k from 1 collect `(,v (+ x ,k)))
+         (declare (type (unsigned-byte 32) ,@vars))
+         (dotimes (iter 5)
+           (setf ,@(loop for (v w) on (append vars (list (first vars))) by #'cdr
+                         while w
+                         append `(,v (logand (+ ,v ,w (the (unsigned-byte 16)
+                                                           (funcall callee-1 iter)))
+                                             #xffffff)))))
+         (when (funcall callee-2 x) (setf a 7))
+         (+ ,@vars)))))
+
+(with-test (:name :unpin-nil-full-calls)
+  (multiple-value-bind (unpinned notes)
+      (compile-capturing-unpin-notes (full-call-lambda t))
+    (let ((pinned (compile nil (full-call-lambda nil)))
+          (f (lambda (i) (if (eq (cdr (list nil)) nil) i 1000))) ; looks at NIL
+          (g (lambda (x) (eq x nil))))
+      (assert (null notes))
+      (assert (disassembly-contains-p unpinned "R12"))
+      (dolist (x '(0 1 77 100000))
+        (assert (= (funcall unpinned x f g) (funcall pinned x f g)))
+        (verify-nil-intact))))
+  ;; An error signalled by a called function, handled by the caller's caller.
+  (let ((fn (compile nil '(lambda (x f)
+                           (declare (sb-ext:unpin-nil) (type fixnum x) (type function f)
+                                    (optimize (speed 3) (safety 0)))
+                           (let ((a (+ x 1)) (b (+ x 2)) (c (+ x 3)) (d (+ x 4)))
+                             (declare (type fixnum a b c d))
+                             (when (> x 5) (funcall f x))
+                             (+ a b c d))))))
+    (assert (= (funcall fn 1 #'identity) 14))
+    (assert (eq :caught (handler-case (funcall fn 10 (lambda (x) (error "x ~a" x)))
+                          (error () :caught))))
+    (verify-nil-intact)))

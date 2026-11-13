@@ -892,6 +892,27 @@
 ;;; the stack top and storing stack arguments into that frame. On
 ;;; entry to the callee, this partial frame is pointed to by FP.
 
+;;; In a component with unpinned NIL, R12 may hold anything. A full call needs
+;;; it to be NIL (the callee, the assembly routines, and the code that unpacks
+;;; the returned values use it as such). Values that live across the call are
+;;; saved by pack and restored after the VOP, so R12 can be set here. The
+;;; generator then runs as it does with NIL pinned until UNPIN-NIL-AFTER-CALL.
+;;; Returns true when it set R12; the TNS must not be in R12 (nor may they be
+;;; temporaries the code after the call uses next to NULL-TN).
+(defvar *unpin-nil-call-open* nil)
+(defun unpin-nil-before-call (&rest tns)
+  (when sb-c::*unpin-nil-trap-active*
+    (dolist (tn tns)
+      (when (and (tn-p tn) (gpr-tn-p tn) (eql (tn-offset tn) card-table-reg))
+        (sb-c::unpin-nil-fallback :call-temporary)))
+    (inst mov r12-tn (boxed-constant-tn nil))
+    (setq sb-c::*unpin-nil-trap-active* nil
+          *unpin-nil-call-open* t)))
+(defun unpin-nil-after-call ()
+  (when *unpin-nil-call-open*
+    (setq sb-c::*unpin-nil-trap-active* t
+          *unpin-nil-call-open* nil)))
+
 ;;; This macro helps in the definition of full call VOPs by avoiding
 ;;; code replication in defining the cross-product VOPs.
 ;;;
@@ -1119,6 +1140,9 @@
                (inst jmp :l LOOP)
                (unless (zerop n-fixed)
                  (inst add :dword rcx (fixnumize n-fixed))))))
+       (unpin-nil-before-call ,@(when (and (eq return :fixed) (neq direct :return))
+                                  '(move-temp))
+                              ,@(when (eq direct :call) '(counter)))
        (when step-instrumenting
          ,@(when named '((compute-linkage-cell node fun rax)))
          (emit-single-step-test)
@@ -1145,7 +1169,8 @@
                   (receive-unknown-values values-start nvals start count node)))
                (:pass-through
                 '((note-this-location vop :unknown-return)))
-               ((:tail :unboxed)))))))
+               ((:tail :unboxed))))
+       (unpin-nil-after-call))))
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
@@ -1250,11 +1275,13 @@
     ;; Move these into the passing locations if they are not already there.
     (move rsi args)
     (move rax function)
+    (unpin-nil-before-call)
     ;; And jump to the assembly routine.
     (invoke-asm-routine 'jmp (if (eq (sb-c::tn-primitive-type function) *backend-t-primitive-type*)
                                  'tail-call-callable-variable
                                  'tail-call-variable)
-                        vop)))
+                        vop)
+    (unpin-nil-after-call)))
 
 ;;;; unknown values return
 

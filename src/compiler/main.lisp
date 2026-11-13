@@ -626,9 +626,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                          (return-from unpin-nil-ineligible-reason :nlx)))
                  (basic-combination
                   (let ((info (basic-combination-info node)))
-                    (cond ((eq info :full)
-                           (return-from unpin-nil-ineligible-reason info))
-                          ((and (eq info :local)
+                    ;; Full calls are fine: UNPIN-NIL-BEFORE-CALL puts NIL back
+                    ;; in R12 for each.
+                    (cond ((and (eq info :local)
                                 (not (node-tail-p node))
                                 (let ((use (lvar-use (basic-combination-fun node))))
                                   (or (not (ref-p use))
