@@ -398,10 +398,10 @@
                  ;; it is promised to fit in (SIGNED-BYTE 32)
                  (must-load (or (sc-is tn constant control-stack)
                                 (and imm
-                                     (neq imm null-tn)
+                                     (neq imm r12-tn)
                                      (not (typep imm '(or (signed-byte 32) fixup))))))
                  (repeats (memq tn inits))
-                 (load (or must-load (and imm (neq imm null-tn) repeats)))
+                 (load (or must-load (and imm (neq imm r12-tn) repeats)))
                  (val (or imm tn)))
             (let ((operand (cond (load
                                   ;; MOVE only wants TNs
