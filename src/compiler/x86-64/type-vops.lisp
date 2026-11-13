@@ -180,7 +180,7 @@
                            (eq lowtag other-pointer-lowtag)
                            (other-pointer-tn-ref-p value-tn-ref t immediate-tested))
                       ;; It's either NIL or an other-pointer
-                      (aver (gpr-tn-p value))
+                      (nil-operand-needs-gpr value)
                       (inst cmp value (nil-operand))
                       (inst jmp (if not-p :e :ne) target)
                       t)
@@ -838,7 +838,7 @@
           (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
           (inst test :byte temp lowtag-mask)
           (inst jmp :e compare-widetag)
-          (aver (gpr-tn-p value))
+          (nil-operand-needs-gpr value)
           (inst cmp value (nil-operand))
           (inst jmp out)
           compare-widetag
@@ -893,7 +893,7 @@
   (:translate consp)
   (:generator 8
     (let ((is-not-cons-label (if not-p target DROP-THRU)))
-      (aver (gpr-tn-p value))
+      (nil-operand-needs-gpr value)
       (inst cmp value (nil-operand))
       (inst jmp :e is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag)))
@@ -1191,7 +1191,7 @@
       ;; Comparing against constant-pool NIL requires a full 64-bit CMP since
       ;; memory operands cannot use CMP r64, imm8/byte-reg, whereas pinned builds
       ;; can use a narrower byte compare against NULL-TN when CONS is ruled out.
-      (aver (gpr-tn-p value))
+      (nil-operand-needs-gpr value)
       (if (and (not sb-c::*unpin-nil-trap-active*)
                (not (types-equal-or-intersect
                      (type-difference (tn-ref-type value-ref) (specifier-type 'null))
