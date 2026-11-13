@@ -369,7 +369,9 @@
   ;; an array of references to lists of original source paths covered
   ;; for coverage instrumentation.
   (coverage-map (make-array 0 :fill-pointer 0 :adjustable t)
-                :type vector :read-only t))
+                :type vector :read-only t)
+  ;; True when (DECLARE (SB-EXT:UNPIN-NIL)) is enabled for this component.
+  (unpin-nil-p nil :type boolean))
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
 ;;; to create each XEP's function entry data structure. ENTRY-INFO

@@ -1733,6 +1733,12 @@
         (make-lexenv
          :default res
          :flushable (cdr spec)))
+       (unpin-nil
+        (when (cdr spec)
+          (compiler-warn "ignoring extra arguments in ~S" spec))
+        (make-lexenv
+         :default res
+         :user-data (acons 'unpin-nil t (lexenv-user-data res))))
        (current-defmethod
         (destructuring-bind (name qualifiers specializers lambda-list)
             (cdr spec)
@@ -1773,7 +1779,7 @@
                 inline notinline maybe-inline
                 no-compiler-macro optimize dynamic-extent
                 flushable current-defmethod no-constraints constant-value
-                no-debug values))
+                no-debug values unpin-nil))
   ;; This is equivalent to (DECLARE (DECLARATION ...)) but avoid some
   ;; bootstrapping issues.
   (setf (info :declaration :known decl) t))
