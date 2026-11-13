@@ -170,19 +170,14 @@
                      "(:CLOSURE)"
                      '(5)
                      16)
-    ;; Foreign callout falls back cleanly (via ALIEN-LINKAGE-TABLE / CALL-OUT)
+    ;; :NULL-TN (foreign callout via ALIEN-LINKAGE-TABLE)
     (expect-fallback '(lambda (x)
                        (sb-alien:alien-funcall
                         (sb-alien:extern-alien "getpid" (function sb-alien:int)))
                        x)
-                     "Unable to unpin NIL"
+                     "(:NULL-TN)"
                      '(99)
                      99)
-    ;; :NULL-TN (materializing boolean NIL in COMPUTE-FROM-FLAGS)
-    (expect-fallback '(lambda (x) (null x))
-                     "(:NULL-TN)"
-                     '(nil)
-                     t)
     ;; :CARD-TABLE-INDEX-MASK (vector write barrier)
     (let ((vec (vector :a :b)))
       (expect-fallback '(lambda (v x) (setf (svref v 0) x) (svref v 0))
@@ -194,6 +189,26 @@
                      "(:CALL-VOP)"
                      '(100 23)
                      123)))
+
+(with-test (:name :unpin-nil-compute-from-flags)
+  (dolist (form '(((lambda (x) (declare (sb-ext:unpin-nil) (optimize (speed 3) (safety 0))) (null x))
+                   ((nil) t) ((t) nil) ((0) nil))
+                  ((lambda (a b)
+                     (declare (sb-ext:unpin-nil) (type fixnum a b) (optimize (speed 3) (safety 0)))
+                     (< a b))
+                   ((1 2) t) ((2 1) nil) ((5 5) nil))
+                  ((lambda (a b)
+                     (declare (sb-ext:unpin-nil) (type fixnum a b) (optimize (speed 3) (safety 0)))
+                     (not (< a b)))
+                   ((1 2) nil) ((2 1) t) ((5 5) t))))
+    (destructuring-bind (lambda-form &rest cases) form
+      (multiple-value-bind (fn notes)
+          (compile-capturing-unpin-notes lambda-form)
+        (assert (null notes))
+        (dolist (case cases)
+          (destructuring-bind (args expected) case
+            (assert (eq (apply fn args) expected)))))))
+  (verify-nil-intact))
 
 (with-test (:name :unpin-nil-unwind-restores-r12)
   (multiple-value-bind (div-fn notes)
