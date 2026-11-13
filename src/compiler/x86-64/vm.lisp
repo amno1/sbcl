@@ -496,9 +496,9 @@
           (sb-c::tn-leaf res) (aref constants offset))
     res))
 
-;;; Return an operand holding NIL for instructions like CMP reg, op without
-;;; reading R12 when NIL is unpinned.
-(defun nil-cmp-operand ()
+;;; Return an operand holding NIL for instructions like CMP/MOV/CMOV/XOR reg, op
+;;; without reading R12 when NIL is unpinned.
+(defun nil-operand ()
   (if sb-c::*unpin-nil-trap-active*
       (boxed-constant-tn nil)
       null-tn))
