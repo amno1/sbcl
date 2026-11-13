@@ -9143,7 +9143,7 @@
            `(lambda (stream control)
               (declare (ignore stream control))
               (replace (make-string ,(length string)
-                                    :element-type ',(if (every #'base-char-p string)
+                                    :element-type ',(if (every (lambda (c) (typep c 'base-char)) string)
                                                         'base-char
                                                         'character))
                        ,string))))
