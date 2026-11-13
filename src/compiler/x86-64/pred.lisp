@@ -300,8 +300,16 @@
       (ecase hint
         (boolean
          (when (eql x t) (setq flag (negate-condition flag)))
-         (load-symbol res t) ; doesn't mess up flags
-         (inst cmov flag res null-tn))
+         (let ((t-tn (if (eql x t) x-tn y-tn))
+               (nil-tn (if (eql x nil) x-tn y-tn)))
+           (cond ((and (sc-is t-tn constant) (sc-is nil-tn constant))
+                  ;; Load from the constant pool directly so flags stay intact
+                  ;; without reading NULL-TN (R12).
+                  (inst mov res t-tn)
+                  (inst cmov flag res nil-tn))
+                 (t
+                  (load-symbol res t) ; doesn't mess up flags
+                  (inst cmov flag res null-tn)))))
         (shl
          (when (eql x 0)
            (setq flag (negate-condition flag)))
