@@ -180,7 +180,8 @@
                            (eq lowtag other-pointer-lowtag)
                            (other-pointer-tn-ref-p value-tn-ref t immediate-tested))
                       ;; It's either NIL or an other-pointer
-                      (inst cmp value (nil-cmp-operand))
+                      (aver (gpr-tn-p value))
+                      (inst cmp value (nil-operand))
                       (inst jmp (if not-p :e :ne) target)
                       t)
                      ((and value-tn-ref
@@ -837,7 +838,8 @@
           (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
           (inst test :byte temp lowtag-mask)
           (inst jmp :e compare-widetag)
-          (inst cmp value (nil-cmp-operand))
+          (aver (gpr-tn-p value))
+          (inst cmp value (nil-operand))
           (inst jmp out)
           compare-widetag
           (inst cmp :byte (ea temp) symbol-widetag)))
@@ -891,7 +893,8 @@
   (:translate consp)
   (:generator 8
     (let ((is-not-cons-label (if not-p target DROP-THRU)))
-      (inst cmp value (nil-cmp-operand))
+      (aver (gpr-tn-p value))
+      (inst cmp value (nil-operand))
       (inst jmp :e is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag)))
     DROP-THRU))
@@ -1185,18 +1188,16 @@
   (:result-types unsigned-num)
   (:generator 1
     (when null-label
-      ;; Since the comparison against a register, not an imm8 or imm32 any more,
-      ;; there is probably no reason to distinguish the two cases here.
-      ;; The only conceivable reason would be if null-tn were in a low register
-      ;; then it's theoretically possible that a REX prefix could be avoided.
-      (cond (sb-c::*unpin-nil-trap-active*
-             (inst cmp value (boxed-constant-tn nil)))
-            ((types-equal-or-intersect
-              (type-difference (tn-ref-type value-ref) (specifier-type 'null))
-              (specifier-type 'cons))
-             (inst cmp value null-tn))
-            (t
-             (inst cmp :byte value null-tn))) ; was: (logand nil-value #xff)
+      ;; Comparing against constant-pool NIL requires a full 64-bit CMP since
+      ;; memory operands cannot use CMP r64, imm8/byte-reg, whereas pinned builds
+      ;; can use a narrower byte compare against NULL-TN when CONS is ruled out.
+      (aver (gpr-tn-p value))
+      (if (and (not sb-c::*unpin-nil-trap-active*)
+               (not (types-equal-or-intersect
+                     (type-difference (tn-ref-type value-ref) (specifier-type 'null))
+                     (specifier-type 'cons))))
+          (inst cmp :byte value null-tn) ; was: (logand nil-value #xff)
+          (inst cmp value (nil-operand)))
       (inst jmp :e null-label))
     (cond ((other-pointer-tn-ref-p value-ref t)
            (if zero-extend
