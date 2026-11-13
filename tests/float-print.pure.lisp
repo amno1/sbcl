@@ -1414,8 +1414,8 @@
         ;; Half a unit at 6 decimals, plus the error of reading back.
         (assert (<= (abs (- (rational f) (rational x))) 1/1000000))))))
 
-(with-test (:name (:float-print zmij-decimal-trimmed)
-            :skipped-on (not :64-bit))
+#+64-bit
+(with-test (:name (:float-print zmij-decimal-trimmed))
   ;; The integer form agrees with the digit string of FLONUM-TO-DIGITS.
   (let ((state (sb-ext:seed-random-state 5)))
     (flet ((check (x)
