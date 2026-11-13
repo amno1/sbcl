@@ -277,3 +277,30 @@
       (sb-thread:join-thread worker)
       (assert (> interrupts 0))
       (verify-nil-intact))))
+
+;;; The declaration is looked at only in a function's own declarations;
+;;; inside LOCALLY it is accepted, ignored, and the code stays correct.
+(with-test (:name :unpin-nil-only-function-level)
+  (let ((inner (compile nil '(lambda (x)
+                              (locally (declare (sb-ext:unpin-nil))
+                                (if x (list x nil t) nil)))))
+        (outer (compile nil '(lambda (x)
+                              (declare (sb-ext:unpin-nil))
+                              (if x (list x nil t) nil)))))
+    (assert (equal (funcall inner 1) '(1 nil t)))
+    (assert (equal (funcall outer 1) '(1 nil t)))
+    (assert (null (funcall inner nil)))
+    (assert (null (funcall outer nil)))
+    ;; Nothing in the LOCALLY version reserves R12, so it doesn't note a
+    ;; fallback either.
+    (assert (null (nth-value 1 (compile-capturing-unpin-notes
+                                '(lambda (x)
+                                  (locally (declare (sb-ext:unpin-nil))
+                                    (if x (list x nil t) nil)))))))))
+
+;;; NIL and static symbols are in the constant pool only while NIL is
+;;; unpinned; other components still see them as immediates.
+(with-test (:name :unpin-nil-immediate-constant-sc)
+  (assert (eql (sb-vm::immediate-constant-sc nil) sb-vm:immediate-sc-number))
+  (assert (eql (sb-vm::immediate-constant-sc t) sb-vm:immediate-sc-number))
+  (assert (eql (sb-vm::immediate-constant-sc 42) sb-vm:immediate-sc-number)))
