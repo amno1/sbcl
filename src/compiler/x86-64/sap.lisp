@@ -213,16 +213,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
           (cond ((imm32-p (tn-value value))
                  (tn-value value))
                 ((null (tn-value value))
-                 (cond ((not sb-c::*unpin-nil-trap-active*)
-                        null-tn)
-                       ((not (offset-needs-temp offset))
-                        (inst mov temp (nil-operand))
-                        temp)
-                       ((and val-temp (neq (tn-kind val-temp) :unused))
-                        (inst mov val-temp (nil-operand))
-                        val-temp)
-                       (t
-                        (sb-c::unpin-nil-fallback :memory-operand))))
+                 null-tn)
                 (val-temp
                  (move-immediate val-temp (immediate-tn-repr value))
                  val-temp)
