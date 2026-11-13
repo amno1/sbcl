@@ -99,8 +99,11 @@
 ;;;; macros to generate useful values
 
 (defmacro load-symbol (reg symbol)
-  (cond (symbol `(inst lea ,reg (ea ,(static-symbol-offset symbol) null-tn)))
-        (t `(inst mov ,reg null-tn))))
+  (cond (symbol
+         `(if sb-c::*unpin-nil-trap-active*
+              (inst mov ,reg (boxed-constant-tn ',symbol))
+              (inst lea ,reg (ea ,(static-symbol-offset symbol) null-tn))))
+        (t `(inst mov ,reg (nil-operand)))))
 
 ;;; Access a thread slot at a fixed index. If GPR-TN is provided,
 ;;; then it points to 'struct thread', which is relevant only if #+gs-seg.
