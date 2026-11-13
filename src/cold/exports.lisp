@@ -261,7 +261,7 @@
    ;; extended declarations..
 
    "ALWAYS-BOUND" "FREEZE-TYPE" "GLOBAL" "INHIBIT-WARNINGS"
-   "MAYBE-INLINE" "START-BLOCK" "END-BLOCK"
+   "MAYBE-INLINE" "START-BLOCK" "END-BLOCK" "UNPIN-NIL"
 
    ;; ..and variables to control compiler policy
 
