@@ -5203,7 +5203,7 @@
     (inst mov :dword length len)
 
     (inst clc)
-    (inst mov res null-tn)
+    (inst mov res (nil-cmp-operand))
 
     LOOP
     (inst mov digit (ea p))
