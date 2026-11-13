@@ -299,6 +299,7 @@
            (flag (car (conditional-flags-flags flags))))
       (ecase hint
         (boolean
+         ;; COMPUTABLE-FROM-FLAGS-P guarantees X and Y are booleans {T, NIL}.
          (when (eql x t) (setq flag (negate-condition flag)))
          (let ((t-tn (if (eql x t) x-tn y-tn))
                (nil-tn (if (eql x nil) x-tn y-tn)))
