@@ -1971,7 +1971,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
 
       (inst lea byte-array (ea start byte-array*))
       (inst add end byte-array*)
@@ -2034,7 +2034,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
 
       (inst lea byte-array (ea start byte-array*))
       (inst add end byte-array*)
@@ -2109,7 +2109,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
 
       (inst lea byte-array (ea end byte-array*))
       (inst add start byte-array*)
@@ -2172,7 +2172,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
 
       (inst lea byte-array (ea end byte-array*))
       (inst add start byte-array*)
@@ -2248,7 +2248,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
       (inst shl end 1)
       (inst lea 32-bit-array (ea 32-bit-array* start 2))
 
@@ -2310,7 +2310,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
       (inst shl end 1)
       (inst lea 32-bit-array (ea 32-bit-array* start 2))
 
@@ -2386,7 +2386,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
 
       (inst shl start 1)
       (inst lea 32-bit-array (ea 32-bit-array* end 2))
@@ -2448,7 +2448,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res null-tn)
+      (inst mov res (nil-operand))
 
       (inst shl start 1)
       (inst lea 32-bit-array (ea 32-bit-array* end 2))
@@ -2688,7 +2688,7 @@
         (inst jmp DONE)
 
         NON-ASCII
-        (inst mov char-length null-tn)
+        (inst mov char-length (nil-operand))
         (zeroize total-conts)
         (inst vpxor total-conts-vec total-conts-vec total-conts-vec)
 
@@ -2749,7 +2749,7 @@
         (inst sub char-length total-conts)
         (inst shl char-length 1)
         ERROR
-        (inst mov all-ascii null-tn)
+        (inst mov all-ascii (nil-operand))
         DONE
         (inst vzeroupper)))))
 
@@ -2804,8 +2804,8 @@
       (inst jmp DONE)
 
       NON-ASCII
-      (inst mov res null-tn)
-      (inst mov all-ascii null-tn)
+      (inst mov res (nil-operand))
+      (inst mov all-ascii (nil-operand))
       (inst vpxor extra-len extra-len extra-len)
       (inst vpcmpeqd errors errors errors)
       (mov-const c-7ff (concat-ub 32 (loop repeat 4 collect #x7FF)))
