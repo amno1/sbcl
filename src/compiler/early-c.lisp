@@ -110,6 +110,9 @@
   "If true (the default), the compiler believes DYNAMIC-EXTENT declarations
 and stack allocates otherwise inaccessible parts of the object whenever
 possible.")
+
+(defvar *unpin-nil-trap-active* nil)
+(defvar *force-pin-nil* nil)
 
 ;;;; miscellaneous utilities
 

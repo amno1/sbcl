@@ -592,12 +592,67 @@ necessary, since type inference may take arbitrarily long to converge.")
                        (component thing))))
       (eq (component-mem-space component) :immobile))))
 
-(defun %compile-component (component)
+(defun unpin-nil-ineligible-reason (component)
+  (let ((2comp (component-info component)))
+    (cond ((ir2-component-values-receivers 2comp) :values-receivers)
+          ((ir2-component-stack-allocates-p 2comp) :stack-allocates)
+          ((> (count-if #'xep-p (component-lambdas component)) 1) :multiple-xeps)
+          (t
+           (do-blocks (block component)
+             (do-nodes (node nil block)
+               (typecase node
+                 (enclose (return-from unpin-nil-ineligible-reason :closure))
+                 (exit (when (exit-nlx-info node)
+                         (return-from unpin-nil-ineligible-reason :nlx)))
+                 (basic-combination
+                  (let ((info (basic-combination-info node)))
+                    (cond ((eq info :full)
+                           (return-from unpin-nil-ineligible-reason info))
+                          ((and (template-p info)
+                                (member (symbol-name (template-name info))
+                                        '("CALL-OUT" "CALL-OUT-NAMED")
+                                        :test #'string=))
+                           (return-from unpin-nil-ineligible-reason :c-call))))))))))))
+
+(defun unpin-nil-fallback (reason)
+  (let ((node (and (boundp 'sb-assem::*current-vop*)
+                   sb-assem::*current-vop*
+                   (vop-node sb-assem::*current-vop*))))
+    (throw 'unpin-nil-fallback (cons reason node))))
+
+(defun reset-component-for-pinned-retry (component)
+  (clear-constant-info)
+  (do-blocks (block component)
+    (setf (block-info block) nil
+          (block-flag block) nil)
+    (do-nodes (node nil block)
+      (when (valued-node-p node)
+        (let ((lvar (node-lvar node)))
+          (when lvar (setf (lvar-info lvar) nil))))))
+  (setf (block-info (component-head component)) nil
+        (block-info (component-tail component)) nil)
+  (find-dfo component))
+
+(defun emit-unpin-nil-fallback-note (component reason &optional node)
+  (let ((node (or node
+                  (let ((fun (first (component-lambdas component))))
+                    (and fun (lambda-bind fun))))))
+    (when (and node (policy node (= speed 3)))
+      (let ((*compiler-error-context* node))
+        (compiler-notify "Unable to unpin NIL (~S); keeping R12 pinned" reason)))))
+
+(defun %%compile-component (component)
   (maybe-mumble "GTN ")
   (gtn-analyze component)
   (maybe-mumble "LTN ")
   (ltn-analyze component)
   (dfo-as-needed component)
+
+  (let ((2comp (component-info component)))
+    (when (ir2-component-unpin-nil-p 2comp)
+      (awhen (unpin-nil-ineligible-reason component)
+        (setf (ir2-component-unpin-nil-p 2comp) nil)
+        (emit-unpin-nil-fallback-note component it))))
 
   (maybe-mumble "Control ")
   (control-analyze component)
@@ -670,7 +725,9 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((assembly
          (let ((*compiler-trace-output*
                 (and (memq :vop *compile-trace-targets*)
-                     *compiler-trace-output*)))
+                     *compiler-trace-output*))
+               (*unpin-nil-trap-active*
+                (ir2-component-unpin-nil-p (component-info component))))
            (generate-code component))))
 
     #-sb-xc-host
@@ -699,6 +756,16 @@ necessary, since type inference may take arbitrarily long to converge.")
   (setf (component-info component) nil)
 
   (values))
+
+(defun %compile-component (component)
+  (let ((fallback (catch 'unpin-nil-fallback
+                    (%%compile-component component)
+                    nil)))
+    (when fallback
+      (emit-unpin-nil-fallback-note component (car fallback) (cdr fallback))
+      (reset-component-for-pinned-retry component)
+      (let ((*force-pin-nil* t))
+        (%%compile-component component)))))
 
 ;;; Delete components with no external entry points before we try to
 ;;; generate code. Unreachable closures can cause IR2 conversion to
