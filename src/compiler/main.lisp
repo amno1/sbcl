@@ -610,7 +610,18 @@ necessary, since type inference may take arbitrarily long to converge.")
            (do-blocks (block component)
              (do-nodes (node nil block)
                (typecase node
-                 (enclose (return-from unpin-nil-ineligible-reason :closure))
+                 ;; As IR2-CONVERT-ENCLOSE: a closure is only made for a live
+                 ;; XEP that closes over something (the enclose that MOD and
+                 ;; REM leave behind makes none).
+                 (enclose
+                  (when (some (lambda (fun)
+                                (let ((xep (functional-entry-fun fun)))
+                                  (and xep
+                                       (not (functional-kind-eq xep deleted))
+                                       (environment-closure
+                                        (get-lambda-environment xep)))))
+                              (enclose-funs node))
+                    (return-from unpin-nil-ineligible-reason :closure)))
                  (exit (when (exit-nlx-info node)
                          (return-from unpin-nil-ineligible-reason :nlx)))
                  (basic-combination
