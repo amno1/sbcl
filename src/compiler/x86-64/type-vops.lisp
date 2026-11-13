@@ -180,7 +180,7 @@
                            (eq lowtag other-pointer-lowtag)
                            (other-pointer-tn-ref-p value-tn-ref t immediate-tested))
                       ;; It's either NIL or an other-pointer
-                      (inst cmp value null-tn)
+                      (inst cmp value (nil-cmp-operand))
                       (inst jmp (if not-p :e :ne) target)
                       t)
                      ((and value-tn-ref
@@ -837,7 +837,7 @@
           (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
           (inst test :byte temp lowtag-mask)
           (inst jmp :e compare-widetag)
-          (inst cmp value null-tn)
+          (inst cmp value (nil-cmp-operand))
           (inst jmp out)
           compare-widetag
           (inst cmp :byte (ea temp) symbol-widetag)))
@@ -891,7 +891,7 @@
   (:translate consp)
   (:generator 8
     (let ((is-not-cons-label (if not-p target DROP-THRU)))
-      (inst cmp value null-tn)
+      (inst cmp value (nil-cmp-operand))
       (inst jmp :e is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag)))
     DROP-THRU))
@@ -1189,11 +1189,14 @@
       ;; there is probably no reason to distinguish the two cases here.
       ;; The only conceivable reason would be if null-tn were in a low register
       ;; then it's theoretically possible that a REX prefix could be avoided.
-      (if (types-equal-or-intersect
-           (type-difference (tn-ref-type value-ref) (specifier-type 'null))
-           (specifier-type 'cons))
-          (inst cmp value null-tn)
-          (inst cmp :byte value null-tn)) ; was: (logand nil-value #xff)
+      (cond (sb-c::*unpin-nil-trap-active*
+             (inst cmp value (boxed-constant-tn nil)))
+            ((types-equal-or-intersect
+              (type-difference (tn-ref-type value-ref) (specifier-type 'null))
+              (specifier-type 'cons))
+             (inst cmp value null-tn))
+            (t
+             (inst cmp :byte value null-tn))) ; was: (logand nil-value #xff)
       (inst jmp :e null-label))
     (cond ((other-pointer-tn-ref-p value-ref t)
            (if zero-extend
