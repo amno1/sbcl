@@ -18,6 +18,21 @@
 (defvar *pack-assign-costs* t)
 (defvar *pack-optimize-saves* t)
 
+(declaim (inline effective-sc-locations))
+(defun effective-sc-locations (sc)
+  (declare (type storage-class sc))
+  (let ((locs (sc-locations sc)))
+    #+x86-64
+    (if (and (boundp '*component-being-compiled*)
+             *component-being-compiled*
+             (ir2-component-unpin-nil-p (component-info *component-being-compiled*))
+             (eq (sb-name (sc-sb sc)) 'sb-vm::registers)
+             (= (sc-element-size sc) 1))
+        (logior locs (sc-offset-to-sc-locations sb-vm:card-table-reg))
+        locs)
+    #-x86-64
+    locs))
+
 (declaim (ftype (function (component) index) ir2-block-count))
 
 ;;;; conflict determination
@@ -431,7 +446,7 @@
       (let* ((sb (sc-sb sc))
              (confs (finite-sb-live-tns sb)))
         (aver (eq (sb-kind sb) :finite))
-        (do-sc-locations (el (sc-locations sc) nil (sc-element-size sc))
+        (do-sc-locations (el (effective-sc-locations sc) nil (sc-element-size sc))
           (let ((conf (load-tn-conflicts-in-sc op sc el t)))
             (if conf
                 (used (describe-tn-use el conf op))
@@ -1194,7 +1209,7 @@
         (if (and (not (eq (tn-kind tn) :unused))
                  (eq (tn-sc tn) sc)
                  (sc-locations-member (the sb-vm:finite-sc-offset loc)
-                                      (sc-locations sc))
+                                      (effective-sc-locations sc))
                  (not (load-tn-conflicts-in-sc op sc loc nil)))
             loc
             nil)))))
@@ -1213,11 +1228,11 @@
         (when (and (not (eq (tn-kind tn) :unused))
                    (eq (sc-sb sc) (sc-sb (tn-sc tn)))
                    (sc-locations-member (the sb-vm:finite-sc-offset loc)
-                                        (sc-locations sc))
+                                        (effective-sc-locations sc))
                    (not (load-tn-conflicts-in-sc op sc loc nil)))
           (return-from select-load-tn-location loc)))))
 
-  (do-sc-locations (loc (sc-locations sc) nil (sc-element-size sc))
+  (do-sc-locations (loc (effective-sc-locations sc) nil (sc-element-size sc))
     (unless (load-tn-conflicts-in-sc op sc loc nil)
       (return loc))))
 
@@ -1271,7 +1286,7 @@
                (event unpack-tn node)
                (unpack-tn victim))
              (throw 'unpacked-tn nil)))
-      (do-sc-locations (loc (sc-locations sc) nil (sc-element-size sc))
+      (do-sc-locations (loc (effective-sc-locations sc) nil (sc-element-size sc))
         (block SKIP
           (collect ((victims nil adjoin))
             (do ((i loc (1+ i))
@@ -1451,7 +1466,7 @@
     ;; -- TN doesn't conflict with target's location.
     (if (and (eq target-sb (sc-sb sc))
              (or (eq (sb-kind target-sb) :unbounded)
-                 (sc-locations-member loc (sc-locations sc)))
+                 (sc-locations-member loc (effective-sc-locations sc)))
              (= (sc-element-size target-sc) (sc-element-size sc))
              (not (conflicts-in-sc tn sc loc))
              (zerop (mod loc (sc-alignment sc))))
@@ -1545,7 +1560,7 @@
             (loop with offset = 0
                   until (> (+ offset element-size) size) do
                   (setf offset (attempt-location offset))))
-          (let* ((locations (sc-locations sc))
+          (let* ((locations (effective-sc-locations sc))
                  (reserved (sc-reserve-locations sc))
                  (wired (logandc2 (finite-sb-wired-map sb) reserved)))
             (cond #+sb-simd-pack-512
