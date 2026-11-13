@@ -1736,6 +1736,9 @@
         (make-lexenv
          :default res
          :flushable (cdr spec)))
+       ;; Only a declaration in the declarations of a function (a lambda or
+       ;; DEFUN body) is looked at, by COMPONENT-UNPIN-NIL-P; one in an inner
+       ;; LOCALLY or LET has no effect.
        (unpin-nil
         (when (cdr spec)
           (compiler-warn "ignoring extra arguments in ~S" spec))
