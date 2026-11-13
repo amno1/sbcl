@@ -1466,9 +1466,9 @@
                        1f0 0.1f0 3.4028235f38 123456789d0 0.001d0 100d0))
         (check x))
       (dotimes (i 5000)
-        (let ((x (abs (sb-kernel:make-double-float
-                       (- (random (ash 1 32) state) (ash 1 31))
-                       (random (ash 1 32) state)))))
-          (unless (or (sb-ext:float-nan-p x) (sb-ext:float-infinity-p x) (zerop x))
+        ;; Not raw random bits: on x86 the x87 FPU traps on loading a
+        ;; signalling NaN.
+        (let ((x (abs (float-print-random-float state))))
+          (unless (zerop x)
             (check x)
             (check (- x))))))))
