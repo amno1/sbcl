@@ -245,7 +245,7 @@
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
          (reserve (sc-reserve-locations sc))
-         (available-locations (logand (sc-locations sc)
+         (available-locations (logand (effective-sc-locations sc)
                                       (lognot reserve)))
          (locations 0))
     (declare (type sc-locations locations))
