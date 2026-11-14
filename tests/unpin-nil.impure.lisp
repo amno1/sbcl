@@ -175,7 +175,8 @@
     ;; :NULL-TN (foreign callout via ALIEN-LINKAGE-TABLE)
     (expect-fallback '(lambda (x)
                        (sb-alien:alien-funcall
-                        (sb-alien:extern-alien "getpid" (function sb-alien:int)))
+                        (sb-alien:extern-alien #+win32 "_getpid" #-win32 "getpid"
+                                               (function sb-alien:int)))
                        x)
                      "(:NULL-TN)"
                      '(99)
