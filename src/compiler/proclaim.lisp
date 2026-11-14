@@ -616,6 +616,31 @@ having to examine the type hierarchy at run-time.
 
 Currently, this has an effect only for structure types.")
 
+#-sb-xc-host
+(setf (documentation 'sb-ext:unpin-nil 'declaration)
+      "Syntax: `(DECLARE (SB-EXT:UNPIN-NIL))`
+
+Only meaningful on x86-64, and only as a declaration of a function (a
+lambda or DEFUN body); in an inner LOCALLY or LET it has no effect.
+
+Normally, the register `R12` is reserved to hold NIL. A function with
+this declaration may instead use `R12` as a general purpose register,
+which helps register-hungry inner loops. NIL is put back in `R12` before
+each full call and when the function returns or unwinds.
+
+Not every function can be compiled this way. When the compiler finds
+that it cannot, for instance because the function makes a closure, a
+non-local exit, or a local call, it falls back to the normal
+compilation with `R12` pinned to NIL and signals a compiler note
+beginning with \"Unable to unpin NIL\" that gives the reason. The
+declaration is therefore always safe to use.
+
+On targets where safepoints are always inserted, such as Windows, the
+declaration has no effect unless paired with `(OPTIMIZE
+(SB-C:INSERT-SAFEPOINTS 0))`. Turning off safepoint insertion means
+that `GC` and thread stop requests wait until the function returns or
+calls out.")
+
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)
