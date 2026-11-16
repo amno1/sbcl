@@ -374,7 +374,13 @@
   (unpin-nil-p nil :type boolean)
   ;; Control-stack TN holding the caller's R12 (NIL) when UNPIN-NIL-P
   ;; is enabled and R12 was actually allocated in the component.
-  (unpin-nil-save-tn nil :type (or null tn)))
+  (unpin-nil-save-tn nil :type (or null tn))
+  ;; True when (DECLARE (SB-EXT:UNPIN-THREAD)) is enabled for this component:
+  ;; R13, the thread register, may then be allocated like any other.
+  (unpin-thread-p nil :type boolean)
+  ;; Control-stack TN holding the caller's R13 (the current thread) when
+  ;; UNPIN-THREAD-P is enabled and R13 was actually allocated in the component.
+  (unpin-thread-save-tn nil :type (or null tn)))
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
 ;;; to create each XEP's function entry data structure. ENTRY-INFO

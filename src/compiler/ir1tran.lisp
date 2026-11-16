@@ -1751,6 +1751,13 @@
         (make-lexenv
          :default res
          :user-data (acons 'unpin-nil t (lexenv-user-data res))))
+       ;; As UNPIN-NIL, for the thread register (R13) instead of NIL's.
+       (unpin-thread
+        (when (cdr spec)
+          (compiler-warn "ignoring extra arguments in ~S" spec))
+        (make-lexenv
+         :default res
+         :user-data (acons 'unpin-thread t (lexenv-user-data res))))
        (current-defmethod
         (destructuring-bind (name qualifiers specializers lambda-list)
             (cdr spec)
@@ -1791,7 +1798,7 @@
                 inline notinline maybe-inline
                 no-compiler-macro optimize dynamic-extent
                 flushable current-defmethod no-constraints constant-value
-                no-debug values unpin-nil))
+                no-debug values unpin-nil unpin-thread))
   ;; This is equivalent to (DECLARE (DECLARATION ...)) but avoid some
   ;; bootstrapping issues.
   (setf (info :declaration :known decl) t))

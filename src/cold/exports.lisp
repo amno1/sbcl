@@ -261,7 +261,7 @@
    ;; extended declarations..
 
    "ALWAYS-BOUND" "FREEZE-TYPE" "GLOBAL" "INHIBIT-WARNINGS"
-   "MAYBE-INLINE" "START-BLOCK" "END-BLOCK" "UNPIN-NIL"
+   "MAYBE-INLINE" "START-BLOCK" "END-BLOCK" "UNPIN-NIL" "UNPIN-THREAD"
 
    ;; ..and variables to control compiler policy
 
@@ -2734,7 +2734,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "INSERT-STEP-CONDITIONS"
            "INSTRUMENT-CONSING"
            "IR2-COMPONENT-CONSTANTS" "IR2-COMPONENT-UNPIN-NIL-P"
-           "IR2-COMPONENT-UNPIN-NIL-SAVE-TN" "IR2-CONVERT"
+           "IR2-COMPONENT-UNPIN-NIL-SAVE-TN"
+           "IR2-COMPONENT-UNPIN-THREAD-P"
+           "IR2-COMPONENT-UNPIN-THREAD-SAVE-TN" "IR2-CONVERT"
            "IR2-ENVIRONMENT-NUMBER-STACK-P"
            "KNOWN-CALL-LOCAL" "KNOWN-RETURN"
            "LAMBDA-VAR-IGNOREP"
