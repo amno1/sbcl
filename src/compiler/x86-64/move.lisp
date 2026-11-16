@@ -270,6 +270,7 @@
   (:note "signed word to integer coercion")
   ;; the bignum is allocated by an assembly routine, which needs the thread
   #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
+  (:temporary (:sc unsigned-reg :offset 12) null-temp)
   (:vop-var vop)
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
@@ -285,7 +286,7 @@
             (inst imul y x #.(ash 1 n-fixnum-tag-bits))
             (inst jmp :no DONE)
             (inst mov y x)))
-     (with-thread-in-r13 (signed=>bignum-in-reg vop y))
+     (with-thread-in-r13 (with-nil-in-r12 (signed=>bignum-in-reg vop y)))
      DONE))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
@@ -327,6 +328,7 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:note "unsigned word to integer coercion")
   #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
+  (:temporary (:sc unsigned-reg :offset 12) null-temp)
   (:vop-var vop)
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
@@ -340,7 +342,7 @@
     ;; support- speculatively restore the fixnum value, test previous flags and jump,
     ;; which would eliminate the 'jmp done' that jumps over the following SHR.
     (inst jmp :z fixnum)
-    (with-thread-in-r13 (unsigned=>bignum-in-reg vop res))
+    (with-thread-in-r13 (with-nil-in-r12 (unsigned=>bignum-in-reg vop res)))
     (inst jmp done)
     FIXNUM
     (inst shr res 1)

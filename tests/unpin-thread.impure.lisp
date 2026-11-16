@@ -359,3 +359,37 @@
       (assert (null notes))
       (dolist (n '(0 1 99 2000))
         (assert (= (funcall unpinned buf n) (funcall pinned buf n)))))))
+
+;;; With both registers unpinned, boxing a bignum puts NIL and the thread
+;;; back for the assembly routine, and leaves both usable afterwards.
+(with-test (:name :unpin-thread-and-nil-box-bignums)
+  (let ((buf (make-test-buffer))
+        (body
+         `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
+                    (type fixnum n)
+                    (optimize (speed 3) (safety 0) (debug 0)))
+           (let ,(loop for v in *pressure-vars*
+                       for i from 1
+                       collect `(,v ,(logand (* i #x1234567890abcdef) #xffffffffffffffff)))
+             (declare (type (unsigned-byte 64) ,@*pressure-vars*))
+             (dotimes (i n)
+               (let ((x (aref buf (logand i 255))))
+                 (setf ,@(loop for v in *pressure-vars*
+                               for i from 1
+                               append `(,v (logand (+ ,v (* x ,(+ i 2000000000)))
+                                                   #xffffffffffffffff))))))
+             (values a0 a7 a13 (logand (+ a1 a2) #xffffffffffffffff))))))
+    (let ((pinned (compile nil `(lambda (buf n) ,@body))))
+      (multiple-value-bind (both notes)
+          (compile-capturing-unpin-notes
+           `(lambda (buf n)
+              (declare (sb-ext:unpin-nil) (sb-ext:unpin-thread))
+              ,@body))
+        (assert (null notes))
+        (assert (disassembly-contains-p both "R12"))
+        (dolist (n '(0 1 77 3000))
+          (assert (equal (multiple-value-list (funcall both buf n))
+                         (multiple-value-list (funcall pinned buf n)))))
+        (assert (null nil))
+        (assert (equal (cons 1 nil) '(1)))
+        (assert (eq (car (list nil)) nil))))))

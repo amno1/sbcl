@@ -124,6 +124,17 @@
      (let ((sb-c::*unpin-thread-trap-active* nil))
        ,@body)))
 
+;;; The same for NIL: for the generator of a VOP that has a temporary named
+;;; NULL-TEMP wired to R12 and needs NIL in it, such as to call an assembly
+;;; routine. With an unpinned NIL, R12 may hold anything on entry to the VOP.
+;;; Inside BODY, NULL-TN is R12 as with a pinned NIL.
+(defmacro with-nil-in-r12 (&body body)
+  `(progn
+     (when sb-c::*unpin-nil-trap-active*
+       (inst mov null-temp (boxed-constant-tn nil)))
+     (let ((sb-c::*unpin-nil-trap-active* nil))
+       ,@body)))
+
 ;;; Access a thread slot at a fixed index. If GPR-TN is provided,
 ;;; then it points to 'struct thread', which is relevant only if #+gs-seg.
 (defun thread-slot-ea (slot-index &optional gpr-tn)
