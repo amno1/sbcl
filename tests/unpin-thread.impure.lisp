@@ -297,7 +297,9 @@
         (assert (= (funcall unpinned buf 30 f) (funcall pinned buf 30 f)))))))
 
 ;;; Returning words too big for a fixnum conses bignums through an assembly
-;;; routine, which needs the thread.
+;;; routine, which needs the thread. Only three values are returned: with
+;;; --with-tls-based-mv-return a fourth goes in the thread's return area,
+;;; which needs the thread, and the function would fall back to a pinned one.
 (with-test (:name :unpin-thread-boxes-bignums)
   (let ((buf (make-test-buffer)))
     (multiple-value-bind (pinned unpinned notes)
@@ -316,7 +318,7 @@
                                for i from 1
                                append `(,v (logand (+ ,v (* x ,(+ i 2000000000)))
                                                    #xffffffffffffffff))))))
-             (values a0 a7 a13 (logand (+ a1 a2) #xffffffffffffffff)))))
+             (values a0 a13 (logand (+ a1 a2) #xffffffffffffffff)))))
       (assert (null notes))
       (assert (disassembly-contains-p unpinned "R13"))
       (dolist (n '(0 1 77 3000))
@@ -378,7 +380,7 @@
                                for i from 1
                                append `(,v (logand (+ ,v (* x ,(+ i 2000000000)))
                                                    #xffffffffffffffff))))))
-             (values a0 a7 a13 (logand (+ a1 a2) #xffffffffffffffff))))))
+             (values a0 a13 (logand (+ a1 a2) #xffffffffffffffff))))))
     (let ((pinned (compile nil `(lambda (buf n) ,@body))))
       (multiple-value-bind (both notes)
           (compile-capturing-unpin-notes
