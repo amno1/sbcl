@@ -198,6 +198,12 @@
       (inst mov target source)
       (inst lea target (ea disp source))))
 
+;;; The frame slot holding the thread, which an unpinned R13 may not.
+(defun unpin-thread-save-ea (&optional (base rbp-tn))
+  (awhen (ir2-component-unpin-thread-save-tn
+          (component-info *component-being-compiled*))
+    (ea (frame-byte-offset (tn-offset it)) base)))
+
 (define-vop (xep-setup-sp)
   (:generator 1
     (emit-lea rsp-tn rbp-tn     (- (* n-word-bytes
@@ -205,7 +211,10 @@
                                          sp->fp-offset))))
     (awhen (ir2-component-unpin-nil-save-tn
             (component-info *component-being-compiled*))
-      (inst mov (ea (frame-byte-offset (tn-offset it)) rbp-tn) r12-tn))))
+      (inst mov (ea (frame-byte-offset (tn-offset it)) rbp-tn) r12-tn))
+    #-gs-seg
+    (awhen (unpin-thread-save-ea)
+      (inst mov it r13-tn))))
 
 ;;; This is emitted directly before either a known-call-local, call-local,
 ;;; or a multiple-call-local. All it does is allocate stack space for the
@@ -913,6 +922,29 @@
     (setq sb-c::*unpin-nil-trap-active* t
           *unpin-nil-call-open* nil)))
 
+;;; Likewise for an unpinned thread register: the callee and the assembly
+;;; routines expect the thread in R13, so reload it from its frame slot.
+;;; TAILP says that RBP still is this function's frame pointer; otherwise
+;;; it is the callee's, and this function's is its saved OCFP.
+(defvar *unpin-thread-call-open* nil)
+(defun unpin-thread-before-call (tailp &rest tns)
+  #-gs-seg
+  (when (sb-c::unpin-thread-trap-p)
+    (dolist (tn tns)
+      (when (and (tn-p tn) (gpr-tn-p tn) (eql (tn-offset tn) thread-reg))
+        (sb-c::unpin-thread-fallback :call-temporary)))
+    (cond (tailp
+           (inst mov r13-tn (unpin-thread-save-ea)))
+          (t
+           (loadw r13-tn rbp-tn (frame-word-offset ocfp-save-offset))
+           (inst mov r13-tn (unpin-thread-save-ea r13-tn))))
+    (setq sb-c::*unpin-thread-trap-active* nil
+          *unpin-thread-call-open* t)))
+(defun unpin-thread-after-call ()
+  (when *unpin-thread-call-open*
+    (setq sb-c::*unpin-thread-trap-active* t
+          *unpin-thread-call-open* nil)))
+
 ;;; This macro helps in the definition of full call VOPs by avoiding
 ;;; code replication in defining the cross-product VOPs.
 ;;;
@@ -1143,6 +1175,10 @@
        (unpin-nil-before-call ,@(when (and (eq return :fixed) (neq direct :return))
                                   '(move-temp))
                               ,@(when (eq direct :call) '(counter)))
+       (unpin-thread-before-call ,(eq return :tail)
+                                 ,@(when (and (eq return :fixed) (neq direct :return))
+                                     '(move-temp))
+                                 ,@(when (eq direct :call) '(counter)))
        (when step-instrumenting
          ,@(when named '((compute-linkage-cell node fun rax)))
          (emit-single-step-test)
@@ -1170,7 +1206,8 @@
                (:pass-through
                 '((note-this-location vop :unknown-return)))
                ((:tail :unboxed))))
-       (unpin-nil-after-call))))
+       (unpin-nil-after-call)
+       (unpin-thread-after-call))))
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
@@ -1276,12 +1313,14 @@
     (move rsi args)
     (move rax function)
     (unpin-nil-before-call)
+    (unpin-thread-before-call t)
     ;; And jump to the assembly routine.
     (invoke-asm-routine 'jmp (if (eq (sb-c::tn-primitive-type function) *backend-t-primitive-type*)
                                  'tail-call-callable-variable
                                  'tail-call-variable)
                         vop)
-    (unpin-nil-after-call)))
+    (unpin-nil-after-call)
+    (unpin-thread-after-call)))
 
 ;;;; unknown values return
 
@@ -1294,10 +1333,13 @@
 ;;; optimizations on modern CPUs quite handily. Second, we can do all
 ;;; this without needing a temp register. Fixed the latter, at least.
 ;;; -- AB 2006/Feb/04
-(defun maybe-restore-unpin-nil ()
+(defun maybe-restore-unpinned-registers ()
   (awhen (ir2-component-unpin-nil-save-tn
           (component-info *component-being-compiled*))
-    (inst mov r12-tn (ea (frame-byte-offset (tn-offset it)) rbp-tn))))
+    (inst mov r12-tn (ea (frame-byte-offset (tn-offset it)) rbp-tn)))
+  #-gs-seg
+  (awhen (unpin-thread-save-ea)
+    (inst mov r13-tn it)))
 
 (define-vop (return-single)
   (:args (old-fp)
@@ -1306,7 +1348,7 @@
   (:ignore value)
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
-    (maybe-restore-unpin-nil)
+    (maybe-restore-unpinned-registers)
     ;; Drop stack above old-fp and restore old frame pointer
     (inst leave)
     ;; Clear the multiple-value return flag
@@ -1319,7 +1361,7 @@
          (return-pc))
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
-    (maybe-restore-unpin-nil)
+    (maybe-restore-unpinned-registers)
     (inst leave)
     (inst ret)))
 
@@ -1376,7 +1418,7 @@
         ;; And away we go. Except that return-pc is still on the
         ;; stack and we've changed the stack pointer. So we might have to
         ;; tell it to index off of RBX instead of RBP, depending on nvals.
-        (maybe-restore-unpin-nil)
+        (maybe-restore-unpinned-registers)
         (cond ((<= nvals register-arg-count)
                (inst leave)
                (inst ret))
@@ -1427,7 +1469,7 @@
                (set-rcx))
               (t
                (set-rcx)))
-        (maybe-restore-unpin-nil)
+        (maybe-restore-unpinned-registers)
         (inst stc)                      ; multiple value return flag
         (inst leave) (inst ret))))))
 
@@ -1460,7 +1502,7 @@
         (inst jmp :ne not-single)
         ;; Return with one value.
         (loadw a0 vals -1)
-        (maybe-restore-unpin-nil)
+        (maybe-restore-unpinned-registers)
         ;; Clear the stack until ocfp.
         (inst leave)
         ;; clear the multiple-value return flag
