@@ -824,7 +824,13 @@ error otherwise.")
           ;; Publish the perfect part before emptying the open-addressing part.
           ;; A reader that sees the old perfect part and the new, empty
           ;; open-addressing part retries because PERFECT changed.
-          (setf (symtbl-perfect table) (make-perfect-symtbl fun cells n nil))
+          ;; The new part's slots (the hash function and the cells) must be
+          ;; visible before the pointer to it: on a weakly ordered CPU such as
+          ;; arm64 a reader could otherwise find a part whose hash function
+          ;; is still 0 and call it.
+          (let ((new (make-perfect-symtbl fun cells n nil)))
+            (sb-thread:barrier (:write))
+            (setf (symtbl-perfect table) new))
           (sb-thread:barrier (:write))
           (resize-symbol-table table 0 'intern)
           t))))
