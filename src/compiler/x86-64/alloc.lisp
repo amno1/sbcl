@@ -211,7 +211,10 @@
 (defconstant +cons-primtype+ list-pointer-lowtag)
 
 (define-vop (sb-c::end-pseudo-atomic)
-  (:generator 1 (emit-end-pseudo-atomic)))
+  #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
+  (:generator 1
+    #-gs-seg (progn thread-tn)          ; reserved, not referred to
+    (with-thread-in-r13 (emit-end-pseudo-atomic))))
 
 #+sb-simd-pack-512
 (defun avx512-tn-p (tn)
@@ -1098,8 +1101,11 @@
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))
     (:temporary (:sc unsigned-reg) alloc-temp)
+    #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
     (:vop-var vop)
-    (:generator 50 (alloc vop thread-tn name words type lowtag dx result alloc-temp)))
+    (:generator 50
+      (with-thread-in-r13
+        (alloc vop thread-tn name words type lowtag dx result alloc-temp))))
   (define-vop (sb-c::fixed-alloc-to-stack)
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))

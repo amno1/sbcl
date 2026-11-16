@@ -198,12 +198,6 @@
       (inst mov target source)
       (inst lea target (ea disp source))))
 
-;;; The frame slot holding the thread, which an unpinned R13 may not.
-(defun unpin-thread-save-ea (&optional (base rbp-tn))
-  (awhen (ir2-component-unpin-thread-save-tn
-          (component-info *component-being-compiled*))
-    (ea (frame-byte-offset (tn-offset it)) base)))
-
 (define-vop (xep-setup-sp)
   (:generator 1
     (emit-lea rsp-tn rbp-tn     (- (* n-word-bytes

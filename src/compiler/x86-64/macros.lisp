@@ -105,6 +105,25 @@
               (inst lea ,reg (ea ,(static-symbol-offset symbol) null-tn))))
         (t `(inst mov ,reg (nil-operand)))))
 
+;;; The frame slot holding the thread, which an unpinned R13 may not.
+(defun unpin-thread-save-ea (&optional (base rbp-tn))
+  (awhen (ir2-component-unpin-thread-save-tn
+          (component-info *component-being-compiled*))
+    (ea (frame-byte-offset (tn-offset it)) base)))
+
+;;; For the generator of a VOP that has a temporary wired to R13 and needs
+;;; the thread in it: with an unpinned thread R13 may hold anything on entry
+;;; to the VOP, so put the thread back, and then it is there for the rest of
+;;; the VOP, which can use THREAD-TN as with a pinned one.
+(defmacro with-thread-in-r13 (&body body)
+  #+gs-seg `(progn ,@body)
+  #-gs-seg
+  `(progn
+     (awhen (unpin-thread-save-ea)
+       (inst mov r13-tn it))
+     (let ((sb-c::*unpin-thread-trap-active* nil))
+       ,@body)))
+
 ;;; Access a thread slot at a fixed index. If GPR-TN is provided,
 ;;; then it points to 'struct thread', which is relevant only if #+gs-seg.
 (defun thread-slot-ea (slot-index &optional gpr-tn)
@@ -241,6 +260,7 @@
 (defmacro define-allocator (name &body body &aux (g (cdr (assoc :generator body))))
   `(define-vop ,name
      #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+     #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
      ,@(remove :generator body :key 'car)
      (:node-var node)
      #+sb-simd-pack-512
@@ -250,7 +270,8 @@
            ((instrument-alloc (&rest args) `(emit-instrument-alloc node thread-tn ,@args))
             (allocation (&rest args) `(emit-allocation node thread-tn ,@args))
             (alloc-other (&rest args) `(emit-alloc-other node thread-tn ,@args)))
-         (assemble () ,@(cdr g)))))) ; forms
+         (with-thread-in-r13
+           (assemble () ,@(cdr g))))))) ; forms
 
 (defmacro pseudo-atomic ((&key elide-if (default-exit t))
                          &body forms)

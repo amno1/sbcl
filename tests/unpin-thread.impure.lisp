@@ -186,3 +186,40 @@
         (assert (= (funcall both buf 1000) (funcall pinned buf 1000)))
         (assert (null nil))
         (assert (equal (cons 1 nil) '(1)))))))
+
+;;; Allocation needs the thread too: the allocators put it back into R13
+;;; for themselves, whatever a live value in R13 around them would be.
+(with-test (:name :unpin-thread-allocation)
+  (let* ((buf (make-test-buffer))
+         (body
+          `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
+                     (type fixnum n)
+                     (optimize (speed 3) (safety 0) (debug 0)))
+            (let ((acc nil)
+                  ,@(loop for v in *pressure-vars*
+                          for i from 1
+                          collect `(,v ,i)))
+              (declare (type (unsigned-byte 32) ,@*pressure-vars*))
+              (dotimes (i n)
+                (let ((x (logand (aref buf (logand i 255)) #xffffffff)))
+                  (setf ,@(loop for v in *pressure-vars*
+                                for i from 1
+                                append `(,v (logand (+ ,v (* x ,i)) #xffffffff))))
+                  (when (zerop (logand i 63))
+                    (push (list a0 (coerce a13 'double-float)) acc))))
+              (values (logand (+ ,@*pressure-vars*) most-positive-fixnum)
+                      (reverse acc)
+                      (coerce a5 'double-float))))))
+    (multiple-value-bind (pinned unpinned notes)
+        (compile-both-ways '(buf n) body)
+      (assert (null notes))
+      (assert (disassembly-contains-p unpinned "R13"))
+      (dolist (n '(0 1 64 5000))
+        (assert (equal (multiple-value-list (funcall unpinned buf n))
+                       (multiple-value-list (funcall pinned buf n)))))
+      ;; Make the collector run while such frames are live.
+      (let ((r nil))
+        (dotimes (i 30)
+          (setq r (multiple-value-list (funcall unpinned buf 20000)))
+          (when (zerop (mod i 10)) (gc)))
+        (assert (equal r (multiple-value-list (funcall pinned buf 20000))))))))
