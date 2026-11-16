@@ -295,3 +295,67 @@
                        (lambda (s) (values s s s s s))
                        (lambda (s) (values-list (make-list (mod s 20) :initial-element s)))))
         (assert (= (funcall unpinned buf 30 f) (funcall pinned buf 30 f)))))))
+
+;;; Returning words too big for a fixnum conses bignums through an assembly
+;;; routine, which needs the thread.
+(with-test (:name :unpin-thread-boxes-bignums)
+  (let ((buf (make-test-buffer)))
+    (multiple-value-bind (pinned unpinned notes)
+        (compile-both-ways
+         '(buf n)
+         `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
+                    (type fixnum n)
+                    (optimize (speed 3) (safety 0) (debug 0)))
+           (let ,(loop for v in *pressure-vars*
+                       for i from 1
+                       collect `(,v ,(logand (* i #x1234567890abcdef) #xffffffffffffffff)))
+             (declare (type (unsigned-byte 64) ,@*pressure-vars*))
+             (dotimes (i n)
+               (let ((x (aref buf (logand i 255))))
+                 (setf ,@(loop for v in *pressure-vars*
+                               for i from 1
+                               append `(,v (logand (+ ,v (* x ,(+ i 2000000000)))
+                                                   #xffffffffffffffff))))))
+             (values a0 a7 a13 (logand (+ a1 a2) #xffffffffffffffff)))))
+      (assert (null notes))
+      (assert (disassembly-contains-p unpinned "R13"))
+      (dolist (n '(0 1 77 3000))
+        (let ((got (multiple-value-list (funcall unpinned buf n))))
+          (assert (equal got (multiple-value-list (funcall pinned buf n))))
+          (when (> n 1) (assert (some (lambda (x) (typep x '(and integer (not fixnum)))) got)))))
+      (let ((*print-base* 5))
+        (funcall unpinned buf 10)
+        (assert (= *print-base* 5))))))
+
+;;; Stack allocation checks for stack overflow against the thread's stack
+;;; limit.
+(with-test (:name :unpin-thread-stack-allocation)
+  (let ((buf (make-test-buffer)))
+    (multiple-value-bind (pinned unpinned notes)
+        (compile-both-ways
+         '(buf n)
+         `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
+                    (type fixnum n)
+                    (optimize (speed 3) (safety 0) (debug 0)))
+           (let ,(loop for v in *pressure-vars*
+                       for i from 1
+                       collect `(,v ,i))
+             (declare (type (unsigned-byte 32) ,@*pressure-vars*))
+             (dotimes (i n)
+               (let* ((x (logand (aref buf (logand i 255)) #xffffffff))
+                      (l (list x i))
+                      (v (make-array 3 :element-type '(unsigned-byte 32)
+                                       :initial-element (logand x #xffff))))
+                 (declare (dynamic-extent l v))
+                 (setf ,@(loop for var in *pressure-vars*
+                               for i from 1
+                               append `(,var (logand (+ ,var (* x ,i)
+                                                        (the fixnum (car l))
+                                                        (aref v 1))
+                                                     #xffffffff))))))
+             (logand (+ ,@*pressure-vars*) most-positive-fixnum))))
+      ;; Values live across a stack allocation can't be in R13, so the
+      ;; register may go unused here; what matters is no fallback.
+      (assert (null notes))
+      (dolist (n '(0 1 99 2000))
+        (assert (= (funcall unpinned buf n) (funcall pinned buf n)))))))

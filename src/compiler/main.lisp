@@ -593,12 +593,14 @@ necessary, since type inference may take arbitrarily long to converge.")
       (eq (component-mem-space component) :immobile))))
 
 ;;; KIND is :NIL or :THREAD. A component that receives unknown values (a
-;;; tail call of an unknown function has one) is only a problem for NIL.
+;;; tail call of an unknown function has one), or that allocates on the
+;;; stack, is only a problem for NIL.
 (defun unpin-ineligible-reason (component kind)
   (let ((2comp (component-info component)))
     (cond ((and (eq kind :nil) (ir2-component-values-receivers 2comp))
            :values-receivers)
-          ((ir2-component-stack-allocates-p 2comp) :stack-allocates)
+          ((and (eq kind :nil) (ir2-component-stack-allocates-p 2comp))
+           :stack-allocates)
           ;; A safepoint, inserted by default at a function's entry and at
           ;; loop edges on #+sb-safepoint targets (always on :win32), reads
           ;; NIL directly (EMIT-SAFEPOINT), not through NULL-TN's trap, so a

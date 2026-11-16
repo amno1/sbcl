@@ -807,6 +807,7 @@
                                         'sc-offset)))))
     (:results (result :scs (descriptor-reg) :from :load))
     (:temporary (:sc unsigned-reg) bytes)
+    #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
     (:node-var node)
     (:vop-var vop)
     (:arg-types #+ubsan (:constant t)
@@ -833,7 +834,7 @@
         (store-originating-pc rax))
       (let ((size (calc-size-in-bytes words bytes)))
         (when (sb-c::make-vector-check-overflow-p node)
-          (generate-stack-overflow-check vop size))
+          (with-thread-in-r13 (generate-stack-overflow-check vop size)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation size other-pointer-lowtag result
@@ -866,6 +867,7 @@
     (:temporary (:sc any-reg :offset rax-offset) rax)
     (:temporary (:sc any-reg :offset rdi-offset) rdi)
     (:temporary (:sc unsigned-reg) bytes)
+    #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
     (:node-var node)
     (:vop-var vop)
     (:generator 10
@@ -875,7 +877,7 @@
         (stack-allocation size other-pointer-lowtag result)
         (store-string-trailing-null result type length words)
         (when (sb-c::make-vector-check-overflow-p node)
-          (generate-stack-overflow-check vop size))
+          (with-thread-in-r13 (generate-stack-overflow-check vop size)))
         (put-header result other-pointer-lowtag type length nil nil)
         (cond ((sc-is words immediate)
                (inst mov rcx (+ (tn-value words) vector-data-offset)))
@@ -926,11 +928,12 @@
     (:vop-var vop)
     (:temporary (:sc unsigned-reg) bytes)
     (:temporary (:sc descriptor-reg) tail next limit)
+    #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
     (:generator 20
       (let ((size (calc-size-in-bytes length bytes))
             (loop (gen-label)))
         (when (sb-c::make-list-check-overflow-p node)
-          (generate-stack-overflow-check vop size))
+          (with-thread-in-r13 (generate-stack-overflow-check vop size)))
         (stack-allocation size list-pointer-lowtag result)
         (compute-end)
         (inst mov next result)
@@ -1108,7 +1111,9 @@
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))
     (:vop-var vop)
-    (:generator 50 (alloc vop thread-tn name words type lowtag dx result nil))))
+    ;; no thread is needed to allocate on the stack
+    (:generator 50 (alloc vop #-gs-seg nil #+gs-seg thread-tn
+                          name words type lowtag dx result nil))))
 
 ;;; Allocate a non-vector variable-length object.
 ;;; Exactly 4 allocators are rendered via this vop:
