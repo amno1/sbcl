@@ -592,7 +592,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                        (component thing))))
       (eq (component-mem-space component) :immobile))))
 
-(defun unpin-nil-ineligible-reason (component)
+(defun unpin-ineligible-reason (component)
   (let ((2comp (component-info component)))
     (cond ((ir2-component-values-receivers 2comp) :values-receivers)
           ((ir2-component-stack-allocates-p 2comp) :stack-allocates)
@@ -635,9 +635,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                                        (environment-closure
                                         (get-lambda-environment xep)))))
                               (enclose-funs node))
-                    (return-from unpin-nil-ineligible-reason :closure)))
+                    (return-from unpin-ineligible-reason :closure)))
                  (exit (when (exit-nlx-info node)
-                         (return-from unpin-nil-ineligible-reason :nlx)))
+                         (return-from unpin-ineligible-reason :nlx)))
                  (basic-combination
                   (let ((info (basic-combination-info node)))
                     ;; Full calls are fine: UNPIN-NIL-BEFORE-CALL puts NIL back
@@ -651,7 +651,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                                             (neq (lambda-environment callee)
                                                  (lambda-environment
                                                   (node-home-lambda node))))))))
-                           (return-from unpin-nil-ineligible-reason :local-call))
+                           (return-from unpin-ineligible-reason :local-call))
                           ((and (template-p info)
                                 (or (and (vop-info-p info)
                                          (member (vop-info-save-p info)
@@ -659,7 +659,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                                     (member (symbol-name (template-name info))
                                             '("CALL-OUT" "CALL-OUT-NAMED")
                                             :test #'string=)))
-                           (return-from unpin-nil-ineligible-reason :call-vop))))))))))))
+                           (return-from unpin-ineligible-reason :call-vop))))))))))))
 
 ;;; Abandon the optimistic pass over the component being compiled: KIND is
 ;;; :NIL or :THREAD, the register that has to be pinned in the retry.
@@ -756,10 +756,15 @@ necessary, since type inference may take arbitrarily long to converge.")
 
   #+x86-64
   (let ((2comp (component-info component)))
-    (when (ir2-component-unpin-nil-p 2comp)
-      (awhen (unpin-nil-ineligible-reason component)
-        (setf (ir2-component-unpin-nil-p 2comp) nil)
-        (emit-unpin-fallback-note component :nil it))))
+    (when (or (ir2-component-unpin-nil-p 2comp)
+              (ir2-component-unpin-thread-p 2comp))
+      (awhen (unpin-ineligible-reason component)
+        (when (ir2-component-unpin-nil-p 2comp)
+          (setf (ir2-component-unpin-nil-p 2comp) nil)
+          (emit-unpin-fallback-note component :nil it))
+        (when (ir2-component-unpin-thread-p 2comp)
+          (setf (ir2-component-unpin-thread-p 2comp) nil)
+          (emit-unpin-fallback-note component :thread it)))))
 
   (maybe-mumble "Control ")
   (control-analyze component)
