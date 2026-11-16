@@ -449,6 +449,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
          (temp (make-symbol-table (length symbols))))
     (dovector (s symbols)
       (add-symbol temp s 'intern))
+    (sb-thread:barrier (:write)) ; the cells are complete before they are published
     (setf (symtbl-%cells table) (symtbl-%cells temp)
           (symtbl-size table) (symtbl-size temp)
           (symtbl-free table) (symtbl-free temp)
@@ -655,6 +656,8 @@ of :INHERITED :EXTERNAL :INTERNAL."
             (ins 0 sym)
             (decf (symtbl-free temp-table))))
         (let ((new (symtbl-%cells temp-table)))
+          ;; The new cells are complete before they are published.
+          (sb-thread:barrier (:write))
           (setf (symtbl-%cells table) new)
           ;; Unlike above, we _do_ need this barrier. Readers must observe that the
           ;; change of %cells happens before the old contents are clobbered.
@@ -1462,10 +1465,13 @@ Experimental: interface subject to change."
                  (setf (sbit deleted index) 1))
                 (t
                  (setf (svref cells index) -1)))
-          (setf (symtbl-perfect table)
-                (if (zerop count)
-                    nil
-                    (make-perfect-symtbl (psymtbl-hash-fn perfect) cells count deleted))))
+          (let ((new (if (zerop count)
+                         nil
+                         (make-perfect-symtbl (psymtbl-hash-fn perfect)
+                                              cells count deleted))))
+            ;; as in PERFECT-SYMBOL-TABLE: complete it before publishing it
+            (sb-thread:barrier (:write))
+            (setf (symtbl-perfect table) new)))
         (return-from nuke-symbol)))
     (let* ((string (symbol-name symbol))
            (length (length string)))
