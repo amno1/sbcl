@@ -658,7 +658,11 @@ Not every function can be compiled this way. Code that needs the thread
 itself, such as binding or reading a special variable, makes the compiler
 fall back to the normal compilation with R13 pinned, with a compiler note
 beginning with \"Unable to unpin the thread\" that gives the reason. The
-declaration is therefore always safe to use.")
+declaration is therefore always safe to use.
+
+On targets where safepoints are always inserted, such as Windows, the
+declaration has no effect unless paired with `(OPTIMIZE
+(SB-C:INSERT-SAFEPOINTS 0))`, as for SB-EXT:UNPIN-NIL.")
 
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)

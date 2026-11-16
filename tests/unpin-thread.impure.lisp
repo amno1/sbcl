@@ -41,7 +41,7 @@
 (defun pressure-body ()
   `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
              (type fixnum n)
-             (optimize (speed 3) (safety 0) (debug 0)))
+             (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
     (let ,(loop for v in *pressure-vars*
                 for i from 1
                 collect `(,v ,i))
@@ -87,7 +87,7 @@
         (body
          `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                     (type fixnum n)
-                    (optimize (speed 3) (safety 0) (debug 0)))
+                    (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
            (let ,(loop for v in *pressure-vars*
                        for i from 1
                        collect `(,v ,i))
@@ -119,7 +119,7 @@
          '(buf n)
          `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                     (type fixnum n)
-                    (optimize (speed 3) (safety 0) (debug 0)))
+                    (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
            (let ,(loop for v in *pressure-vars*
                        for i from 1
                        collect `(,v ,i))
@@ -147,7 +147,7 @@
         (body
          `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                     (type fixnum n)
-                    (optimize (speed 3) (safety 0) (debug 0)))
+                    (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
            (let ,(loop for v in *pressure-vars*
                        for i from 1
                        collect `(,v ,i))
@@ -194,7 +194,7 @@
          (body
           `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                      (type fixnum n)
-                     (optimize (speed 3) (safety 0) (debug 0)))
+                     (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
             (let ((acc nil)
                   ,@(loop for v in *pressure-vars*
                           for i from 1
@@ -227,7 +227,7 @@
 (defun pressure-loop-then (final)
   `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
              (type fixnum n) (type function f)
-             (optimize (speed 3) (safety 0) (debug 0)))
+             (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
     (let ,(loop for v in *pressure-vars*
                 for i from 1
                 collect `(,v ,i))
@@ -305,7 +305,7 @@
          '(buf n)
          `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                     (type fixnum n)
-                    (optimize (speed 3) (safety 0) (debug 0)))
+                    (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
            (let ,(loop for v in *pressure-vars*
                        for i from 1
                        collect `(,v ,(logand (* i #x1234567890abcdef) #xffffffffffffffff)))
@@ -336,7 +336,7 @@
          '(buf n)
          `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                     (type fixnum n)
-                    (optimize (speed 3) (safety 0) (debug 0)))
+                    (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
            (let ,(loop for v in *pressure-vars*
                        for i from 1
                        collect `(,v ,i))
@@ -367,7 +367,7 @@
         (body
          `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
                     (type fixnum n)
-                    (optimize (speed 3) (safety 0) (debug 0)))
+                    (optimize (speed 3) (safety 0) (debug 0) #+sb-safepoint (sb-c:insert-safepoints 0)))
            (let ,(loop for v in *pressure-vars*
                        for i from 1
                        collect `(,v ,(logand (* i #x1234567890abcdef) #xffffffffffffffff)))
