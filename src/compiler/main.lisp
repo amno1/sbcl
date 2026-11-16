@@ -592,9 +592,12 @@ necessary, since type inference may take arbitrarily long to converge.")
                        (component thing))))
       (eq (component-mem-space component) :immobile))))
 
-(defun unpin-ineligible-reason (component)
+;;; KIND is :NIL or :THREAD. A component that receives unknown values (a
+;;; tail call of an unknown function has one) is only a problem for NIL.
+(defun unpin-ineligible-reason (component kind)
   (let ((2comp (component-info component)))
-    (cond ((ir2-component-values-receivers 2comp) :values-receivers)
+    (cond ((and (eq kind :nil) (ir2-component-values-receivers 2comp))
+           :values-receivers)
           ((ir2-component-stack-allocates-p 2comp) :stack-allocates)
           ;; A safepoint, inserted by default at a function's entry and at
           ;; loop edges on #+sb-safepoint targets (always on :win32), reads
@@ -758,11 +761,12 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((2comp (component-info component)))
     (when (or (ir2-component-unpin-nil-p 2comp)
               (ir2-component-unpin-thread-p 2comp))
-      (awhen (unpin-ineligible-reason component)
-        (when (ir2-component-unpin-nil-p 2comp)
+      (when (ir2-component-unpin-nil-p 2comp)
+        (awhen (unpin-ineligible-reason component :nil)
           (setf (ir2-component-unpin-nil-p 2comp) nil)
-          (emit-unpin-fallback-note component :nil it))
-        (when (ir2-component-unpin-thread-p 2comp)
+          (emit-unpin-fallback-note component :nil it)))
+      (when (ir2-component-unpin-thread-p 2comp)
+        (awhen (unpin-ineligible-reason component :thread)
           (setf (ir2-component-unpin-thread-p 2comp) nil)
           (emit-unpin-fallback-note component :thread it)))))
 

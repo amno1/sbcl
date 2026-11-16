@@ -223,3 +223,75 @@
           (setq r (multiple-value-list (funcall unpinned buf 20000)))
           (when (zerop (mod i 10)) (gc)))
         (assert (equal r (multiple-value-list (funcall pinned buf 20000))))))))
+
+(defun pressure-loop-then (final)
+  `((declare (type (simple-array (unsigned-byte 64) (*)) buf)
+             (type fixnum n) (type function f)
+             (optimize (speed 3) (safety 0) (debug 0)))
+    (let ,(loop for v in *pressure-vars*
+                for i from 1
+                collect `(,v ,i))
+      (declare (type (unsigned-byte 32) ,@*pressure-vars*))
+      (dotimes (i n)
+        (let ((x (logand (aref buf (logand i 255)) #xffffffff)))
+          (setf ,@(loop for v in *pressure-vars*
+                        for i from 1
+                        append `(,v (logand (+ ,v (* x ,i)) #xffffffff))))))
+      (let ((s (logand (+ ,@*pressure-vars*) #xffffffff)))
+        (declare (type (unsigned-byte 32) s))
+        ,final))))
+
+;;; A tail call out of the unpinned code reloads R13 before the jump, and
+;;; there is no return to restore it.
+(with-test (:name :unpin-thread-tail-call)
+  (let ((buf (make-test-buffer)))
+    (multiple-value-bind (pinned unpinned notes)
+        (compile-both-ways '(buf n f) (pressure-loop-then '(funcall f s)))
+      (assert (null notes))
+      (assert (disassembly-contains-p unpinned "R13"))
+      (dolist (n '(0 9 250))
+        (assert (equal (multiple-value-list (funcall unpinned buf n #'list))
+                       (multiple-value-list (funcall pinned buf n #'list)))))
+      ;; The callee conses and binds a special, which need the thread.
+      (let ((g (lambda (s) (let ((*print-base* 7)) (list s *print-base* (cons s s))))))
+        (assert (equal (funcall unpinned buf 100 g) (funcall pinned buf 100 g)))
+        (assert (= *print-base* 10))))))
+
+;;; A throw out of a callee of the unpinned code lands in a pinned frame,
+;;; which must still find the thread in R13 (specials, consing).
+(with-test (:name :unpin-thread-throw-through)
+  (let ((buf (make-test-buffer)))
+    (multiple-value-bind (pinned unpinned notes)
+        (compile-both-ways '(buf n f)
+                           (pressure-loop-then '(1+ (the fixnum (funcall f s)))))
+      (assert (null notes))
+      (assert (disassembly-contains-p unpinned "R13"))
+      (flet ((run (fn)
+               (let ((*print-base* 2))
+                 (let ((r (catch 'out (funcall fn buf 50 (lambda (s) (throw 'out (list s)))))))
+                   (assert (= *print-base* 2))
+                   (list r (cons 1 *print-base*) (make-list 3 :initial-element r))))))
+        (assert (equal (run unpinned) (run pinned))))
+      ;; And an error handled farther up.
+      (dotimes (i 3)
+        (assert (eq :caught
+                    (handler-case (funcall unpinned buf 10 (lambda (s) (error "x ~a" s)))
+                      (error () :caught))))
+        (assert (equal (list (cons i i)) (list (cons i i))))))))
+
+(declaim (notinline count-args))
+(defun count-args (&rest args) (length args))
+
+;;; Receiving an unknown number of values from a call, with the thread
+;;; unpinned: the values are unpacked using the thread's return-value area.
+(with-test (:name :unpin-thread-receives-unknown-values)
+  (let ((buf (make-test-buffer)))
+    (multiple-value-bind (pinned unpinned notes)
+        (compile-both-ways
+         '(buf n f)
+         (pressure-loop-then '(multiple-value-call #'count-args (funcall f s))))
+      (assert (null notes))
+      (dolist (f (list (lambda (s) (declare (ignore s)) (values))
+                       (lambda (s) (values s s s s s))
+                       (lambda (s) (values-list (make-list (mod s 20) :initial-element s)))))
+        (assert (= (funcall unpinned buf 30 f) (funcall pinned buf 30 f)))))))
