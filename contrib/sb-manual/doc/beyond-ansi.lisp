@@ -1256,6 +1256,7 @@
   (sb-ext:compile-file-line macro)
   (sb-ext:parse-float function)
   (sb-ext:unpin-nil declaration)
+  (sb-ext:unpin-thread declaration)
   (documentation generic-function)
   "__Conditions__:"
   (sb-ext:implicit-generic-function-warning condition)

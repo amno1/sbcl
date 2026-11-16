@@ -641,6 +641,25 @@ declaration has no effect unless paired with `(OPTIMIZE
 that `GC` and thread stop requests wait until the function returns or
 calls out.")
 
+#-sb-xc-host
+(setf (documentation 'sb-ext:unpin-thread 'declaration)
+      "Syntax: `(SB-EXT:UNPIN-THREAD)`
+
+Only meaningful on x86-64, and only as a declaration of a function (a
+LAMBDA or DEFUN body); in an inner LOCALLY or LET it has no effect.
+
+Normally, the register R13 is reserved to hold the current thread. A
+function with this declaration may instead use R13 as a general purpose
+register, which helps register-hungry inner loops. The thread is put back
+in R13 before each full call and when the function returns, and by the
+code that allocates objects.
+
+Not every function can be compiled this way. Code that needs the thread
+itself, such as binding or reading a special variable, makes the compiler
+fall back to the normal compilation with R13 pinned, with a compiler note
+beginning with \"Unable to unpin the thread\" that gives the reason. The
+declaration is therefore always safe to use.")
+
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)

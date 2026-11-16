@@ -3303,6 +3303,26 @@ declaration has no effect unless paired with @code{(optimize
 that @code{gc} and thread stop requests wait until the function returns or
 calls out.
 @end deffn
+@anchor{Declaration sb-ext unpin-thread}
+@ddindex @sortas{unpin-thread sb-ext} unpin-thread [sb-ext]
+@deffn{Declaration} sb-ext:unpin-thread
+Syntax: @code{(declare (sb-ext:unpin-thread))}
+
+Only meaningful on x86-64, and only as a declaration of a function (a
+lambda or @code{defun} body); in an inner @code{locally} or @code{let} it has no effect.
+
+Normally, the register @code{r13} is reserved to hold the current thread. A
+function with this declaration may instead use @code{r13} as a general purpose
+register, which helps register-hungry inner loops. The thread is put back
+in @code{r13} before each full call and when the function returns, and by the
+code that allocates objects.
+
+Not every function can be compiled this way. Code that needs the thread
+itself, such as binding or reading a special variable, makes the compiler
+fall back to the normal compilation with @code{r13} pinned, with a compiler note
+beginning with "Unable to unpin the thread" that gives the reason. The
+declaration is therefore always safe to use.
+@end deffn
 @anchor{Generic function common-lisp documentation}
 @ffindex @sortas{documentation common-lisp} documentation [common-lisp]
 @deffn{Generic function} documentation object doc-type
