@@ -116,6 +116,15 @@
                               :static-call
                               :named-call)))
     (unpin-nil-fallback flavor))
+  ;; Callees and assembly routines expect the thread in R13.
+  #+x86-64
+  (when (and (unpin-thread-trap-p)
+             (member flavor '(:assembly-routine
+                              :linkage-cell
+                              :fdefn-call
+                              :static-call
+                              :named-call)))
+    (unpin-thread-fallback flavor))
   (%make-fixup name flavor offset))
 
 ;;; Record a FIXUP of KIND occurring at the current position in SEGMENT

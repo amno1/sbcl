@@ -661,11 +661,25 @@ necessary, since type inference may take arbitrarily long to converge.")
                                             :test #'string=)))
                            (return-from unpin-nil-ineligible-reason :call-vop))))))))))))
 
-(defun unpin-nil-fallback (reason)
+;;; Abandon the optimistic pass over the component being compiled: KIND is
+;;; :NIL or :THREAD, the register that has to be pinned in the retry.
+(defun unpin-fallback (kind reason)
   (let ((node (and (boundp 'sb-assem::*current-vop*)
                    sb-assem::*current-vop*
                    (vop-node sb-assem::*current-vop*))))
-    (throw 'unpin-nil-fallback (cons reason node))))
+    (throw 'unpin-fallback (list* kind reason node))))
+
+(defun unpin-nil-fallback (reason)
+  (unpin-fallback :nil reason))
+
+(defun unpin-thread-fallback (reason)
+  (unpin-fallback :thread reason))
+
+;;; True while generating code for a component whose R13 may hold something
+;;; other than the thread: the trap only matters once R13 was allocated.
+(defun unpin-thread-trap-p ()
+  (and *unpin-thread-trap-active*
+       (ir2-component-unpin-thread-save-tn (component-info *component-being-compiled*))))
 
 ;;; SELECT-REPRESENTATIONS can split blocks and relink their successors
 ;;; (see REUSE-MOVE-COERCION), which changes the IR1 flow graph. Remember it
@@ -720,13 +734,18 @@ necessary, since type inference may take arbitrarily long to converge.")
         (block-info (component-tail component)) nil)
   (find-dfo component))
 
-(defun emit-unpin-nil-fallback-note (component reason &optional node)
+(defun emit-unpin-fallback-note (component kind reason &optional node)
   (let ((node (or node
                   (let ((fun (first (component-lambdas component))))
                     (and fun (lambda-bind fun))))))
     (when (and node (policy node (= speed 3)))
       (let ((*compiler-error-context* node))
-        (compiler-notify "Unable to unpin NIL (~S); keeping R12 pinned" reason)))))
+        (ecase kind
+          (:nil
+           (compiler-notify "Unable to unpin NIL (~S); keeping R12 pinned" reason))
+          (:thread
+           (compiler-notify "Unable to unpin the thread (~S); keeping R13 pinned"
+                            reason)))))))
 
 (defun %%compile-component (component)
   (maybe-mumble "GTN ")
@@ -740,7 +759,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (when (ir2-component-unpin-nil-p 2comp)
       (awhen (unpin-nil-ineligible-reason component)
         (setf (ir2-component-unpin-nil-p 2comp) nil)
-        (emit-unpin-nil-fallback-note component it))))
+        (emit-unpin-fallback-note component :nil it))))
 
   (maybe-mumble "Control ")
   (control-analyze component)
@@ -815,7 +834,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                 (and (memq :vop *compile-trace-targets*)
                      *compiler-trace-output*))
                (*unpin-nil-trap-active*
-                (ir2-component-unpin-nil-p (component-info component))))
+                (ir2-component-unpin-nil-p (component-info component)))
+               (*unpin-thread-trap-active*
+                (ir2-component-unpin-thread-p (component-info component))))
            (generate-code component))))
 
     #-sb-xc-host
@@ -849,13 +870,15 @@ necessary, since type inference may take arbitrarily long to converge.")
   #-x86-64
   (%%compile-component component)
   #+x86-64
-  (if (and (not *force-pin-nil*)
-           (component-unpin-nil-p component))
+  (if (or (and (not *force-pin-nil*)
+               (component-unpin-nil-p component))
+          (and (not *force-pin-thread*)
+               (component-unpin-thread-p component)))
       (let* ((*unpin-nil-retry-state* (vector nil nil))
              (cfg (snapshot-ir1-cfg component))
              (deferred-diagnostics nil)
              (fallback
-              (catch 'unpin-nil-fallback
+              (catch 'unpin-fallback
                 (handler-bind
                     ((compiler-note
                        (lambda (c)
@@ -878,10 +901,15 @@ necessary, since type inference may take arbitrarily long to converge.")
                (dolist (annot (svref *unpin-nil-retry-state* 1))
                  (setf (lvar-annotation-fired annot) nil))
                (restore-ir1-cfg component cfg)
-               (emit-unpin-nil-fallback-note component (car fallback) (cdr fallback))
-               (reset-component-for-pinned-retry component)
-               (let ((*force-pin-nil* t))
-                 (%%compile-component component)))
+               (destructuring-bind (kind reason . node) fallback
+                 (emit-unpin-fallback-note component kind reason node)
+                 (reset-component-for-pinned-retry component)
+                 ;; Pin only the register that gave up: the other may still
+                 ;; be unpinned, and gets another optimistic pass.
+                 (let ((*force-pin-nil* (or *force-pin-nil* (eq kind :nil)))
+                       (*force-pin-thread* (or *force-pin-thread*
+                                               (eq kind :thread))))
+                   (%compile-component component))))
               (t
                (dolist (entry (nreverse deferred-diagnostics))
                  (destructuring-bind (kind condition context) entry

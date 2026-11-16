@@ -74,7 +74,7 @@
   ;; r13 is preferable to r12 because 12 is an alias of 4 in ModRegRM, which
   ;; implies use of a SIB byte with no index register for fixed displacement.
   (define-symbol-macro thread-reg 13)
-  (define-symbol-macro thread-tn r13-tn))
+  (define-symbol-macro thread-tn (thread-tn)))
 
 ;;; Kludge needed for decoding internal error args - we assume that the
 ;;; shadow memory is pointed to by this register (RAX).
@@ -478,6 +478,15 @@
     (sb-c::unpin-nil-fallback :null-tn))
   r12-tn)
 (define-symbol-macro null-tn (null-tn))
+
+;;; The register holding the current thread. With an unpinned thread it may
+;;; hold something else, so a use of it that isn't prepared for that (one
+;;; that doesn't bind it as a temporary) can't be generated.
+#-gs-seg
+(defun thread-tn ()
+  (when (sb-c::unpin-thread-trap-p)
+    (sb-c::unpin-thread-fallback :thread-tn))
+  r13-tn)
 
 ;;; Return a constant-SC TN for VALUE from the current component's constant pool
 ;;; during code generation.
