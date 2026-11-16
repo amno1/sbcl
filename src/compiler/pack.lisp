@@ -25,10 +25,17 @@
     #+x86-64
     (if (and (boundp '*component-being-compiled*)
              *component-being-compiled*
-             (ir2-component-unpin-nil-p (component-info *component-being-compiled*))
              (eq (sb-name (sc-sb sc)) 'sb-vm::registers)
              (= (sc-element-size sc) 1))
-        (logior locs (sc-offset-to-sc-locations sb-vm:card-table-reg))
+        (let ((2comp (component-info *component-being-compiled*)))
+          (when (ir2-component-unpin-nil-p 2comp)
+            (setq locs (logior locs (sc-offset-to-sc-locations
+                                     sb-vm:card-table-reg))))
+          #-gs-seg
+          (when (ir2-component-unpin-thread-p 2comp)
+            (setq locs (logior locs (sc-offset-to-sc-locations
+                                     sb-vm::thread-reg))))
+          locs)
         locs)
     #-x86-64
     locs))
@@ -1763,8 +1770,12 @@
 
 (declaim (ftype function pack-greedy pack-iterative))
 
+;;; Return true if a TN of COMPONENT was packed into the general-purpose
+;;; register OFFSET. A TN that was wired there beforehand counts too, unless
+;;; COUNT-WIRED is false: a VOP may reserve a register as a temporary for the
+;;; value it needs to put in it, which is no reason to save the register.
 #+x86-64
-(defun component-uses-gpr-p (component 2comp offset)
+(defun component-uses-gpr-p (component 2comp offset &optional (count-wired t))
   (labels ((tn-uses-offset-p (tn)
              (and tn
                   (tn-offset tn)
@@ -1777,14 +1788,16 @@
                  (return t)))))
     (or (any-tn-list-uses-p (ir2-component-normal-tns 2comp))
         (any-tn-list-uses-p (ir2-component-restricted-tns 2comp))
-        (any-tn-list-uses-p (ir2-component-wired-tns 2comp))
+        (and count-wired
+             (any-tn-list-uses-p (ir2-component-wired-tns 2comp)))
         (do-ir2-blocks (block component)
           (do ((vop (ir2-block-start-vop block) (vop-next vop)))
               ((null vop))
             (flet ((refs-use-p (refs)
                      (do ((ref refs (tn-ref-across ref)))
                          ((null ref) nil)
-                       (when (or (tn-uses-offset-p (tn-ref-tn ref))
+                       (when (or (and count-wired
+                                      (tn-uses-offset-p (tn-ref-tn ref)))
                                  (tn-uses-offset-p (tn-ref-load-tn ref)))
                          (return t)))))
               (when (or (refs-use-p (vop-args vop))
@@ -1906,6 +1919,14 @@
              (component-live-tn save-tn)
              (pack-tn save-tn nil)
              (setf (ir2-component-unpin-nil-save-tn 2comp) save-tn)))
+         #+(and x86-64 (not gs-seg))
+         (when (and (ir2-component-unpin-thread-p 2comp)
+                    (component-uses-gpr-p component 2comp sb-vm::thread-reg nil))
+           (let ((save-tn (make-representation-tn *backend-t-primitive-type*
+                                                  sb-vm:control-stack-sc-number)))
+             (component-live-tn save-tn)
+             (pack-tn save-tn nil)
+             (setf (ir2-component-unpin-thread-save-tn 2comp) save-tn)))
 
          (values))
     (clean-up-pack-structures)))
