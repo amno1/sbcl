@@ -212,9 +212,7 @@
 
 (define-vop (sb-c::end-pseudo-atomic)
   #-gs-seg (:temporary (:sc unsigned-reg :offset 13) thread-tn)
-  (:generator 1
-    #-gs-seg (progn thread-tn)          ; reserved, not referred to
-    (with-thread-in-r13 (emit-end-pseudo-atomic))))
+  (:generator 1 (with-thread-in-r13 (emit-end-pseudo-atomic))))
 
 #+sb-simd-pack-512
 (defun avx512-tn-p (tn)

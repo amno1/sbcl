@@ -111,8 +111,8 @@
           (component-info *component-being-compiled*))
     (ea (frame-byte-offset (tn-offset it)) base)))
 
-;;; For the generator of a VOP that has a temporary wired to R13 and needs
-;;; the thread in it: with an unpinned thread R13 may hold anything on entry
+;;; For the generator of a VOP that has a temporary named THREAD-TN wired to
+;;; R13, and needs the thread in it: with an unpinned thread R13 may hold anything on entry
 ;;; to the VOP, so put the thread back, and then it is there for the rest of
 ;;; the VOP, which can use THREAD-TN as with a pinned one.
 (defmacro with-thread-in-r13 (&body body)
@@ -120,7 +120,7 @@
   #-gs-seg
   `(progn
      (awhen (unpin-thread-save-ea)
-       (inst mov r13-tn it))
+       (inst mov thread-tn it))
      (let ((sb-c::*unpin-thread-trap-active* nil))
        ,@body)))
 
