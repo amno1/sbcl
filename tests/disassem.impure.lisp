@@ -134,5 +134,9 @@
       (let* ((after (- after (car discount)))
              (delta (- after before)))
         (format t "~&Consed ~D bytes discounting ~D bytes~%" delta (car discount))
-        ;; Should be less than this amount of overhead
-        (assert (< delta 500000))))))
+        ;; Should be less than this amount of overhead. The figure is the
+        ;; difference of two numbers of about 20MB each (what was consed, and
+        ;; the discount), so it moves with the instruction mix of the image
+        ;; and with the GC's allocation granularity: it was about 400KB on
+        ;; upstream, 440-500KB with the AVX-512 disassembler.
+        (assert (< delta 750000))))))
